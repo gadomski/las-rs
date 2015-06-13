@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(*b"LASF", header.file_signature);
         assert_eq!(0, header.file_source_id);
         assert_eq!(0, header.global_encoding);
-        assert_eq!("b8f18883-1baa-0841-bca3-6bc68e7b062e", header.project_id.as_hex());
+        assert_eq!("b8f18883-1baa-0841-bca3-6bc68e7b062e", header.project_id.as_string());
         assert_eq!(1, header.version_major);
         assert_eq!(2, header.version_minor);
         assert_eq!("libLAS", header.system_identifier);

@@ -62,9 +62,9 @@ impl ProjectId {
     /// ```
     /// # use las::header::ProjectId;
     /// let project_id = ProjectId([0; 4], [0; 2], [0; 2], [0; 8]);
-    /// assert_eq!("00000000-0000-0000-0000-000000000000", project_id.as_hex());
+    /// assert_eq!("00000000-0000-0000-0000-000000000000", project_id.as_string());
     /// ```
-    pub fn as_hex(&self) -> String {
+    pub fn as_string(&self) -> String {
         let mut s = self.0.to_hex();
         s.push_str("-");
         s.push_str(&self.1.to_hex());
