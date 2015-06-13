@@ -155,21 +155,6 @@ mod tests {
     use point::Point;
     use point::ScanDirection;
 
-    fn check_point(point: &Point, point_format: u8) {
-        assert_eq!(470692.44, point.x);
-        assert_eq!(4602888.90, point.y);
-        assert_eq!(16.0, point.z);
-        assert_eq!(0, point.intensity);
-        assert_eq!(2, point.return_number);
-        assert_eq!(0, point.number_of_returns);
-        assert_eq!(ScanDirection::Backward, point.scan_direction);
-        assert!(!point.edge_of_flight_line);
-        assert_eq!(Classification::Ground, point.classification);
-        assert_eq!(-13, point.scan_angle_rank);
-        assert_eq!(0, point.user_data);
-        assert_eq!(0, point.point_source_id);
-    }
-
     #[test]
     fn header() {
         let reader = Reader::open("data/1.2_0.las").unwrap();
@@ -210,7 +195,23 @@ mod tests {
         let mut reader = Reader::open("data/1.2_0.las").unwrap();
         let points: Vec<Point> = reader.points_iter().unwrap().collect();
         assert_eq!(1, points.len());
-        let point = &points[0];
-        check_point(point, 0);
+    }
+
+    #[test]
+    fn formats_and_versions() {
+        let mut reader = Reader::open("data/1.2_0.las").unwrap();
+        let point = &reader.points().unwrap()[0];
+        assert_eq!(470692.44, point.x);
+        assert_eq!(4602888.90, point.y);
+        assert_eq!(16.0, point.z);
+        assert_eq!(0, point.intensity);
+        assert_eq!(2, point.return_number);
+        assert_eq!(0, point.number_of_returns);
+        assert_eq!(ScanDirection::Backward, point.scan_direction);
+        assert!(!point.edge_of_flight_line);
+        assert_eq!(Classification::Ground, point.classification);
+        assert_eq!(-13, point.scan_angle_rank);
+        assert_eq!(0, point.user_data);
+        assert_eq!(0, point.point_source_id);
     }
 }
