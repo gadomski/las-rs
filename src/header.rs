@@ -154,6 +154,31 @@ impl Header {
         header.system_identifier = try!(buffer_to_string(&buffer));
         try_read_n!(reader, buffer, 32);
         header.generating_software = try!(buffer_to_string(&buffer));
+        header.file_creation_day_of_year = try!(reader.read_u16::<LittleEndian>());
+        header.file_creation_year = try!(reader.read_u16::<LittleEndian>());
+        header.header_size = try!(reader.read_u16::<LittleEndian>());
+        header.offset_to_point_data = try!(reader.read_u32::<LittleEndian>());
+        header.number_of_variable_length_records = try!(reader.read_u32::<LittleEndian>());
+        header.point_data_format_id = try!(reader.read_u8());
+        header.point_data_record_length = try!(reader.read_u16::<LittleEndian>());
+        header.number_of_point_records = try!(reader.read_u32::<LittleEndian>());
+        header.number_of_points_by_return[0] = try!(reader.read_u32::<LittleEndian>());
+        header.number_of_points_by_return[1] = try!(reader.read_u32::<LittleEndian>());
+        header.number_of_points_by_return[2] = try!(reader.read_u32::<LittleEndian>());
+        header.number_of_points_by_return[3] = try!(reader.read_u32::<LittleEndian>());
+        header.number_of_points_by_return[4] = try!(reader.read_u32::<LittleEndian>());
+        header.scale_factors.x = try!(reader.read_f64::<LittleEndian>());
+        header.scale_factors.y = try!(reader.read_f64::<LittleEndian>());
+        header.scale_factors.z = try!(reader.read_f64::<LittleEndian>());
+        header.offsets.x = try!(reader.read_f64::<LittleEndian>());
+        header.offsets.y = try!(reader.read_f64::<LittleEndian>());
+        header.offsets.z = try!(reader.read_f64::<LittleEndian>());
+        header.maxs.x = try!(reader.read_f64::<LittleEndian>());
+        header.mins.x = try!(reader.read_f64::<LittleEndian>());
+        header.maxs.y = try!(reader.read_f64::<LittleEndian>());
+        header.mins.y = try!(reader.read_f64::<LittleEndian>());
+        header.maxs.z = try!(reader.read_f64::<LittleEndian>());
+        header.mins.z = try!(reader.read_f64::<LittleEndian>());
         Ok(header)
     }
 }
