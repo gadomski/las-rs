@@ -260,17 +260,42 @@ mod tests {
     }
 
     #[test]
-    fn formats_and_versions() {
+    fn las10_0() {
         check_file("data/1.0_0.las", &POINT0);
-        check_file("data/1.1_0.las", &POINT0);
-        check_file("data/1.2_0.las", &POINT0);
+    }
 
+    #[test]
+    fn las10_1() {
         check_file("data/1.0_1.las", &POINT1);
+    }
+
+    #[test]
+    fn las11_0() {
+        check_file("data/1.1_0.las", &POINT0);
+    }
+
+    #[test]
+    fn las11_1() {
         check_file("data/1.1_1.las", &POINT1);
+    }
+
+    #[test]
+    fn las12_0() {
+        check_file("data/1.2_0.las", &POINT0);
+    }
+
+    #[test]
+    fn las12_1() {
         check_file("data/1.2_1.las", &POINT1);
+    }
 
+    #[test]
+    fn las12_2() {
         check_file("data/1.2_2.las", &POINT2);
+    }
 
+    #[test]
+    fn las12_3() {
         check_file("data/1.2_3.las", &POINT3);
     }
 }
