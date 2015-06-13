@@ -50,7 +50,7 @@ pub struct Triplet {
 
 /// Project ID newtype.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ProjectId([u8; 4], [u8; 2], [u8; 2], [u8; 8]);
+pub struct ProjectId(pub [u8; 4], pub [u8; 2], pub [u8; 2], pub [u8; 8]);
 
 impl ProjectId {
     /// Returns a hexadecimal string representation of the project ID.
@@ -61,7 +61,7 @@ impl ProjectId {
     ///
     /// ```
     /// # use las::header::ProjectId;
-    /// let project_id = ProjectId([0; 16]);
+    /// let project_id = ProjectId([0; 4], [0; 2], [0; 2], [0; 8]);
     /// assert_eq!("00000000-0000-0000-0000-000000000000", project_id.as_hex());
     /// ```
     pub fn as_hex(&self) -> String {
@@ -137,7 +137,8 @@ impl Header {
     /// # Examples
     ///
     /// ```
-    /// let reader = std::fs::File::open("data/1.2_0.las").unwrap();
+    /// # use las::header::Header;
+    /// let mut reader = std::fs::File::open("data/1.2_0.las").unwrap();
     /// let header = Header::new(&mut reader);
     /// ```
     pub fn new<R: Read>(reader: &mut R) -> Result<Header> {

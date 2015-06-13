@@ -18,8 +18,9 @@ impl Reader {
     /// # Examples
     ///
     /// ```
-    /// let stream = std::fs::File::open("data/1.2_0.las");
-    /// let reader = las::Reader::new(stream);
+    /// # use las::reader::Reader;
+    /// let stream = std::fs::File::open("data/1.2_0.las").unwrap();
+    /// let reader = Reader::new(stream);
     /// ```
     pub fn new<R: Read>(mut reader: R) -> Result<Reader> {
         Ok(Reader {
@@ -32,7 +33,8 @@ impl Reader {
     /// # Examples
     ///
     /// ```
-    /// let reader = las::Reader::open("data/1.2_0.las");
+    /// # use las::reader::Reader;
+    /// let reader = Reader::open("data/1.2_0.las");
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Reader> {
         // TODO wrap in BufRead
@@ -45,9 +47,10 @@ impl Reader {
     /// # Examples
     ///
     /// ```
-    /// let reader = las::Reader::open("data/1.2_0.las");
+    /// # use las::reader::Reader;
+    /// let reader = Reader::open("data/1.2_0.las").unwrap();
     /// let header = reader.header();
-    /// assert_eq!("LASF", header.file_signature);
+    /// assert_eq!(*b"LASF", header.file_signature);
     /// ```
     pub fn header(&self) -> &Header { &self.header }
 
@@ -60,12 +63,13 @@ impl Reader {
     /// # Examples
     ///
     /// ```
-    /// let reader = las::Reader::open("data/1.2_0.las");
+    /// # use las::reader::Reader;
+    /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
     /// let points = reader.points();
-    /// expect_eq!(1, points.len());
+    /// assert_eq!(1, points.len());
     /// ```
-    pub fn points(&mut self) -> Result<Vec<Point>> {
-        Ok(Vec::new())
+    pub fn points(&mut self) -> Vec<Point> {
+        Vec::new()
     }
 }
 

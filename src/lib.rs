@@ -5,9 +5,9 @@ extern crate rustc_serialize;
 
 use std::result;
 
-mod header;
-mod point;
-mod reader;
+pub mod header;
+pub mod point;
+pub mod reader;
 
 pub use header::Header;
 pub use point::Point;
