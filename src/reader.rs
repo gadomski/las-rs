@@ -1,6 +1,7 @@
 //! Read points from las files.
 
 use std::fs::File;
+use std::io::BufReader;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -131,7 +132,7 @@ impl<R: Read + Seek> Reader<R> {
     }
 }
 
-impl Reader<File> {
+impl Reader<BufReader<File>> {
     /// Opens a reader for a given file path.
     ///
     /// # Examples
@@ -140,10 +141,9 @@ impl Reader<File> {
     /// # use las::reader::Reader;
     /// let reader = Reader::open("data/1.2_0.las");
     /// ```
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Reader<File>> {
-        // TODO wrap in BufRead
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
         let reader = try!(File::open(path));
-        Ok(try!(Reader::new(reader)))
+        Ok(try!(Reader::new(BufReader::new(reader))))
     }
 }
 
