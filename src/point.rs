@@ -1,6 +1,6 @@
 //! Las points.
 
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -12,7 +12,7 @@ pub struct Point {
     pub scan_direction: ScanDirection,
     pub edge_of_flight_line: bool,
     pub classification: Classification,
-    pub scan_angle_rank: u8,
+    pub scan_angle_rank: i8,
     pub user_data: u8,
     pub point_source_id: u16,
 }

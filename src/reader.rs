@@ -109,7 +109,7 @@ impl<R: Read + Seek> Reader<R> {
             Some(classification) => classification,
             None => Default::default(),
         };
-        point.scan_angle_rank = try!(self.reader.read_u8());
+        point.scan_angle_rank = try!(self.reader.read_i8());
         point.user_data = try!(self.reader.read_u8());
         point.point_source_id = try!(self.reader.read_u16::<LittleEndian>());
         Ok(point)
@@ -155,6 +155,27 @@ mod tests {
     use point::Point;
     use point::ScanDirection;
 
+    const POINT0: Point = Point {
+        x: 470692.44,
+        y: 4602888.90,
+        z: 16.0,
+        intensity: 0,
+        return_number: 2,
+        number_of_returns: 0,
+        scan_direction: ScanDirection::Backward,
+        edge_of_flight_line: false,
+        classification: Classification::Ground,
+        scan_angle_rank: -13,
+        user_data: 0,
+        point_source_id: 0,
+    };
+
+    fn check_file(filename: &str, reference_point: &Point) {
+        let mut reader = Reader::open(filename).unwrap();
+        let point = &reader.points().unwrap()[0];
+        assert_eq!(reference_point, point);
+    }
+
     #[test]
     fn header() {
         let reader = Reader::open("data/1.2_0.las").unwrap();
@@ -199,19 +220,6 @@ mod tests {
 
     #[test]
     fn formats_and_versions() {
-        let mut reader = Reader::open("data/1.2_0.las").unwrap();
-        let point = &reader.points().unwrap()[0];
-        assert_eq!(470692.44, point.x);
-        assert_eq!(4602888.90, point.y);
-        assert_eq!(16.0, point.z);
-        assert_eq!(0, point.intensity);
-        assert_eq!(2, point.return_number);
-        assert_eq!(0, point.number_of_returns);
-        assert_eq!(ScanDirection::Backward, point.scan_direction);
-        assert!(!point.edge_of_flight_line);
-        assert_eq!(Classification::Ground, point.classification);
-        assert_eq!(-13, point.scan_angle_rank);
-        assert_eq!(0, point.user_data);
-        assert_eq!(0, point.point_source_id);
+        check_file("data/1.0_0.las", &POINT0);
     }
 }
