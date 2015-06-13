@@ -113,8 +113,18 @@ impl<R: Read + Seek> Reader<R> {
         point.user_data = try!(self.reader.read_u8());
         point.point_source_id = try!(self.reader.read_u16::<LittleEndian>());
 
-        if self.header.point_data_format_id == 1 {
-            point.gps_time = Some(try!(self.reader.read_f64::<LittleEndian>()));
+        match self.header.point_data_format_id {
+            1 | 3 => point.gps_time = Some(try!(self.reader.read_f64::<LittleEndian>())),
+            _ => (),
+        }
+
+        match self.header.point_data_format_id {
+            2 | 3 => {
+                point.red = Some(try!(self.reader.read_u16::<LittleEndian>()));
+                point.green = Some(try!(self.reader.read_u16::<LittleEndian>()));
+                point.blue = Some(try!(self.reader.read_u16::<LittleEndian>()));
+            },
+            _ => (),
         }
 
         Ok(point)
@@ -174,6 +184,9 @@ mod tests {
         user_data: 0,
         point_source_id: 0,
         gps_time: None,
+        red: None,
+        green: None,
+        blue: None,
     };
 
     const POINT1: Point = Point {
@@ -190,6 +203,47 @@ mod tests {
         user_data: 0,
         point_source_id: 0,
         gps_time: Some(1205902800.0),
+        red: None,
+        green: None,
+        blue: None,
+    };
+
+    const POINT2: Point = Point {
+        x: 470692.44,
+        y: 4602888.90,
+        z: 16.0,
+        intensity: 0,
+        return_number: 2,
+        number_of_returns: 0,
+        scan_direction: ScanDirection::Backward,
+        edge_of_flight_line: false,
+        classification: Classification::Ground,
+        scan_angle_rank: -13,
+        user_data: 0,
+        point_source_id: 0,
+        gps_time: None,
+        red: Some(255),
+        green: Some(12),
+        blue: Some(234),
+    };
+
+    const POINT3: Point = Point {
+        x: 470692.44,
+        y: 4602888.90,
+        z: 16.0,
+        intensity: 0,
+        return_number: 2,
+        number_of_returns: 0,
+        scan_direction: ScanDirection::Backward,
+        edge_of_flight_line: false,
+        classification: Classification::Ground,
+        scan_angle_rank: -13,
+        user_data: 0,
+        point_source_id: 0,
+        gps_time: Some(1205902800.0),
+        red: Some(255),
+        green: Some(12),
+        blue: Some(234),
     };
 
     fn check_file(filename: &str, reference_point: &Point) {
@@ -249,5 +303,9 @@ mod tests {
         check_file("data/1.0_1.las", &POINT1);
         check_file("data/1.1_1.las", &POINT1);
         check_file("data/1.2_1.las", &POINT1);
+
+        check_file("data/1.2_2.las", &POINT2);
+
+        check_file("data/1.2_3.las", &POINT3);
     }
 }

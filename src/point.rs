@@ -16,6 +16,9 @@ pub struct Point {
     pub user_data: u8,
     pub point_source_id: u16,
     pub gps_time: Option<f64>,
+    pub red: Option<u16>,
+    pub green: Option<u16>,
+    pub blue: Option<u16>,
 }
 
 enum_from_primitive! {
