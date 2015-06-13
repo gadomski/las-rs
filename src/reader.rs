@@ -2,17 +2,27 @@
 
 use std::fs::File;
 use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::path::Path;
+
+use byteorder::LittleEndian;
+use byteorder::ReadBytesExt;
+
+use num::FromPrimitive;
 
 use Result;
 use header::Header;
+use point::Classification;
 use point::Point;
+use point::ScanDirection;
 
-pub struct Reader {
+pub struct Reader<R: Read + Seek> {
     header: Header,
+    reader: R,
 }
 
-impl Reader {
+impl<R: Read + Seek> Reader<R> {
     /// Creates a reader for a `Read` object.
     ///
     /// # Examples
@@ -22,24 +32,11 @@ impl Reader {
     /// let stream = std::fs::File::open("data/1.2_0.las").unwrap();
     /// let reader = Reader::new(stream);
     /// ```
-    pub fn new<R: Read>(mut reader: R) -> Result<Reader> {
+    pub fn new(mut reader: R) -> Result<Reader<R>> {
         Ok(Reader {
             header: try!(Header::new(&mut reader)),
+            reader: reader,
         })
-    }
-
-    /// Opens a reader for a given file path.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::reader::Reader;
-    /// let reader = Reader::open("data/1.2_0.las");
-    /// ```
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Reader> {
-        // TODO wrap in BufRead
-        let reader = try!(File::open(path));
-        Ok(try!(Reader::new(reader)))
     }
 
     /// Returns the `Header`.
@@ -65,11 +62,11 @@ impl Reader {
     /// ```
     /// # use las::reader::Reader;
     /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
-    /// let points = reader.points();
+    /// let points = reader.points().unwrap();
     /// assert_eq!(1, points.len());
     /// ```
-    pub fn points(&mut self) -> Vec<Point> {
-        Vec::new()
+    pub fn points(&mut self) -> Result<Vec<Point>> {
+        Ok(try!(self.points_iter()).collect())
     }
 
     /// Creates an interator over this reader's points.
@@ -78,25 +75,75 @@ impl Reader {
     ///
     /// ```
     /// # use las::reader::Reader;
+    /// # use las::point::Point;
     /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
-    /// let points = reader.points_iter().collect();
+    /// let points: Vec<Point> = reader.points_iter().unwrap().collect();
     /// assert_eq!(1, points.len());
     /// ```
-    pub fn points_iter(&mut self) -> PointsIterator {
-        PointsIterator
+    pub fn points_iter(&mut self) -> Result<PointsIterator<R>> {
+        try!(self.reader.seek(SeekFrom::Start(self.header.offset_to_point_data as u64)));
+        Ok(PointsIterator {
+            reader: self,
+        })
+    }
+
+    /// Reads and returns the next point from the reader.
+    fn next_point(&mut self) -> Result<Point> {
+        let mut point: Point = Default::default();
+        point.x = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.x +
+            self.header.offset.x;
+        point.y = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.y +
+            self.header.offset.y;
+        point.z = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.z +
+            self.header.offset.z;
+        point.intensity = try!(self.reader.read_u16::<LittleEndian>());
+        let byte = try!(self.reader.read_u8());
+        point.return_number = byte & 0b00000111;
+        point.number_of_returns = byte >> 3 & 0b00000111;
+        point.scan_direction = match ScanDirection::from_u8(byte >> 6 & 0b00000001) {
+            Some(scan_direction) => scan_direction,
+            None => unreachable!(),
+        };
+        point.edge_of_flight_line = (byte >> 7 & 0b00000001) == 1;
+        point.classification = match Classification::from_u8(try!(self.reader.read_u8())) {
+            Some(classification) => classification,
+            None => Default::default(),
+        };
+        point.scan_angle_rank = try!(self.reader.read_u8());
+        point.user_data = try!(self.reader.read_u8());
+        point.point_source_id = try!(self.reader.read_u16::<LittleEndian>());
+        Ok(point)
+    }
+}
+
+impl Reader<File> {
+    /// Opens a reader for a given file path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::reader::Reader;
+    /// let reader = Reader::open("data/1.2_0.las");
+    /// ```
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Reader<File>> {
+        // TODO wrap in BufRead
+        let reader = try!(File::open(path));
+        Ok(try!(Reader::new(reader)))
     }
 }
 
 /// Iterator over the points of a reader.
 ///
 /// The iterator starts at the first point and reads through to the end.
-pub struct PointsIterator;
+pub struct PointsIterator<'a, R: 'a + Read + Seek> {
+    reader: &'a mut Reader<R>,
+}
 
-impl Iterator for PointsIterator {
+impl<'a, R: Read + Seek> Iterator for PointsIterator<'a, R> {
     type Item = Point;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        None
+    fn next(&mut self) -> Option<Point> {
+        self.reader.next_point().ok()
     }
 }
 
@@ -110,7 +157,7 @@ mod tests {
 
     #[test]
     fn header() {
-        let mut reader = Reader::open("data/1.2_0.las").unwrap();
+        let reader = Reader::open("data/1.2_0.las").unwrap();
         let header = reader.header();
         assert_eq!(*b"LASF", header.file_signature);
         assert_eq!(0, header.file_source_id);
@@ -129,34 +176,34 @@ mod tests {
         assert_eq!(20, header.point_data_record_length);
         assert_eq!(1, header.number_of_point_records);
         assert_eq!([0, 1, 0, 0, 0], header.number_of_points_by_return);
-        assert_eq!(0.01, header.scale_factors.x);
-        assert_eq!(0.01, header.scale_factors.y);
-        assert_eq!(0.01, header.scale_factors.z);
-        assert_eq!(0.0, header.offsets.x);
-        assert_eq!(0.0, header.offsets.y);
-        assert_eq!(0.0, header.offsets.z);
-        assert_eq!(470692.447538, header.mins.x);
-        assert_eq!(4602888.904642, header.mins.y);
-        assert_eq!(16.0, header.mins.z);
-        assert_eq!(470692.447538, header.maxs.x);
-        assert_eq!(4602888.904642, header.maxs.y);
-        assert_eq!(16.0, header.maxs.z);
+        assert_eq!(0.01, header.scale.x);
+        assert_eq!(0.01, header.scale.y);
+        assert_eq!(0.01, header.scale.z);
+        assert_eq!(0.0, header.offset.x);
+        assert_eq!(0.0, header.offset.y);
+        assert_eq!(0.0, header.offset.z);
+        assert_eq!(470692.447538, header.min.x);
+        assert_eq!(4602888.904642, header.min.y);
+        assert_eq!(16.0, header.min.z);
+        assert_eq!(470692.447538, header.max.x);
+        assert_eq!(4602888.904642, header.max.y);
+        assert_eq!(16.0, header.max.z);
     }
 
     #[test]
     fn points() {
         let mut reader = Reader::open("data/1.2_0.las").unwrap();
-        let points: Vec<Point> = reader.points_iter().collect();
+        let points: Vec<Point> = reader.points_iter().unwrap().collect();
         assert_eq!(1, points.len());
         let point = &points[0];
-        assert_eq!(470692.447538, point.x);
-        assert_eq!(4602888.904642, point.y);
+        assert_eq!(470692.44, point.x);
+        assert_eq!(4602888.90, point.y);
         assert_eq!(16.0, point.z);
         assert_eq!(0, point.intensity);
         assert_eq!(2, point.return_number);
-        assert_eq!(2, point.number_of_returns);
-        assert_eq!(ScanDirection::Forward, point.scan_direction);
-        assert!(false, point.edge_of_flight_line);
+        assert_eq!(0, point.number_of_returns);
+        assert_eq!(ScanDirection::Backward, point.scan_direction);
+        assert!(!point.edge_of_flight_line);
         assert_eq!(Classification::Ground, point.classification);
         assert_eq!(-13, point.scan_angle_rank);
         assert_eq!(0, point.user_data);

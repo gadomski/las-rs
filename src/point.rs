@@ -1,5 +1,6 @@
 //! Las points.
 
+#[derive(Default)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -16,12 +17,21 @@ pub struct Point {
     pub point_source_id: u16,
 }
 
+enum_from_primitive! {
 #[derive(Debug, PartialEq)]
 pub enum ScanDirection {
-    Backward,
-    Forward,
+    Backward = 0,
+    Forward = 1,
+}
 }
 
+impl Default for ScanDirection {
+    fn default() -> ScanDirection {
+        ScanDirection::Forward
+    }
+}
+
+enum_from_primitive! {
 #[derive(Debug, PartialEq)]
 pub enum Classification {
     CreatedNeverClassified = 0,
@@ -38,4 +48,11 @@ pub enum Classification {
     Reserved11 = 11,
     Overlap = 12,
     Reserved,
+}
+}
+
+impl Default for Classification {
+    fn default() -> Classification {
+        Classification::CreatedNeverClassified
+    }
 }

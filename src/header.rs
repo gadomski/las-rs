@@ -97,10 +97,10 @@ pub struct Header {
     pub point_data_record_length: u16,
     pub number_of_point_records: u32,
     pub number_of_points_by_return: [u32; 5],
-    pub scale_factors: Triplet,
-    pub offsets: Triplet,
-    pub mins: Triplet,
-    pub maxs: Triplet,
+    pub scale: Triplet,
+    pub offset: Triplet,
+    pub min: Triplet,
+    pub max: Triplet,
 }
 
 impl Default for Header {
@@ -123,10 +123,10 @@ impl Default for Header {
             point_data_record_length: 0,
             number_of_point_records: 0,
             number_of_points_by_return: [0; 5],
-            scale_factors: Default::default(),
-            offsets: Default::default(),
-            mins: Default::default(),
-            maxs: Default::default(),
+            scale: Default::default(),
+            offset: Default::default(),
+            min: Default::default(),
+            max: Default::default(),
         }
     }
 }
@@ -170,18 +170,18 @@ impl Header {
         header.number_of_points_by_return[2] = try!(reader.read_u32::<LittleEndian>());
         header.number_of_points_by_return[3] = try!(reader.read_u32::<LittleEndian>());
         header.number_of_points_by_return[4] = try!(reader.read_u32::<LittleEndian>());
-        header.scale_factors.x = try!(reader.read_f64::<LittleEndian>());
-        header.scale_factors.y = try!(reader.read_f64::<LittleEndian>());
-        header.scale_factors.z = try!(reader.read_f64::<LittleEndian>());
-        header.offsets.x = try!(reader.read_f64::<LittleEndian>());
-        header.offsets.y = try!(reader.read_f64::<LittleEndian>());
-        header.offsets.z = try!(reader.read_f64::<LittleEndian>());
-        header.maxs.x = try!(reader.read_f64::<LittleEndian>());
-        header.mins.x = try!(reader.read_f64::<LittleEndian>());
-        header.maxs.y = try!(reader.read_f64::<LittleEndian>());
-        header.mins.y = try!(reader.read_f64::<LittleEndian>());
-        header.maxs.z = try!(reader.read_f64::<LittleEndian>());
-        header.mins.z = try!(reader.read_f64::<LittleEndian>());
+        header.scale.x = try!(reader.read_f64::<LittleEndian>());
+        header.scale.y = try!(reader.read_f64::<LittleEndian>());
+        header.scale.z = try!(reader.read_f64::<LittleEndian>());
+        header.offset.x = try!(reader.read_f64::<LittleEndian>());
+        header.offset.y = try!(reader.read_f64::<LittleEndian>());
+        header.offset.z = try!(reader.read_f64::<LittleEndian>());
+        header.max.x = try!(reader.read_f64::<LittleEndian>());
+        header.min.x = try!(reader.read_f64::<LittleEndian>());
+        header.max.y = try!(reader.read_f64::<LittleEndian>());
+        header.min.y = try!(reader.read_f64::<LittleEndian>());
+        header.max.z = try!(reader.read_f64::<LittleEndian>());
+        header.min.z = try!(reader.read_f64::<LittleEndian>());
         Ok(header)
     }
 }

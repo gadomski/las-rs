@@ -1,6 +1,9 @@
 //! Read ASPRS las files.
 
 extern crate byteorder;
+#[macro_use]
+extern crate enum_primitive;
+extern crate num;
 extern crate rustc_serialize;
 
 use std::result;
