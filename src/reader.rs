@@ -71,11 +71,42 @@ impl Reader {
     pub fn points(&mut self) -> Vec<Point> {
         Vec::new()
     }
+
+    /// Creates an interator over this reader's points.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::reader::Reader;
+    /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
+    /// let points = reader.points_iter().collect();
+    /// assert_eq!(1, points.len());
+    /// ```
+    pub fn points_iter(&mut self) -> PointsIterator {
+        PointsIterator
+    }
+}
+
+/// Iterator over the points of a reader.
+///
+/// The iterator starts at the first point and reads through to the end.
+pub struct PointsIterator;
+
+impl Iterator for PointsIterator {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use point::Classification;
+    use point::Point;
+    use point::ScanDirection;
 
     #[test]
     fn header() {
@@ -110,5 +141,25 @@ mod tests {
         assert_eq!(470692.447538, header.maxs.x);
         assert_eq!(4602888.904642, header.maxs.y);
         assert_eq!(16.0, header.maxs.z);
+    }
+
+    #[test]
+    fn points() {
+        let mut reader = Reader::open("data/1.2_0.las").unwrap();
+        let points: Vec<Point> = reader.points_iter().collect();
+        assert_eq!(1, points.len());
+        let point = &points[0];
+        assert_eq!(470692.447538, point.x);
+        assert_eq!(4602888.904642, point.y);
+        assert_eq!(16.0, point.z);
+        assert_eq!(0, point.intensity);
+        assert_eq!(2, point.return_number);
+        assert_eq!(2, point.number_of_returns);
+        assert_eq!(ScanDirection::Forward, point.scan_direction);
+        assert!(false, point.edge_of_flight_line);
+        assert_eq!(Classification::Ground, point.classification);
+        assert_eq!(-13, point.scan_angle_rank);
+        assert_eq!(0, point.user_data);
+        assert_eq!(0, point.point_source_id);
     }
 }
