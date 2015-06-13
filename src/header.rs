@@ -41,7 +41,7 @@ fn buffer_to_string(buffer: &[u8]) -> Result<String> {
 }
 
 /// Three f64 values in x, y, z order.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Triplet {
     pub x: f64,
     pub y: f64,
@@ -49,6 +49,7 @@ pub struct Triplet {
 }
 
 /// Project ID newtype.
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProjectId([u8; 4], [u8; 2], [u8; 2], [u8; 8]);
 
 impl ProjectId {
@@ -77,6 +78,7 @@ impl ProjectId {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Header {
     pub file_signature: [u8; 4],
     pub file_source_id: u16,
