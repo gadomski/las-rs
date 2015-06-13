@@ -18,6 +18,7 @@ pub use writer::Writer;
 #[derive(Debug)]
 enum Error {
     ByteorderError(byteorder::Error),
+    CharacterAfterNullByte,
     IoError(std::io::Error),
     ReadError(String),
 }
