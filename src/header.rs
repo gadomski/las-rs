@@ -185,3 +185,45 @@ impl Header {
         Ok(header)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fs::File;
+
+    #[test]
+    fn header() {
+        let mut reader = File::open("data/1.2_0.las").unwrap();
+        let header = Header::new(&mut reader).unwrap();
+        assert_eq!(*b"LASF", header.file_signature);
+        assert_eq!(0, header.file_source_id);
+        assert_eq!(0, header.global_encoding);
+        assert_eq!("b8f18883-1baa-0841-bca3-6bc68e7b062e", header.project_id.as_string());
+        assert_eq!(1, header.version_major);
+        assert_eq!(2, header.version_minor);
+        assert_eq!("libLAS", header.system_identifier);
+        assert_eq!("libLAS 1.2", header.generating_software);
+        assert_eq!(78, header.file_creation_day_of_year);
+        assert_eq!(2008, header.file_creation_year);
+        assert_eq!(227, header.header_size);
+        assert_eq!(438, header.offset_to_point_data);
+        assert_eq!(2, header.number_of_variable_length_records);
+        assert_eq!(0, header.point_data_format_id);
+        assert_eq!(20, header.point_data_record_length);
+        assert_eq!(1, header.number_of_point_records);
+        assert_eq!([0, 1, 0, 0, 0], header.number_of_points_by_return);
+        assert_eq!(0.01, header.scale.x);
+        assert_eq!(0.01, header.scale.y);
+        assert_eq!(0.01, header.scale.z);
+        assert_eq!(0.0, header.offset.x);
+        assert_eq!(0.0, header.offset.y);
+        assert_eq!(0.0, header.offset.z);
+        assert_eq!(470692.447538, header.min.x);
+        assert_eq!(4602888.904642, header.min.y);
+        assert_eq!(16.0, header.min.z);
+        assert_eq!(470692.447538, header.max.x);
+        assert_eq!(4602888.904642, header.max.y);
+        assert_eq!(16.0, header.max.z);
+    }
+}
