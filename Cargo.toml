@@ -1,0 +1,4 @@
+[package]
+name = "las"
+version = "0.2.0"
+authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
