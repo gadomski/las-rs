@@ -1,5 +1,8 @@
 //! Read and write ASPRS las files.
 
+extern crate byteorder;
+extern crate rustc_serialize;
+
 use std::result;
 
 mod header;
@@ -14,6 +17,7 @@ pub use writer::Writer;
 
 #[derive(Debug)]
 enum Error {
+    ByteorderError(byteorder::Error),
     IoError(std::io::Error),
     ReadError(String),
 }
@@ -21,6 +25,12 @@ enum Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::IoError(err)
+    }
+}
+
+impl From<byteorder::Error> for Error {
+    fn from(err: byteorder::Error) -> Error {
+        Error::ByteorderError(err)
     }
 }
 

@@ -2,3 +2,7 @@
 name = "las"
 version = "0.2.0"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
+
+[dependencies]
+byteorder = "0.3"
+rustc-serialize = "0.3"

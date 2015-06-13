@@ -2,6 +2,10 @@
 
 use std::io::Read;
 
+use byteorder::ReadBytesExt;
+use byteorder::LittleEndian;
+use rustc_serialize::hex::ToHex;
+
 use Error;
 use Result;
 
@@ -22,11 +26,40 @@ pub struct Triplet {
     pub z: f64,
 }
 
+/// Project ID newtype.
+pub struct ProjectId([u8; 4], [u8; 2], [u8; 2], [u8; 8]);
+
+impl ProjectId {
+    /// Returns a hexadecimal string representation of the project ID.
+    ///
+    /// The format for this string was derived from libLAS's output.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::header::ProjectId;
+    /// let project_id = ProjectId([0; 16]);
+    /// assert_eq!("00000000-0000-0000-0000-000000000000", project_id.as_hex());
+    /// ```
+    pub fn as_hex(&self) -> String {
+        let mut s = self.0.to_hex();
+        s.push_str("-");
+        s.push_str(&self.1.to_hex());
+        s.push_str("-");
+        s.push_str(&self.2.to_hex());
+        s.push_str("-");
+        s.push_str(&self.3[0..2].to_hex());
+        s.push_str("-");
+        s.push_str(&self.3[2..8].to_hex());
+        s
+    }
+}
+
 pub struct Header {
     pub file_signature: [u8; 4],
     pub file_source_id: u16,
     pub global_encoding: u16,
-    pub project_id: [u8; 16],
+    pub project_id: ProjectId,
     pub version_major: u8,
     pub version_minor: u8,
     pub system_identifier: String,
@@ -52,7 +85,7 @@ impl Default for Header {
             file_signature: *b"LASF",
             file_source_id: 0,
             global_encoding: 0,
-            project_id: [0; 16],
+            project_id: ProjectId([0; 4], [0; 2], [0; 2], [0; 8]),
             version_major: 0,
             version_minor: 0,
             system_identifier: "".to_string(),
@@ -83,9 +116,17 @@ impl Header {
     /// let reader = std::fs::File::open("data/1.2_0.las").unwrap();
     /// let header = Header::new(&mut reader);
     /// ```
-    pub fn new<R: Read>(reader: R) -> Result<Header> {
+    pub fn new<R: Read>(reader: &mut R) -> Result<Header> {
         let mut header: Header = Default::default();
-        let file_signature = try_read_n!(reader, header.file_signature, 4);
+        try_read_n!(reader, header.file_signature, 4);
+        header.file_source_id = try!(reader.read_u16::<LittleEndian>());
+        header.global_encoding = try!(reader.read_u16::<LittleEndian>());
+        try_read_n!(reader, header.project_id.0, 4);
+        try_read_n!(reader, header.project_id.1, 2);
+        try_read_n!(reader, header.project_id.2, 2);
+        try_read_n!(reader, header.project_id.3, 8);
+        header.version_major = try!(reader.read_u8());
+        header.version_minor = try!(reader.read_u8());
         Ok(header)
     }
 }
