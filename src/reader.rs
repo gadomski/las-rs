@@ -112,6 +112,11 @@ impl<R: Read + Seek> Reader<R> {
         point.scan_angle_rank = try!(self.reader.read_i8());
         point.user_data = try!(self.reader.read_u8());
         point.point_source_id = try!(self.reader.read_u16::<LittleEndian>());
+
+        if self.header.point_data_format_id == 1 {
+            point.gps_time = Some(try!(self.reader.read_f64::<LittleEndian>()));
+        }
+
         Ok(point)
     }
 }
@@ -168,6 +173,23 @@ mod tests {
         scan_angle_rank: -13,
         user_data: 0,
         point_source_id: 0,
+        gps_time: None,
+    };
+
+    const POINT1: Point = Point {
+        x: 470692.44,
+        y: 4602888.90,
+        z: 16.0,
+        intensity: 0,
+        return_number: 2,
+        number_of_returns: 0,
+        scan_direction: ScanDirection::Backward,
+        edge_of_flight_line: false,
+        classification: Classification::Ground,
+        scan_angle_rank: -13,
+        user_data: 0,
+        point_source_id: 0,
+        gps_time: Some(1205902800.0),
     };
 
     fn check_file(filename: &str, reference_point: &Point) {
@@ -221,5 +243,11 @@ mod tests {
     #[test]
     fn formats_and_versions() {
         check_file("data/1.0_0.las", &POINT0);
+        check_file("data/1.1_0.las", &POINT0);
+        check_file("data/1.2_0.las", &POINT0);
+
+        check_file("data/1.0_1.las", &POINT1);
+        check_file("data/1.1_1.las", &POINT1);
+        check_file("data/1.2_1.las", &POINT1);
     }
 }

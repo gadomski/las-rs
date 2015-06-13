@@ -15,6 +15,7 @@ pub struct Point {
     pub scan_angle_rank: i8,
     pub user_data: u8,
     pub point_source_id: u16,
+    pub gps_time: Option<f64>,
 }
 
 enum_from_primitive! {
