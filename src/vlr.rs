@@ -6,7 +6,7 @@ use byteorder::LittleEndian;
 use byteorder::ReadBytesExt;
 
 use Result;
-use utils::read_into_string;
+use io::LasStringExt;
 
 #[derive(Debug, Default)]
 pub struct Vlr {
@@ -52,10 +52,10 @@ impl Vlr {
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Vlr> {
         let mut vlr: Vlr = Default::default();
         vlr.reserved = try!(reader.read_u16::<LittleEndian>());
-        vlr.user_id = try!(read_into_string(reader, 16));
+        vlr.user_id = try!(reader.read_las_string(16));
         vlr.record_id = try!(reader.read_u16::<LittleEndian>());
         vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
-        vlr.description = try!(read_into_string(reader, 32));
+        vlr.description = try!(reader.read_las_string(32));
         Ok(vlr)
     }
 }

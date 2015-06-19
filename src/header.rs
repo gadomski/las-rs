@@ -8,7 +8,7 @@ use rustc_serialize::hex::ToHex;
 
 use Error;
 use Result;
-use utils::read_into_string;
+use io::LasStringExt;
 
 /// Three f64 values in x, y, z order.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -122,11 +122,8 @@ impl Header {
         try_read_n!(reader, header.project_id.3, 8);
         header.version_major = try!(reader.read_u8());
         header.version_minor = try!(reader.read_u8());
-        let mut buffer = [0u8; 32];
-        try_read_n!(reader, buffer, 32);
-        header.system_identifier = try!(buffer_to_string(&buffer));
-        try_read_n!(reader, buffer, 32);
-        header.generating_software = try!(buffer_to_string(&buffer));
+        header.system_identifier = try!(reader.read_las_string(32));
+        header.generating_software = try!(reader.read_las_string(32));
         header.file_creation_day_of_year = try!(reader.read_u16::<LittleEndian>());
         header.file_creation_year = try!(reader.read_u16::<LittleEndian>());
         header.header_size = try!(reader.read_u16::<LittleEndian>());
