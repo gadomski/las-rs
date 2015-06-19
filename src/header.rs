@@ -8,37 +8,7 @@ use rustc_serialize::hex::ToHex;
 
 use Error;
 use Result;
-
-/// Reads n bytes into a buffer, or returns a `ReadError`.
-macro_rules! try_read_n {
-    ($reader:expr, $data:expr, $n:expr) => {{
-        let took = try!($reader.take($n).read(&mut $data));
-        if took != $n {
-            return Err(Error::ReadError(format!("Tried to take {} bytes, only took {}", $n, took)));
-        }
-    }};
-}
-
-/// Converts a `u8` buffer to a string, using null bytes as the terminator.
-///
-/// Also checks for characters after the first null byte, which is invalid according to the las
-/// spec.
-fn buffer_to_string(buffer: &[u8]) -> Result<String> {
-    let mut s = String::with_capacity(buffer.len());
-    let mut seen_null_byte = false;
-    for &byte in buffer {
-        if byte > 0u8 {
-            if seen_null_byte {
-                return Err(Error::CharacterAfterNullByte);
-            } else {
-                s.push(byte as char);
-            }
-        } else {
-            seen_null_byte = true;
-        }
-    }
-    Ok(s)
-}
+use utils::read_into_string;
 
 /// Three f64 values in x, y, z order.
 #[derive(Clone, Debug, Default, PartialEq)]

@@ -8,13 +8,19 @@ extern crate rustc_serialize;
 
 use std::result;
 
+#[macro_use]
+mod macros;
+mod utils;
+
 pub mod header;
 pub mod point;
 pub mod reader;
+pub mod vlr;
 
 pub use header::Header;
 pub use point::Point;
 pub use reader::Reader;
+pub use vlr::Vlr;
 
 #[derive(Debug)]
 enum Error {

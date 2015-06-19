@@ -17,10 +17,12 @@ use header::Header;
 use point::Classification;
 use point::Point;
 use point::ScanDirection;
+use vlr::Vlr;
 
 pub struct Reader<R: Read + Seek> {
     header: Header,
     reader: R,
+    vlrs: Vec<Vlr>,
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -34,9 +36,12 @@ impl<R: Read + Seek> Reader<R> {
     /// let reader = Reader::new(stream);
     /// ```
     pub fn new(mut reader: R) -> Result<Reader<R>> {
+        let header = try!(Header::new(&mut reader));
+        let vlrs = try!(Vlr::read_n_from(&mut reader, header.number_of_variable_length_records as usize));
         Ok(Reader {
-            header: try!(Header::new(&mut reader)),
+            header: header,
             reader: reader,
+            vlrs: vlrs,
         })
     }
 
@@ -51,6 +56,18 @@ impl<R: Read + Seek> Reader<R> {
     /// assert_eq!(*b"LASF", header.file_signature);
     /// ```
     pub fn header(&self) -> &Header { &self.header }
+
+    /// Returns a `Vec` of the file's `Vlr`s.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # user las::reader::Reader;
+    /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
+    /// let vlrs = reader.vlrs();
+    /// assert_eq!(2, vlrs.len());
+    /// ```
+    pub fn vlrs(&self) -> &Vec<Vlr> { &self.vlrs }
 
     /// Returns a vector of all the points in the lasfile.
     ///
@@ -257,6 +274,19 @@ mod tests {
         let mut reader = Reader::open("data/1.2_0.las").unwrap();
         let points: Vec<Point> = reader.points_iter().unwrap().collect();
         assert_eq!(1, points.len());
+    }
+
+    #[test]
+    fn vlrs() {
+        let reader = Reader::open("data/1.2_0.las").unwrap();
+        let vlrs = reader.vlrs();
+
+        let vlr = &vlrs[0];
+        assert_eq!(0, vlr.reserved);
+        assert_eq!("LASF_Projection", vlr.user_id);
+        assert_eq!(34735, vlr.record_id);
+        assert_eq!(64, vlr.record_length_after_header);
+        assert_eq!("", vlr.description);
     }
 
     #[test]
