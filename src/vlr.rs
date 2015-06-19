@@ -51,11 +51,11 @@ impl Vlr {
     /// ```
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Vlr> {
         let mut vlr: Vlr = Default::default();
-        vlr.reserved = try!(reader.read_u16::<LittleEndian>());
-        vlr.user_id = try!(reader.read_las_string(16));
-        vlr.record_id = try!(reader.read_u16::<LittleEndian>());
-        vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
-        vlr.description = try!(reader.read_las_string(32));
+        //vlr.reserved = try!(reader.read_u16::<LittleEndian>());
+        //vlr.user_id = try!(reader.read_las_string(16));
+        //vlr.record_id = try!(reader.read_u16::<LittleEndian>());
+        //vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
+        //vlr.description = try!(reader.read_las_string(32));
         Ok(vlr)
     }
 }
