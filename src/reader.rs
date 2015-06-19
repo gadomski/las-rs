@@ -62,7 +62,7 @@ impl<R: Read + Seek> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// # user las::reader::Reader;
+    /// # use las::reader::Reader;
     /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
     /// let vlrs = reader.vlrs();
     /// assert_eq!(2, vlrs.len());

@@ -23,11 +23,12 @@ impl Vlr {
     /// # Example
     ///
     /// ```
+    /// # use las::vlr::Vlr;
     /// use std::fs::File;
     /// use std::io::{Seek, SeekFrom};
-    /// let mut reader = File::open("data/1.2_0.las");
+    /// let ref mut reader = File::open("data/1.2_0.las").unwrap();
     /// reader.seek(SeekFrom::Start(227));
-    /// let vlrs = Vlr::read_n_from(reader, 2);
+    /// let vlrs = Vlr::read_n_from(reader, 2).unwrap();
     /// assert_eq!(2, vlrs.len());
     /// ```
     pub fn read_n_from<R: Read>(reader: &mut R, n: usize) -> Result<Vec<Vlr>> {
@@ -43,18 +44,19 @@ impl Vlr {
     /// # Example
     ///
     /// ```
+    /// # use las::vlr::Vlr;
     /// use std::fs::File;
     /// use std::io::{Seek, SeekFrom};
-    /// let mut reader = File::open("data/1.2_0.las");
+    /// let ref mut reader = File::open("data/1.2_0.las").unwrap();
     /// reader.seek(SeekFrom::Start(227));
     /// let vlr = Vlr::read_from(reader);
     /// ```
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Vlr> {
         let mut vlr: Vlr = Default::default();
-        //vlr.reserved = try!(reader.read_u16::<LittleEndian>());
-        //vlr.user_id = try!(reader.read_las_string(16));
-        //vlr.record_id = try!(reader.read_u16::<LittleEndian>());
-        //vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
+        vlr.reserved = try!(reader.read_u16::<LittleEndian>());
+        vlr.user_id = try!(reader.read_las_string(16));
+        vlr.record_id = try!(reader.read_u16::<LittleEndian>());
+        vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
         //vlr.description = try!(reader.read_las_string(32));
         Ok(vlr)
     }
