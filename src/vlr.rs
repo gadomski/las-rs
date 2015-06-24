@@ -5,6 +5,7 @@ use std::io::Read;
 use byteorder::LittleEndian;
 use byteorder::ReadBytesExt;
 
+use Error;
 use Result;
 use io::LasStringExt;
 
@@ -15,6 +16,7 @@ pub struct Vlr {
     pub record_id: u16,
     pub record_length_after_header: u16,
     pub description: String,
+    pub body: Vec<u8>,
 }
 
 impl Vlr {
@@ -57,7 +59,13 @@ impl Vlr {
         vlr.user_id = try!(reader.read_las_string(16));
         vlr.record_id = try!(reader.read_u16::<LittleEndian>());
         vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
-        //vlr.description = try!(reader.read_las_string(32));
+        vlr.description = try!(reader.read_las_string(32));
+        let num_read = try!(reader.take(vlr.record_length_after_header as u64).read_to_end(&mut vlr.body));
+        if num_read != vlr.record_length_after_header as usize {
+            return Err(Error::ReadError(format!("Tried to take {} bytes, only took {}",
+                                                vlr.record_length_after_header,
+                                                num_read)));
+        }
         Ok(vlr)
     }
 }

@@ -37,6 +37,7 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn new(mut reader: R) -> Result<Reader<R>> {
         let header = try!(Header::new(&mut reader));
+        try!(reader.seek(SeekFrom::Start(header.header_size as u64)));
         let vlrs = try!(Vlr::read_n_from(&mut reader, header.number_of_variable_length_records as usize));
         Ok(Reader {
             header: header,
