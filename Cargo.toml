@@ -10,7 +10,7 @@ repository = "https://github.com/gadomski/las-rs"
 
 readme = "README.md"
 
-keywords = ["lidar", "point clouds", "las", "gis"]
+keywords = ["lidar", "pointcloud", "las", "gis"]
 
 license = "MIT"
 
