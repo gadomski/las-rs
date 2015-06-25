@@ -2,6 +2,17 @@
 name = "las"
 version = "0.2.0"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
+description = "Read ASPRS las data, used to store point clouds."
+
+documentation = "http://gadomski.github.io/las-rs"
+homepage = "https://github.com/gadomski/las-rs"
+repository = "https://github.com/gadomski/las-rs"
+
+readme = "README.md"
+
+keywords = ["lidar", "point clouds", "las", "gis"]
+
+license = "MIT"
 
 [dependencies]
 byteorder = "0.3"
