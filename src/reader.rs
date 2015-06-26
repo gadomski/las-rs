@@ -39,6 +39,7 @@ impl<R: Read + Seek> Reader<R> {
         let header = try!(Header::new(&mut reader));
         try!(reader.seek(SeekFrom::Start(header.header_size as u64)));
         let vlrs = try!(Vlr::read_n_from(&mut reader, header.number_of_variable_length_records as usize));
+        try!(reader.seek(SeekFrom::Start(header.offset_to_point_data as u64)));
         Ok(Reader {
             header: header,
             reader: reader,
@@ -84,29 +85,10 @@ impl<R: Read + Seek> Reader<R> {
     /// let points = reader.points().unwrap();
     /// assert_eq!(1, points.len());
     /// ```
-    pub fn points(&mut self) -> Result<Vec<Point>> {
-        Ok(try!(self.points_iter()).collect())
+    pub fn points(self) -> Result<Vec<Point>> {
+        Ok(self.into_iter().collect())
     }
 
-    /// Creates an interator over this reader's points.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::reader::Reader;
-    /// # use las::point::Point;
-    /// let mut reader = Reader::open("data/1.2_0.las").unwrap();
-    /// let points: Vec<Point> = reader.points_iter().unwrap().collect();
-    /// assert_eq!(1, points.len());
-    /// ```
-    pub fn points_iter(&mut self) -> Result<PointsIterator<R>> {
-        try!(self.reader.seek(SeekFrom::Start(self.header.offset_to_point_data as u64)));
-        Ok(PointsIterator {
-            reader: self,
-        })
-    }
-
-    /// Reads and returns the next point from the reader.
     fn next_point(&mut self) -> Result<Point> {
         let mut point: Point = Default::default();
         point.x = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.x +
@@ -165,14 +147,23 @@ impl Reader<BufReader<File>> {
     }
 }
 
+impl<R: Read + Seek> IntoIterator for Reader<R> {
+    type Item = Point;
+    type IntoIter = PointsIterator<R>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PointsIterator { reader: self } 
+    }
+}
+
 /// Iterator over the points of a reader.
 ///
 /// The iterator starts at the first point and reads through to the end.
-pub struct PointsIterator<'a, R: 'a + Read + Seek> {
-    reader: &'a mut Reader<R>,
+pub struct PointsIterator<R: Read + Seek> {
+    reader: Reader<R>,
 }
 
-impl<'a, R: Read + Seek> Iterator for PointsIterator<'a, R> {
+impl<R: Read + Seek> Iterator for PointsIterator<R> {
     type Item = Point;
 
     fn next(&mut self) -> Option<Point> {
@@ -265,15 +256,15 @@ mod tests {
     };
 
     fn check_file(filename: &str, reference_point: &Point) {
-        let mut reader = Reader::open(filename).unwrap();
+        let reader = Reader::open(filename).unwrap();
         let point = &reader.points().unwrap()[0];
         assert_eq!(reference_point, point);
     }
 
     #[test]
     fn points() {
-        let mut reader = Reader::open("data/1.2_0.las").unwrap();
-        let points: Vec<Point> = reader.points_iter().unwrap().collect();
+        let reader = Reader::open("data/1.2_0.las").unwrap();
+        let points: Vec<Point> = reader.into_iter().collect();
         assert_eq!(1, points.len());
     }
 
