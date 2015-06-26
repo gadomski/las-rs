@@ -12,11 +12,9 @@ use std::result;
 #[macro_use]
 pub mod macros;
 
-// Private modules
-mod io;
-
 // Public modules
 pub mod header;
+pub mod io;
 pub mod point;
 pub mod reader;
 pub mod vlr;
