@@ -66,10 +66,10 @@ pub struct Header {
     pub point_data_record_length: u16,
     pub number_of_point_records: u32,
     pub number_of_points_by_return: [u32; 5],
-    pub scale: Triplet,
-    pub offset: Triplet,
-    pub min: Triplet,
-    pub max: Triplet,
+    pub scale: Triplet<f64>,
+    pub offset: Triplet<f64>,
+    pub min: Triplet<f64>,
+    pub max: Triplet<f64>,
 }
 
 impl Default for Header {
