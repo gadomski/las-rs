@@ -25,7 +25,7 @@ pub use reader::Reader;
 pub use vlr::Vlr;
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     ByteorderError(byteorder::Error),
     CharacterAfterNullByte,
     IoError(std::io::Error),
