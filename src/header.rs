@@ -9,14 +9,7 @@ use rustc_serialize::hex::ToHex;
 use Error;
 use Result;
 use io::LasStringExt;
-
-/// Three f64 values in x, y, z order.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Triplet {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
+use util::Triplet;
 
 /// Project ID newtype.
 #[derive(Clone, Debug, PartialEq)]

@@ -17,6 +17,7 @@ pub mod header;
 pub mod io;
 pub mod point;
 pub mod reader;
+pub mod util;
 pub mod vlr;
 
 pub use header::Header;
