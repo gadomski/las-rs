@@ -22,6 +22,12 @@ pub struct Triplet {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProjectId(pub [u8; 4], pub [u8; 2], pub [u8; 2], pub [u8; 8]);
 
+impl Default for ProjectId {
+    fn default() -> ProjectId {
+        ProjectId([0; 4], [0; 2], [0; 2], [0; 8])
+    }
+}
+
 impl ProjectId {
     /// Returns a hexadecimal string representation of the project ID.
     ///
@@ -79,7 +85,7 @@ impl Default for Header {
             file_signature: *b"LASF",
             file_source_id: 0,
             global_encoding: 0,
-            project_id: ProjectId([0; 4], [0; 2], [0; 2], [0; 8]),
+            project_id: Default::default(),
             version_major: 0,
             version_minor: 0,
             system_identifier: "".to_string(),
