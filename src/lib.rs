@@ -8,9 +8,11 @@ extern crate rustc_serialize;
 
 use std::result;
 
-// Private modules
+// Macros
 #[macro_use]
-mod macros;
+pub mod macros;
+
+// Private modules
 mod io;
 
 // Public modules
