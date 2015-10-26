@@ -5,18 +5,13 @@
         unused_import_braces, unused_qualifications)]
 
 extern crate byteorder;
-#[macro_use]
-extern crate enum_primitive;
+#[macro_use] extern crate enum_primitive;
 extern crate num;
 extern crate rustc_serialize;
 
 use std::result;
 
-// Macros
-#[macro_use]
-pub mod macros;
-
-// Public modules
+#[macro_use] pub mod macros;
 pub mod header;
 pub mod io;
 pub mod point;
