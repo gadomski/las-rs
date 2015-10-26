@@ -52,9 +52,12 @@ pub struct Point {
     pub blue: Option<u16>,
 }
 
-#[derive(Debug, PartialEq)]
+/// The scan direction of the mirror when this point was collected.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ScanDirection {
+    /// The scan was moving backward, whatever that means.
     Backward = 0,
+    /// The scan was moving forward, whatever that means.
     Forward = 1,
 }
 
