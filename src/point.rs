@@ -1,5 +1,7 @@
 //! Las points.
 
+use super::{Error, Result};
+
 /// A las point.
 ///
 /// As we do for the `Header` we encasulate different point formats by using `Option<T>`.
@@ -50,12 +52,10 @@ pub struct Point {
     pub blue: Option<u16>,
 }
 
-enum_from_primitive! {
 #[derive(Debug, PartialEq)]
 pub enum ScanDirection {
     Backward = 0,
     Forward = 1,
-}
 }
 
 impl Default for ScanDirection {
@@ -64,7 +64,27 @@ impl Default for ScanDirection {
     }
 }
 
-enum_from_primitive! {
+impl ScanDirection {
+    /// Translates a u8 into a scan direction.
+    ///
+    /// Returns an error if the u8 is not zero or one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::ScanDirection;
+    /// assert_eq!(ScanDirection::Backward, ScanDirection::from_u8(0);
+    /// assert_eq!(ScanDirection::Forward, ScanDirection::from_u8(1);
+    /// ```
+    pub fn from_u8(n: u8) -> Result<ScanDirection> {
+        match n {
+            0 => Ok(ScanDirection::Backward),
+            1 => Ok(ScanDirection::Forward),
+            _ => Err(Error::InvalidScanDirection(n)),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Classification {
     CreatedNeverClassified = 0,
@@ -82,10 +102,30 @@ pub enum Classification {
     Overlap = 12,
     Reserved,
 }
-}
 
 impl Default for Classification {
     fn default() -> Classification {
         Classification::CreatedNeverClassified
+    }
+}
+
+impl From<u8> for Classification {
+    fn from(n: u8) -> Self {
+        match n {
+            0 => Classification::CreatedNeverClassified,
+            1 => Classification::Unclassified,
+            2 => Classification::Ground,
+            3 => Classification::LowVegetation,
+            4 => Classification::MediumVegetation,
+            5 => Classification::HighVegetation,
+            6 => Classification::Building,
+            7 => Classification::LowPoint,
+            8 => Classification::ModelKeyPoint,
+            9 => Classification::Water,
+            10 => Classification::Reserved10,
+            11 => Classification::Reserved11,
+            12 => Classification::Overlap,
+            _ => Classification::Reserved,
+       }
     }
 }

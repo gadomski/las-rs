@@ -10,8 +10,6 @@ use std::path::Path;
 use byteorder::LittleEndian;
 use byteorder::ReadBytesExt;
 
-use num::FromPrimitive;
-
 use Result;
 use header::Header;
 use point::Classification;
@@ -106,15 +104,10 @@ impl<R: Read + Seek> Reader<R> {
         let byte = try!(self.reader.read_u8());
         point.return_number = byte & 0b00000111;
         point.number_of_returns = byte >> 3 & 0b00000111;
-        point.scan_direction = match ScanDirection::from_u8(byte >> 6 & 0b00000001) {
-            Some(scan_direction) => scan_direction,
-            None => unreachable!(),
-        };
+        // We unwrap because the mask should never give us anything but a zero or a one.
+        point.scan_direction = ScanDirection::from_u8(byte >> 6 & 0b00000001).unwrap();
         point.edge_of_flight_line = (byte >> 7 & 0b00000001) == 1;
-        point.classification = match Classification::from_u8(try!(self.reader.read_u8())) {
-            Some(classification) => classification,
-            None => Default::default(),
-        };
+        point.classification = Classification::from(try!(self.reader.read_u8()));
         point.scan_angle_rank = try!(self.reader.read_i8());
         point.user_data = try!(self.reader.read_u8());
         point.point_source_id = try!(self.reader.read_u16::<LittleEndian>());

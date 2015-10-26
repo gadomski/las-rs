@@ -5,8 +5,6 @@
         unused_import_braces, unused_qualifications)]
 
 extern crate byteorder;
-#[macro_use] extern crate enum_primitive;
-extern crate num;
 extern crate rustc_serialize;
 
 use std::result;
@@ -28,6 +26,8 @@ pub use vlr::Vlr;
 pub enum Error {
     ByteorderError(byteorder::Error),
     CharacterAfterNullByte,
+    /// A scan direction is either a zero or a one, nothing else.
+    InvalidScanDirection(u8),
     IoError(std::io::Error),
     ReadError(String),
 }
