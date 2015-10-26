@@ -10,4 +10,3 @@ macro_rules! try_read_n {
         }
     }};
 }
-

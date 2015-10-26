@@ -60,7 +60,8 @@ impl Vlr {
         vlr.record_id = try!(reader.read_u16::<LittleEndian>());
         vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
         vlr.description = try!(reader.read_las_string(32));
-        let num_read = try!(reader.take(vlr.record_length_after_header as u64).read_to_end(&mut vlr.body));
+        let num_read = try!(reader.take(vlr.record_length_after_header as u64)
+                                  .read_to_end(&mut vlr.body));
         if num_read != vlr.record_length_after_header as usize {
             return Err(Error::ReadError(format!("Tried to take {} bytes, only took {}",
                                                 vlr.record_length_after_header,
