@@ -9,13 +9,22 @@ use Error;
 use Result;
 use io::LasStringExt;
 
+/// A variable length record.
 #[derive(Debug, Default)]
 pub struct Vlr {
+    /// This field is reserved for future use.
     pub reserved: u16,
+    /// The is a "unique" user id that is supposed to be registered with ASPRS.
     pub user_id: String,
+    /// The integer id provides a key for some well-known types of vlrs.
     pub record_id: u16,
+    /// The Length of the VLR after this header.
     pub record_length_after_header: u16,
+    /// A textual description of this VLR.
+    ///
+    /// Maxes out at 32 bytes.
     pub description: String,
+    /// The VLR data.
     pub body: Vec<u8>,
 }
 
