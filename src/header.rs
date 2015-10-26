@@ -12,7 +12,7 @@ use io::LasStringExt;
 use util::Triplet;
 
 /// Project ID newtype.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProjectId(pub [u8; 4], pub [u8; 2], pub [u8; 2], pub [u8; 8]);
 
 impl Default for ProjectId {
