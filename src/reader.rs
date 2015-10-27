@@ -17,6 +17,8 @@ use point::Point;
 use point::ScanDirection;
 use vlr::Vlr;
 
+/// A structure to read in las data.
+#[derive(Debug)]
 pub struct Reader<R: Read + Seek> {
     header: Header,
     reader: R,
@@ -157,6 +159,7 @@ impl<R: Read + Seek> IntoIterator for Reader<R> {
 /// Iterator over the points of a reader.
 ///
 /// The iterator starts at the first point and reads through to the end.
+#[derive(Debug)]
 pub struct PointsIterator<R: Read + Seek> {
     reader: Reader<R>,
 }

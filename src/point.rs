@@ -5,7 +5,7 @@ use super::{Error, Result};
 /// A las point.
 ///
 /// As we do for the `Header` we encasulate different point formats by using `Option<T>`.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Point {
     /// The x value of the point.
     ///
@@ -88,7 +88,11 @@ impl ScanDirection {
     }
 }
 
-#[derive(Debug, PartialEq)]
+/// The classification of a point.
+///
+/// We allow mising docs on the classes because the names say it all.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Classification {
     CreatedNeverClassified = 0,
     Unclassified = 1,
