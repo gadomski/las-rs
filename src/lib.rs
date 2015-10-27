@@ -22,13 +22,18 @@ pub use point::Point;
 pub use reader::Reader;
 pub use vlr::Vlr;
 
+/// Crate-specific errors.
 #[derive(Debug)]
 pub enum Error {
+    /// Wrapper around a byteorder::Error.
     ByteorderError(byteorder::Error),
+    /// A reader found a non-null character after a null byte when reading a las string.
     CharacterAfterNullByte,
     /// A scan direction is either a zero or a one, nothing else.
     InvalidScanDirection(u8),
+    /// Wrapper around an io::Error.
     IoError(std::io::Error),
+    /// Some sort of error occurred while reading.
     ReadError(String),
 }
 
@@ -44,4 +49,5 @@ impl From<byteorder::Error> for Error {
     }
 }
 
+/// Crate-specific result type.
 pub type Result<T> = result::Result<T, Error>;

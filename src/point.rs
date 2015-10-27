@@ -76,8 +76,8 @@ impl ScanDirection {
     ///
     /// ```
     /// use las::point::ScanDirection;
-    /// assert_eq!(ScanDirection::Backward, ScanDirection::from_u8(0);
-    /// assert_eq!(ScanDirection::Forward, ScanDirection::from_u8(1);
+    /// assert_eq!(ScanDirection::Backward, ScanDirection::from_u8(0).unwrap());
+    /// assert_eq!(ScanDirection::Forward, ScanDirection::from_u8(1).unwrap());
     /// ```
     pub fn from_u8(n: u8) -> Result<ScanDirection> {
         match n {
