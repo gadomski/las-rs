@@ -1,18 +1,15 @@
 //! Read ASPRS las files.
 
+#![deny(missing_copy_implementations, missing_debug_implementations, missing_docs, trivial_casts,
+        trivial_numeric_casts, unsafe_code, unstable_features, unused_extern_crates,
+        unused_import_braces, unused_qualifications)]
+
 extern crate byteorder;
-#[macro_use]
-extern crate enum_primitive;
-extern crate num;
 extern crate rustc_serialize;
 
 use std::result;
 
-// Macros
-#[macro_use]
-pub mod macros;
-
-// Public modules
+#[macro_use] pub mod macros;
 pub mod header;
 pub mod io;
 pub mod point;
@@ -25,11 +22,18 @@ pub use point::Point;
 pub use reader::Reader;
 pub use vlr::Vlr;
 
+/// Crate-specific errors.
 #[derive(Debug)]
 pub enum Error {
+    /// Wrapper around a byteorder::Error.
     ByteorderError(byteorder::Error),
+    /// A reader found a non-null character after a null byte when reading a las string.
     CharacterAfterNullByte,
+    /// A scan direction is either a zero or a one, nothing else.
+    InvalidScanDirection(u8),
+    /// Wrapper around an io::Error.
     IoError(std::io::Error),
+    /// Some sort of error occurred while reading.
     ReadError(String),
 }
 
@@ -45,4 +49,5 @@ impl From<byteorder::Error> for Error {
     }
 }
 
+/// Crate-specific result type.
 pub type Result<T> = result::Result<T, Error>;

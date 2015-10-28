@@ -10,8 +10,6 @@ use std::path::Path;
 use byteorder::LittleEndian;
 use byteorder::ReadBytesExt;
 
-use num::FromPrimitive;
-
 use Result;
 use header::Header;
 use point::Classification;
@@ -19,6 +17,8 @@ use point::Point;
 use point::ScanDirection;
 use vlr::Vlr;
 
+/// A structure to read in las data.
+#[derive(Debug)]
 pub struct Reader<R: Read + Seek> {
     header: Header,
     reader: R,
@@ -38,7 +38,8 @@ impl<R: Read + Seek> Reader<R> {
     pub fn new(mut reader: R) -> Result<Reader<R>> {
         let header = try!(Header::new(&mut reader));
         try!(reader.seek(SeekFrom::Start(header.header_size as u64)));
-        let vlrs = try!(Vlr::read_n_from(&mut reader, header.number_of_variable_length_records as usize));
+        let vlrs = try!(Vlr::read_n_from(&mut reader,
+                                         header.number_of_variable_length_records as usize));
         try!(reader.seek(SeekFrom::Start(header.offset_to_point_data as u64)));
         Ok(Reader {
             header: header,
@@ -57,7 +58,9 @@ impl<R: Read + Seek> Reader<R> {
     /// let header = reader.header();
     /// assert_eq!(*b"LASF", header.file_signature);
     /// ```
-    pub fn header(&self) -> &Header { &self.header }
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
 
     /// Returns a `Vec` of the file's `Vlr`s.
     ///
@@ -69,7 +72,9 @@ impl<R: Read + Seek> Reader<R> {
     /// let vlrs = reader.vlrs();
     /// assert_eq!(2, vlrs.len());
     /// ```
-    pub fn vlrs(&self) -> &Vec<Vlr> { &self.vlrs }
+    pub fn vlrs(&self) -> &Vec<Vlr> {
+        &self.vlrs
+    }
 
     /// Returns a vector of all the points in the lasfile.
     ///
@@ -92,24 +97,19 @@ impl<R: Read + Seek> Reader<R> {
     fn next_point(&mut self) -> Result<Point> {
         let mut point: Point = Default::default();
         point.x = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.x +
-            self.header.offset.x;
+                  self.header.offset.x;
         point.y = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.y +
-            self.header.offset.y;
+                  self.header.offset.y;
         point.z = try!(self.reader.read_u32::<LittleEndian>()) as f64 * self.header.scale.z +
-            self.header.offset.z;
+                  self.header.offset.z;
         point.intensity = try!(self.reader.read_u16::<LittleEndian>());
         let byte = try!(self.reader.read_u8());
         point.return_number = byte & 0b00000111;
         point.number_of_returns = byte >> 3 & 0b00000111;
-        point.scan_direction = match ScanDirection::from_u8(byte >> 6 & 0b00000001) {
-            Some(scan_direction) => scan_direction,
-            None => unreachable!(),
-        };
+        // We unwrap because the mask should never give us anything but a zero or a one.
+        point.scan_direction = ScanDirection::from_u8(byte >> 6 & 0b00000001).unwrap();
         point.edge_of_flight_line = (byte >> 7 & 0b00000001) == 1;
-        point.classification = match Classification::from_u8(try!(self.reader.read_u8())) {
-            Some(classification) => classification,
-            None => Default::default(),
-        };
+        point.classification = Classification::from(try!(self.reader.read_u8()));
         point.scan_angle_rank = try!(self.reader.read_i8());
         point.user_data = try!(self.reader.read_u8());
         point.point_source_id = try!(self.reader.read_u16::<LittleEndian>());
@@ -124,7 +124,7 @@ impl<R: Read + Seek> Reader<R> {
                 point.red = Some(try!(self.reader.read_u16::<LittleEndian>()));
                 point.green = Some(try!(self.reader.read_u16::<LittleEndian>()));
                 point.blue = Some(try!(self.reader.read_u16::<LittleEndian>()));
-            },
+            }
             _ => (),
         }
 
@@ -152,13 +152,14 @@ impl<R: Read + Seek> IntoIterator for Reader<R> {
     type IntoIter = PointsIterator<R>;
 
     fn into_iter(self) -> Self::IntoIter {
-        PointsIterator { reader: self } 
+        PointsIterator { reader: self }
     }
 }
 
 /// Iterator over the points of a reader.
 ///
 /// The iterator starts at the first point and reads through to the end.
+#[derive(Debug)]
 pub struct PointsIterator<R: Read + Seek> {
     reader: Reader<R>,
 }

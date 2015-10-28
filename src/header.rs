@@ -12,7 +12,7 @@ use io::LasStringExt;
 use util::Triplet;
 
 /// Project ID newtype.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProjectId(pub [u8; 4], pub [u8; 2], pub [u8; 2], pub [u8; 8]);
 
 impl Default for ProjectId {
@@ -47,28 +47,72 @@ impl ProjectId {
     }
 }
 
+/// A las header.
+///
+/// This header encapsulates all versions of las headers by:
+///
+/// - Simplifying some name changes to their later name (e.g. global_encoding)
+/// - Representing some added-later fields as Options
 #[derive(Clone, Debug, PartialEq)]
 pub struct Header {
+    /// The las file signature.
+    ///
+    /// Should always be "LASF".
     pub file_signature: [u8; 4],
+    /// The textual source of the file, e.g. "libLAS".
     pub file_source_id: u16,
+    /// Unused in early version, and exapanded to help with GPS time offsets in later versions.
     pub global_encoding: u16,
+    /// The project ID, which is a set of integers.
+    ///
+    /// Can sometimes be known as the GUID, though it it not necessarily a GUID.
     pub project_id: ProjectId,
+    /// The las major version.
+    ///
+    /// Should always be 1.
     pub version_major: u8,
+    /// The las minor version.
     pub version_minor: u8,
+    /// Generally the hardware system that created the las file.
+    ///
+    /// Can also be the algorithm that produced the lasfile. This field is poorly defined.
     pub system_identifier: String,
+    /// The software the generated the las file.
     pub generating_software: String,
+    /// The day of the year, indexed to 1.
     pub file_creation_day_of_year: u16,
+    /// The year of file creation.
     pub file_creation_year: u16,
+    /// The size of the las header.
+    ///
+    /// Softwares are technically allowed to add custom extensions to the las header, which would
+    /// then affect this header size, but that is discouraged as such support is not universal.
     pub header_size: u16,
+    /// The byte offset to the beginning of point data.
+    ///
+    /// Includes the size of the header and the variable length records.
     pub offset_to_point_data: u32,
+    /// The number of variable length records.
     pub number_of_variable_length_records: u32,
+    /// The point data format.
+    ///
+    /// TODO this should probably be a wrapper class to describe the formats.
     pub point_data_format_id: u8,
+    /// The length of one point data record, in bytes.
     pub point_data_record_length: u16,
+    /// The total number of point records.
     pub number_of_point_records: u32,
+    /// The number of point records of each return number.
+    ///
+    /// This only supports five returns per pulse.
     pub number_of_points_by_return: [u32; 5],
+    /// The x, y, z scaling of each point.
     pub scale: Triplet<f64>,
+    /// The x, y, z offset of each point.
     pub offset: Triplet<f64>,
+    /// The minimum value for x, y, and z in this file.
     pub min: Triplet<f64>,
+    /// The maximum value for x, y, and z in this file.
     pub max: Triplet<f64>,
 }
 
@@ -165,7 +209,8 @@ mod tests {
         assert_eq!(*b"LASF", header.file_signature);
         assert_eq!(0, header.file_source_id);
         assert_eq!(0, header.global_encoding);
-        assert_eq!("b8f18883-1baa-0841-bca3-6bc68e7b062e", header.project_id.as_string());
+        assert_eq!("b8f18883-1baa-0841-bca3-6bc68e7b062e",
+                   header.project_id.as_string());
         assert_eq!(1, header.version_major);
         assert_eq!(2, header.version_minor);
         assert_eq!("libLAS", header.system_identifier);

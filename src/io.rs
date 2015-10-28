@@ -5,7 +5,13 @@ use std::io::Read;
 use Error;
 use Result;
 
+/// Readers that can provide a las string.
+///
+/// A las string is really just a c string, which is terminated by a null byte, but we do some
+/// extra checking to ensure there are no valid characters after the first null byte, per the las
+/// specification.
 pub trait LasStringExt: Read {
+    /// Read a las `String` of size `count` from the underlying Read object.
     fn read_las_string(&mut self, count: usize) -> Result<String>;
 }
 

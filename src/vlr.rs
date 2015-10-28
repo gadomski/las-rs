@@ -9,13 +9,22 @@ use Error;
 use Result;
 use io::LasStringExt;
 
+/// A variable length record.
 #[derive(Debug, Default)]
 pub struct Vlr {
+    /// This field is reserved for future use.
     pub reserved: u16,
+    /// The is a "unique" user id that is supposed to be registered with ASPRS.
     pub user_id: String,
+    /// The integer id provides a key for some well-known types of vlrs.
     pub record_id: u16,
+    /// The Length of the VLR after this header.
     pub record_length_after_header: u16,
+    /// A textual description of this VLR.
+    ///
+    /// Maxes out at 32 bytes.
     pub description: String,
+    /// The VLR data.
     pub body: Vec<u8>,
 }
 
@@ -60,7 +69,8 @@ impl Vlr {
         vlr.record_id = try!(reader.read_u16::<LittleEndian>());
         vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
         vlr.description = try!(reader.read_las_string(32));
-        let num_read = try!(reader.take(vlr.record_length_after_header as u64).read_to_end(&mut vlr.body));
+        let num_read = try!(reader.take(vlr.record_length_after_header as u64)
+                                  .read_to_end(&mut vlr.body));
         if num_read != vlr.record_length_after_header as usize {
             return Err(Error::ReadError(format!("Tried to take {} bytes, only took {}",
                                                 vlr.record_length_after_header,
