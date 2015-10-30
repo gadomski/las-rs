@@ -7,6 +7,8 @@
 extern crate byteorder;
 extern crate rustc_serialize;
 
+use std::error::Error;
+use std::fmt;
 use std::result;
 
 #[macro_use] pub mod macros;
@@ -35,6 +37,39 @@ pub enum LasError {
     Io(std::io::Error),
     /// Some sort of error occurred while reading.
     Read(String),
+}
+
+impl fmt::Display for LasError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LasError::Byteorder(ref err) => write!(f, "Byteorder error: {}", err),
+            LasError::CharacterAfterNullByte => write!(f, "Found a character after a null byte"),
+            LasError::InvalidScanDirection(number) => write!(f, "Invalid scan direction: {}", number),
+            LasError::Io(ref err) => write!(f, "IO error: {}", err),
+            LasError::Read(ref string) => write!(f, "Read error: {}", string),
+        }
+    }
+}
+
+impl Error for LasError {
+    fn description(&self) -> &str {
+        match *self {
+            LasError::Byteorder(ref err) => err.description(),
+            LasError::CharacterAfterNullByte => "character after a null byte",
+            LasError::InvalidScanDirection(_) => "invalid scan direction",
+            LasError::Io(ref err) => err.description(),
+            LasError::Read(_) => "read error",
+        }
+
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        match *self {
+            LasError::Byteorder(ref err) => Some(err),
+            LasError::Io(ref err) => Some(err),
+            _ => None,
+        }
+    }
 }
 
 impl From<std::io::Error> for LasError {
