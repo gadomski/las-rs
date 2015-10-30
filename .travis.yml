@@ -1,3 +1,4 @@
+sudo: false
 language: rust
 after_success: |
   [ $TRAVIS_BRANCH = master ] &&
