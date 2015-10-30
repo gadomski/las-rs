@@ -6,8 +6,7 @@ use byteorder::ReadBytesExt;
 use byteorder::LittleEndian;
 use rustc_serialize::hex::ToHex;
 
-use Error;
-use Result;
+use super::{LasError, Result};
 use io::LasStringExt;
 use util::Triplet;
 

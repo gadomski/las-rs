@@ -2,8 +2,7 @@
 
 use std::io::Read;
 
-use Error;
-use Result;
+use super::{LasError, Result};
 
 /// Readers that can provide a las string.
 ///
@@ -31,7 +30,7 @@ impl<R: Read> LasStringExt for R {
             }
         }
         if character_after_null {
-            Err(Error::CharacterAfterNullByte)
+            Err(LasError::CharacterAfterNullByte)
         } else {
             Ok(string)
         }

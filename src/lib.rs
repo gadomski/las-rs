@@ -24,7 +24,7 @@ pub use vlr::Vlr;
 
 /// Crate-specific errors.
 #[derive(Debug)]
-pub enum Error {
+pub enum LasError {
     /// Wrapper around a byteorder::Error.
     ByteorderError(byteorder::Error),
     /// A reader found a non-null character after a null byte when reading a las string.
@@ -37,17 +37,17 @@ pub enum Error {
     ReadError(String),
 }
 
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
-        Error::IoError(err)
+impl From<std::io::Error> for LasError {
+    fn from(err: std::io::Error) -> LasError {
+        LasError::IoError(err)
     }
 }
 
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        Error::ByteorderError(err)
+impl From<byteorder::Error> for LasError {
+    fn from(err: byteorder::Error) -> LasError {
+        LasError::ByteorderError(err)
     }
 }
 
 /// Crate-specific result type.
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, LasError>;
