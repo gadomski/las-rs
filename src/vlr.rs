@@ -71,9 +71,9 @@ impl Vlr {
         let num_read = try!(reader.take(vlr.record_length_after_header as u64)
                             .read_to_end(&mut vlr.body));
         if num_read != vlr.record_length_after_header as usize {
-            return Err(LasError::ReadError(format!("Tried to take {} bytes, only took {}",
-                                                   vlr.record_length_after_header,
-                                                   num_read)));
+            return Err(LasError::Read(format!("Tried to take {} bytes, only took {}",
+                                              vlr.record_length_after_header,
+                                              num_read)));
         }
         Ok(vlr)
     }

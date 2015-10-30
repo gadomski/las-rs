@@ -26,26 +26,26 @@ pub use vlr::Vlr;
 #[derive(Debug)]
 pub enum LasError {
     /// Wrapper around a byteorder::Error.
-    ByteorderError(byteorder::Error),
+    Byteorder(byteorder::Error),
     /// A reader found a non-null character after a null byte when reading a las string.
     CharacterAfterNullByte,
     /// A scan direction is either a zero or a one, nothing else.
     InvalidScanDirection(u8),
     /// Wrapper around an io::Error.
-    IoError(std::io::Error),
+    Io(std::io::Error),
     /// Some sort of error occurred while reading.
-    ReadError(String),
+    Read(String),
 }
 
 impl From<std::io::Error> for LasError {
     fn from(err: std::io::Error) -> LasError {
-        LasError::IoError(err)
+        LasError::Io(err)
     }
 }
 
 impl From<byteorder::Error> for LasError {
     fn from(err: byteorder::Error) -> LasError {
-        LasError::ByteorderError(err)
+        LasError::Byteorder(err)
     }
 }
 
