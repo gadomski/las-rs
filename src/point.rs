@@ -1,6 +1,6 @@
 //! Las points.
 
-use super::{Error, Result};
+use super::{LasError, Result};
 
 /// A las point.
 ///
@@ -83,7 +83,7 @@ impl ScanDirection {
         match n {
             0 => Ok(ScanDirection::Backward),
             1 => Ok(ScanDirection::Forward),
-            _ => Err(Error::InvalidScanDirection(n)),
+            _ => Err(LasError::InvalidScanDirection(n)),
         }
     }
 }
