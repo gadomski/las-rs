@@ -5,6 +5,7 @@ use std::fmt;
 use std::iter::repeat;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use time;
 
 use Result;
 use error::Error;
@@ -163,6 +164,7 @@ impl Header {
                                       .zip(generating_software.iter_mut()) {
             *b = *c;
         }
+        let now = time::now();
         Header {
             file_signature: *b"LASF",
             file_source_id: 0,
@@ -175,8 +177,8 @@ impl Header {
             version_minor: 0,
             system_identifier: [0; 32],
             generating_software: generating_software,
-            file_creation_day_of_year: 0,
-            file_creation_year: 0,
+            file_creation_day_of_year: now.tm_yday as u16,
+            file_creation_year: now.tm_year as u16,
             header_size: 0,
             offset_to_point_data: 0,
             number_of_variable_length_records: 0,

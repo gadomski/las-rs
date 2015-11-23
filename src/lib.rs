@@ -5,6 +5,7 @@
         unused_import_braces, unused_qualifications)]
 
 extern crate byteorder;
+extern crate time;
 
 pub mod header;
 pub mod error;
