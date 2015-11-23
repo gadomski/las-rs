@@ -15,6 +15,7 @@ mod scale;
 pub mod stream;
 pub mod vlr;
 
+pub use error::Error;
 pub use file::File;
 pub use point::Point;
 pub use stream::Stream;
@@ -22,4 +23,4 @@ pub use stream::Stream;
 use std::result;
 
 /// Crate-specific resuls.
-pub type Result<T> = result::Result<T, error::Error>;
+pub type Result<T> = result::Result<T, Error>;
