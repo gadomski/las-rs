@@ -2,6 +2,7 @@
 
 use std::io::{Read, Write};
 use std::fmt;
+use std::iter::repeat;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
@@ -154,6 +155,14 @@ impl Header {
     /// let header = Header::new();
     /// ```
     pub fn new() -> Header {
+        let name_and_version = format!("las-rs {}", env!("CARGO_PKG_VERSION")).into_bytes();
+        let mut generating_software = [0; 32];
+        for (c, b) in name_and_version.iter()
+                                      .chain(repeat(&0).take(generating_software.len() -
+                                                             name_and_version.len()))
+                                      .zip(generating_software.iter_mut()) {
+            *b = *c;
+        }
         Header {
             file_signature: *b"LASF",
             file_source_id: 0,
@@ -165,7 +174,7 @@ impl Header {
             version_major: 1,
             version_minor: 0,
             system_identifier: [0; 32],
-            generating_software: [0; 32],
+            generating_software: generating_software,
             file_creation_day_of_year: 0,
             file_creation_year: 0,
             header_size: 0,
