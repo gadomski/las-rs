@@ -98,6 +98,21 @@ impl File {
         self
     }
 
+    /// Set the offset values for a file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::file::File;
+    /// let file = File::new().offsets(1000.0, 2000.0, 100.0);
+    /// ```
+    pub fn offsets(mut self, x_offset: f64, y_offset: f64, z_offset: f64) -> File {
+        self.header.x_offset = x_offset;
+        self.header.y_offset = y_offset;
+        self.header.z_offset = z_offset;
+        self
+    }
+
     /// Returns a reference to a vector of this file's points.
     ///
     /// # Examples
