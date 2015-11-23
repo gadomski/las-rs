@@ -1,5 +1,6 @@
 //! `las` file management.
 
+use std::f64;
 use std::fs;
 use std::io::{BufReader, BufWriter, Seek, Read, Write};
 use std::path::Path;
@@ -141,12 +142,42 @@ impl File {
         self.header.point_data_record_length = self.header.point_data_format.record_length();
 
         let mut number_of_points_by_return = [0u32; 5];
+        let mut x_min = f64::MAX;
+        let mut y_min = f64::MAX;
+        let mut z_min = f64::MAX;
+        let mut x_max = f64::MIN;
+        let mut y_max = f64::MIN;
+        let mut z_max = f64::MIN;
         for point in &self.points {
             let return_number = point.return_number.as_u8();
             if return_number > 0 {
                 number_of_points_by_return[(return_number - 1) as usize] += 1;
             }
+            if point.x < x_min {
+                x_min = point.x;
+            }
+            if point.y < y_min {
+                y_min = point.y;
+            }
+            if point.z < z_min {
+                z_min = point.z;
+            }
+            if point.x > x_max {
+                x_max = point.x;
+            }
+            if point.y > y_max {
+                y_max = point.y;
+            }
+            if point.z > z_max {
+                z_max = point.z;
+            }
         }
+        self.header.x_min = x_min;
+        self.header.y_min = y_min;
+        self.header.z_min = z_min;
+        self.header.x_max = x_max;
+        self.header.y_max = y_max;
+        self.header.z_max = z_max;
 
         let mut bytes_written = try!(self.header.write_to(writer)) as usize;
         if bytes_written < self.header.header_size as usize {
