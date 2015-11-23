@@ -154,14 +154,14 @@ impl Header {
     /// ```
     pub fn new() -> Header {
         Header {
-            file_signature: [0; 4],
+            file_signature: *b"LASF",
             file_source_id: 0,
             global_encoding: 0,
             guid_data_1: 0,
             guid_data_2: 0,
             guid_data_3: 0,
             guid_data_4: [0; 8],
-            version_major: 0,
+            version_major: 1,
             version_minor: 0,
             system_identifier: [0; 32],
             generating_software: [0; 32],
@@ -174,9 +174,9 @@ impl Header {
             point_data_record_length: 0,
             number_of_point_records: 0,
             number_of_points_by_return: [0; 5],
-            x_scale_factor: 0.0,
-            y_scale_factor: 0.0,
-            z_scale_factor: 0.0,
+            x_scale_factor: 1.0,
+            y_scale_factor: 1.0,
+            z_scale_factor: 1.0,
             x_offset: 0.0,
             y_offset: 0.0,
             z_offset: 0.0,
@@ -238,6 +238,20 @@ impl Header {
         try!(writer.write_f64::<LittleEndian>(self.z_max));
         try!(writer.write_f64::<LittleEndian>(self.z_min));
         Ok(DEFAULT_BYTES_IN_HEADER)
+    }
+
+    /// Calculates the size of this header and assigns it to the header structure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::Header;
+    /// let mut header = Header::new();
+    /// header.calculate_size();
+    /// assert_eq!(227, header.header_size);
+    /// ```
+    pub fn calculate_size(&mut self) {
+        self.header_size = DEFAULT_BYTES_IN_HEADER
     }
 }
 

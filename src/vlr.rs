@@ -72,6 +72,19 @@ impl Vlr {
         }
     }
 
+    /// Returns the length of this variable length record in bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::vlr::Vlr;
+    /// let vlr = Vlr::new();
+    /// assert_eq!(54, vlr.len());
+    /// ```
+    pub fn len(&self) -> u32 {
+        DEFAULT_HEADER_LENGTH as u32 + self.record.len() as u32
+    }
+
     /// Writes this vlr to a `Write`.
     ///
     /// # Examples
