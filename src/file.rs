@@ -140,6 +140,14 @@ impl File {
                                            self.vlrs.iter().fold(0, |a, v| a + v.len());
         self.header.point_data_record_length = self.header.point_data_format.record_length();
 
+        let mut number_of_points_by_return = [0u32; 5];
+        for point in &self.points {
+            let return_number = point.return_number.as_u8();
+            if return_number > 0 {
+                number_of_points_by_return[(return_number - 1) as usize] += 1;
+            }
+        }
+
         let mut bytes_written = try!(self.header.write_to(writer)) as usize;
         if bytes_written < self.header.header_size as usize {
             bytes_written += try!(write_zeros(writer,
