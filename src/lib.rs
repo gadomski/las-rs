@@ -16,6 +16,7 @@ pub mod vlr;
 
 pub use file::File;
 pub use point::Point;
+pub use stream::Stream;
 
 /// Crate-specific errors.
 #[derive(Debug)]
