@@ -79,6 +79,25 @@ impl File {
         }
     }
 
+    /// Set the scale factors on a file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::file::File;
+    /// let file = File::new().scale_factors(0.01, 0.01, 0.01);
+    /// ```
+    pub fn scale_factors(mut self,
+                         x_scale_factor: f64,
+                         y_scale_factor: f64,
+                         z_scale_factor: f64)
+                         -> File {
+        self.header.x_scale_factor = x_scale_factor;
+        self.header.y_scale_factor = y_scale_factor;
+        self.header.z_scale_factor = z_scale_factor;
+        self
+    }
+
     /// Returns a reference to a vector of this file's points.
     ///
     /// # Examples
