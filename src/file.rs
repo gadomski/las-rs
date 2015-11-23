@@ -6,14 +6,14 @@ use std::path::Path;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
+use Result;
+use error::Error;
 use header::Header;
 use io::write_zeros;
 use point::Point;
 use scale::descale;
 use stream::Stream;
 use vlr::Vlr;
-
-use super::{LasError, Result};
 
 /// A las file.
 #[derive(Debug, PartialEq)]
@@ -183,7 +183,7 @@ impl File {
             match point.gps_time {
                 Some(gps_time) => try!(writer.write_f64::<LittleEndian>(gps_time)),
                 None => {
-                    return Err(LasError::PointFormat(self.header.point_data_format,
+                    return Err(Error::PointFormat(self.header.point_data_format,
                                                      "gps_time".to_string()))
                 }
             }
@@ -192,21 +192,21 @@ impl File {
             match point.red {
                 Some(red) => try!(writer.write_u16::<LittleEndian>(red)),
                 None => {
-                    return Err(LasError::PointFormat(self.header.point_data_format,
+                    return Err(Error::PointFormat(self.header.point_data_format,
                                                      "red".to_string()))
                 }
             }
             match point.green {
                 Some(green) => try!(writer.write_u16::<LittleEndian>(green)),
                 None => {
-                    return Err(LasError::PointFormat(self.header.point_data_format,
+                    return Err(Error::PointFormat(self.header.point_data_format,
                                                      "green".to_string()))
                 }
             }
             match point.blue {
                 Some(blue) => try!(writer.write_u16::<LittleEndian>(blue)),
                 None => {
-                    return Err(LasError::PointFormat(self.header.point_data_format,
+                    return Err(Error::PointFormat(self.header.point_data_format,
                                                      "blue".to_string()))
                 }
             }

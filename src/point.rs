@@ -1,6 +1,7 @@
 //! las points.
 
-use super::{LasError, Result};
+use Result;
+use error::Error;
 
 /// A las point.
 #[derive(Debug, Default, PartialEq)]
@@ -95,7 +96,7 @@ impl ReturnNumber {
         if n < 6 {
             Ok(ReturnNumber(n))
         } else {
-            Err(LasError::InvalidReturnNumber(n))
+            Err(Error::InvalidReturnNumber(n))
         }
     }
 
@@ -132,7 +133,7 @@ impl NumberOfReturns {
         if n < 6 {
             Ok(NumberOfReturns(n))
         } else {
-            Err(LasError::InvalidNumberOfReturns(n))
+            Err(Error::InvalidNumberOfReturns(n))
         }
     }
 
@@ -247,7 +248,7 @@ impl Classification {
             9 => Classification::Water,
             12 => Classification::Overlap,
             10 | 11 | 13...31 => Classification::Reserved(n),
-            _ => return Err(LasError::InvalidClassification(n)),
+            _ => return Err(Error::InvalidClassification(n)),
         })
     }
 

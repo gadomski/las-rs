@@ -5,7 +5,8 @@ use std::fmt;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use super::{LasError, Result};
+use Result;
+use error::Error;
 use io::read_full;
 
 /// This constant value is the bytes in your normal header. There are worlds where people put crap
@@ -276,7 +277,7 @@ impl PointDataFormat {
         if n < 4 {
             Ok(PointDataFormat(n))
         } else {
-            Err(LasError::InvalidPointDataFormat(n))
+            Err(Error::InvalidPointDataFormat(n))
         }
     }
 
