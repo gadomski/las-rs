@@ -1,15 +1,16 @@
 //! `las` file management.
 
 use std::fs;
-use std::io::{BufReader, Seek, SeekFrom, Read, Write};
+use std::io::{BufReader, Seek, Read, Write};
 use std::path::Path;
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, WriteBytesExt};
 
 use header::Header;
-use io::{read_full, write_zeros};
-use point::{Classification, NumberOfReturns, Point, ReturnNumber, ScanDirection};
-use scale::{descale, scale};
+use io::write_zeros;
+use point::Point;
+use scale::descale;
+use stream::Stream;
 use vlr::Vlr;
 
 use super::{LasError, Result};
@@ -32,7 +33,7 @@ impl File {
     /// let file = File::from_path("data/1.0_0.las").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<File> {
-        let ref mut reader = BufReader::new(try!(fs::File::open(path)));
+        let reader = BufReader::new(try!(fs::File::open(path)));
         File::read_from(reader)
     }
 
@@ -43,27 +44,21 @@ impl File {
     /// ```
     /// use std::fs;
     /// use las::file::File;
-    /// let ref mut reader = fs::File::open("data/1.0_0.las").unwrap();
+    /// let reader = fs::File::open("data/1.0_0.las").unwrap();
     /// let file = File::read_from(reader).unwrap();
     /// ```
-    pub fn read_from<R: Read + Seek>(reader: &mut R) -> Result<File> {
+    pub fn read_from<R: Read + Seek>(reader: R) -> Result<File> {
         let mut file = File::new();
-
-        file.header = try!(Header::read_from(reader));
-
-        let _ = try!(reader.seek(SeekFrom::Start(file.header.header_size as u64)));
-        file.vlrs.reserve(file.header.number_of_variable_length_records as usize);
-        for _ in 0..file.header.number_of_variable_length_records {
-            file.vlrs.push(try!(Vlr::read_from(reader)));
+        let mut stream = try!(Stream::new(reader));
+        file.header = stream.header();
+        file.vlrs = (*stream.vlrs()).clone();
+        file.points.reserve(stream.npoints() as usize);
+        loop {
+            match try!(stream.next_point()) {
+                Some(point) => file.points.push(point),
+                None => break
+            }
         }
-
-        let _ = try!(reader.seek(SeekFrom::Start(file.header.offset_to_point_data as u64)));
-        file.points.reserve(file.header.number_of_point_records as usize);
-        for _ in 0..file.header.number_of_point_records {
-            let point = try!(file.read_point_from(reader));
-            file.points.push(point);
-        }
-
         Ok(file)
     }
 
@@ -81,51 +76,6 @@ impl File {
             vlrs: Vec::new(),
             points: Vec::new(),
         }
-    }
-
-    fn read_point_from<R: Read + Seek>(&self, reader: &mut R) -> Result<Point> {
-        let mut point = Point::new();
-        let start = try!(reader.seek(SeekFrom::Current(0)));
-        point.x = scale(try!(reader.read_i32::<LittleEndian>()),
-                        self.header.x_scale_factor,
-                        self.header.x_offset);
-        point.y = scale(try!(reader.read_i32::<LittleEndian>()),
-                        self.header.y_scale_factor,
-                        self.header.y_offset);
-        point.z = scale(try!(reader.read_i32::<LittleEndian>()),
-                        self.header.z_scale_factor,
-                        self.header.x_offset);
-        point.intensity = try!(reader.read_u16::<LittleEndian>());
-        let byte = try!(reader.read_u8());
-        point.return_number = try!(ReturnNumber::from_u8(byte & 0b00000111));
-        point.number_of_returns = try!(NumberOfReturns::from_u8((byte >> 3) & 0b00000111));
-        point.scan_direction = ScanDirection::from((byte >> 6) & 0b00000001 == 1);
-        point.edge_of_flight_line = byte >> 7 == 1;
-        let byte = try!(reader.read_u8());
-        point.classification = try!(Classification::from_u8(byte & 0b00011111));
-        point.synthetic = (byte >> 5) & 0b00000001 == 1;
-        point.key_point = (byte >> 6) & 0b00000001 == 1;
-        point.withheld = byte >> 7 == 1;
-        point.scan_angle_rank = try!(reader.read_i8());
-        point.user_data = try!(reader.read_u8());
-        point.point_source_id = try!(reader.read_u16::<LittleEndian>());
-        if self.header.point_data_format.has_time() {
-            point.gps_time = Some(try!(reader.read_f64::<LittleEndian>()));
-        }
-        if self.header.point_data_format.has_color() {
-            point.red = Some(try!(reader.read_u16::<LittleEndian>()));
-            point.green = Some(try!(reader.read_u16::<LittleEndian>()));
-            point.blue = Some(try!(reader.read_u16::<LittleEndian>()));
-        }
-        let bytes_read = try!(reader.seek(SeekFrom::Current(0))) - start;
-
-        if bytes_read < self.header.point_data_record_length as u64 {
-            let mut buf = vec![0; (self.header.point_data_record_length as u64 - bytes_read) as usize];
-            try!(read_full(reader, &mut buf[..]));
-            point.extra_bytes = Some(buf);
-        }
-
-        Ok(point)
     }
 
     /// Returns a reference to a vector of this file's points.

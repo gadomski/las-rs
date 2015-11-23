@@ -11,6 +11,7 @@ pub mod file;
 pub mod point;
 mod io;
 mod scale;
+pub mod stream;
 pub mod vlr;
 
 pub use file::File;

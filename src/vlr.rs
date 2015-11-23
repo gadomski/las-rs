@@ -10,7 +10,7 @@ use io::read_full;
 const DEFAULT_HEADER_LENGTH: u16 = 54;
 
 /// A variable length record
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Vlr {
     /// Reserved for future use.
     pub reserved: u16,
