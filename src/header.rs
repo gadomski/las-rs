@@ -317,6 +317,24 @@ impl PointDataFormat {
     pub fn has_color(&self) -> bool {
         self.0 == 2 || self.0 == 3
     }
+
+    /// Returns the record length for this point data format.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::PointDataFormat;
+    /// assert_eq!(20, PointDataFormat::from_u8(0).unwrap().record_length());
+    /// ```
+    pub fn record_length(&self) -> u16 {
+        match self.0 {
+            0 => 20,
+            1 => 28,
+            2 => 26,
+            3 => 34,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl fmt::Display for PointDataFormat {

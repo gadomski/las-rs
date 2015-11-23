@@ -138,6 +138,7 @@ impl File {
         self.header.number_of_point_records = self.points.len() as u32;
         self.header.offset_to_point_data = self.header.header_size as u32 +
                                            self.vlrs.iter().fold(0, |a, v| a + v.len());
+        self.header.point_data_record_length = self.header.point_data_format.record_length();
 
         let mut bytes_written = try!(self.header.write_to(writer)) as usize;
         if bytes_written < self.header.header_size as usize {
