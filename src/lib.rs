@@ -14,6 +14,7 @@ mod scale;
 pub mod vlr;
 
 pub use file::File;
+pub use point::Point;
 
 /// Crate-specific errors.
 #[derive(Debug)]
