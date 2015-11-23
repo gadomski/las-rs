@@ -1,51 +1,30 @@
-//! I/O related extensions.
+//! Utilities for reading and writing
 
-use std::io::Read;
+use std::io;
 
-use super::{LasError, Result};
+use byteorder::{Error, Result};
 
-/// Readers that can provide a las string.
+/// Reads enough data to fill the buffer, or errors.
 ///
-/// A las string is really just a c string, which is terminated by a null byte, but we do some
-/// extra checking to ensure there are no valid characters after the first null byte, per the las
-/// specification.
-pub trait LasStringExt: Read {
-    /// Read a las `String` of size `count` from the underlying Read object.
-    fn read_las_string(&mut self, count: usize) -> Result<String>;
-}
-
-impl<R: Read> LasStringExt for R {
-    fn read_las_string(&mut self, count: usize) -> Result<String> {
-        let mut character_after_null = false;
-        let mut seen_null = false;
-        let mut string = String::with_capacity(count);
-        for byte in self.take(count as u64).bytes() {
-            let byte = try!(byte);
-            if byte == 0u8 {
-                seen_null = true;
-            } else if seen_null {
-                character_after_null = true;
-            } else {
-                string.push(byte as char);
-            }
-        }
-        if character_after_null {
-            Err(LasError::CharacterAfterNullByte)
-        } else {
-            Ok(string)
+/// This is taken from the byteorder souce, where it is a private method.
+pub fn read_full<R: io::Read + ?Sized>(rdr: &mut R, buf: &mut [u8]) -> Result<()> {
+    let mut nread = 0usize;
+    while nread < buf.len() {
+        match rdr.read(&mut buf[nread..]) {
+            Ok(0) => return Err(Error::UnexpectedEOF),
+            Ok(n) => nread += n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(From::from(e)),
         }
     }
+    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::io::Cursor;
-
-    #[test]
-    fn simple_las_string() {
-        let mut cursor = Cursor::new(Vec::from("hi"));
-        assert_eq!("hi", cursor.read_las_string(2).unwrap());
-    }
+/// Writes a certain number of null bytes to a buffer.
+///
+/// This is basically `write_all` that returns the number of bytes written.
+pub fn write_zeros<W: io::Write>(writer: &mut W, n: usize) -> io::Result<usize> {
+    let buf = vec![0; n];
+    try!(writer.write_all(&buf[..]));
+    Ok(n)
 }

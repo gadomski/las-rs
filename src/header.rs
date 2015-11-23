@@ -1,58 +1,19 @@
-//! Las headers.
+//! `las` headers describe the point format, data bounds, and other metadata.
 
-use std::io::Read;
+use std::io::{Read, Write};
+use std::fmt;
 
-use byteorder::ReadBytesExt;
-use byteorder::LittleEndian;
-use rustc_serialize::hex::ToHex;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use super::{LasError, Result};
-use io::LasStringExt;
-use util::Triplet;
+use io::read_full;
 
-/// Project ID newtype.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ProjectId(pub [u8; 4], pub [u8; 2], pub [u8; 2], pub [u8; 8]);
-
-impl Default for ProjectId {
-    fn default() -> ProjectId {
-        ProjectId([0; 4], [0; 2], [0; 2], [0; 8])
-    }
-}
-
-impl ProjectId {
-    /// Returns a hexadecimal string representation of the project ID.
-    ///
-    /// The format for this string was derived from libLAS's output.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::header::ProjectId;
-    /// let project_id = ProjectId([0; 4], [0; 2], [0; 2], [0; 8]);
-    /// assert_eq!("00000000-0000-0000-0000-000000000000", project_id.as_string());
-    /// ```
-    pub fn as_string(&self) -> String {
-        let mut s = self.0.to_hex();
-        s.push_str("-");
-        s.push_str(&self.1.to_hex());
-        s.push_str("-");
-        s.push_str(&self.2.to_hex());
-        s.push_str("-");
-        s.push_str(&self.3[0..2].to_hex());
-        s.push_str("-");
-        s.push_str(&self.3[2..8].to_hex());
-        s
-    }
-}
+/// This constant value is the bytes in your normal header. There are worlds where people put crap
+/// into headers that don't belong there, so we have to guard against this.
+const DEFAULT_BYTES_IN_HEADER: u16 = 227;
 
 /// A las header.
-///
-/// This header encapsulates all versions of las headers by:
-///
-/// - Simplifying some name changes to their later name (e.g. global_encoding)
-/// - Representing some added-later fields as Options
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Header {
     /// The las file signature.
     ///
@@ -62,10 +23,14 @@ pub struct Header {
     pub file_source_id: u16,
     /// Unused in early version, and exapanded to help with GPS time offsets in later versions.
     pub global_encoding: u16,
-    /// The project ID, which is a set of integers.
-    ///
-    /// Can sometimes be known as the GUID, though it it not necessarily a GUID.
-    pub project_id: ProjectId,
+    /// The first of four parts of the project id.
+    pub guid_data_1: u32,
+    /// The second of four parts of the project id.
+    pub guid_data_2: u16,
+    /// The third of four parts of the project id.
+    pub guid_data_3: u16,
+    /// The fourth of four parts of the project id.
+    pub guid_data_4: [u8; 8],
     /// The las major version.
     ///
     /// Should always be 1.
@@ -75,9 +40,9 @@ pub struct Header {
     /// Generally the hardware system that created the las file.
     ///
     /// Can also be the algorithm that produced the lasfile. This field is poorly defined.
-    pub system_identifier: String,
+    pub system_identifier: [u8; 32],
     /// The software the generated the las file.
-    pub generating_software: String,
+    pub generating_software: [u8; 32],
     /// The day of the year, indexed to 1.
     pub file_creation_day_of_year: u16,
     /// The year of file creation.
@@ -94,9 +59,7 @@ pub struct Header {
     /// The number of variable length records.
     pub number_of_variable_length_records: u32,
     /// The point data format.
-    ///
-    /// TODO this should probably be a wrapper class to describe the formats.
-    pub point_data_format_id: u8,
+    pub point_data_format: PointDataFormat,
     /// The length of one point data record, in bytes.
     pub point_data_record_length: u16,
     /// The total number of point records.
@@ -105,135 +68,233 @@ pub struct Header {
     ///
     /// This only supports five returns per pulse.
     pub number_of_points_by_return: [u32; 5],
-    /// The x, y, z scaling of each point.
-    pub scale: Triplet<f64>,
-    /// The x, y, z offset of each point.
-    pub offset: Triplet<f64>,
-    /// The minimum value for x, y, and z in this file.
-    pub min: Triplet<f64>,
-    /// The maximum value for x, y, and z in this file.
-    pub max: Triplet<f64>,
-}
-
-impl Default for Header {
-    fn default() -> Header {
-        Header {
-            file_signature: *b"LASF",
-            file_source_id: 0,
-            global_encoding: 0,
-            project_id: Default::default(),
-            version_major: 0,
-            version_minor: 0,
-            system_identifier: "".to_string(),
-            generating_software: "".to_string(),
-            file_creation_day_of_year: 0,
-            file_creation_year: 0,
-            header_size: 0,
-            offset_to_point_data: 0,
-            number_of_variable_length_records: 0,
-            point_data_format_id: 0,
-            point_data_record_length: 0,
-            number_of_point_records: 0,
-            number_of_points_by_return: [0; 5],
-            scale: Default::default(),
-            offset: Default::default(),
-            min: Default::default(),
-            max: Default::default(),
-        }
-    }
+    /// The x scale factor for each point.
+    pub x_scale_factor: f64,
+    /// The y scale factor for each point.
+    pub y_scale_factor: f64,
+    /// The z scale factor for each point.
+    pub z_scale_factor: f64,
+    /// The x offset for each point.
+    pub x_offset: f64,
+    /// The y offset for each point.
+    pub y_offset: f64,
+    /// The z offset for each point.
+    pub z_offset: f64,
+    /// The maximum x value.
+    pub x_max: f64,
+    /// The minimum x value.
+    pub x_min: f64,
+    /// The maximum y value.
+    pub y_max: f64,
+    /// The minimum y value.
+    pub y_min: f64,
+    /// The maximum z value.
+    pub z_max: f64,
+    /// The minimum z value.
+    pub z_min: f64,
 }
 
 impl Header {
-    /// Creates a new header from a `Read` object.
+    /// Reads a header from a `Read`.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use las::header::Header;
-    /// let mut reader = std::fs::File::open("data/1.2_0.las").unwrap();
-    /// let header = Header::new(&mut reader);
+    /// use std::fs::File;
+    /// use las::header::Header;
+    /// let ref mut file = File::open("data/1.0_0.las").unwrap();
+    /// let header = Header::read_from(file);
     /// ```
-    pub fn new<R: Read>(reader: &mut R) -> Result<Header> {
-        let mut header: Header = Default::default();
-        try_read_n!(reader, header.file_signature, 4);
+    pub fn read_from<R: Read>(reader: &mut R) -> Result<Header> {
+        let mut header = Header::new();
+        try!(read_full(reader, &mut header.file_signature));
         header.file_source_id = try!(reader.read_u16::<LittleEndian>());
         header.global_encoding = try!(reader.read_u16::<LittleEndian>());
-        try_read_n!(reader, header.project_id.0, 4);
-        try_read_n!(reader, header.project_id.1, 2);
-        try_read_n!(reader, header.project_id.2, 2);
-        try_read_n!(reader, header.project_id.3, 8);
+        header.guid_data_1 = try!(reader.read_u32::<LittleEndian>());
+        header.guid_data_2 = try!(reader.read_u16::<LittleEndian>());
+        header.guid_data_3 = try!(reader.read_u16::<LittleEndian>());
+        try!(read_full(reader, &mut header.guid_data_4));
         header.version_major = try!(reader.read_u8());
         header.version_minor = try!(reader.read_u8());
-        header.system_identifier = try!(reader.read_las_string(32));
-        header.generating_software = try!(reader.read_las_string(32));
+        try!(read_full(reader, &mut header.system_identifier));
+        try!(read_full(reader, &mut header.generating_software));
         header.file_creation_day_of_year = try!(reader.read_u16::<LittleEndian>());
         header.file_creation_year = try!(reader.read_u16::<LittleEndian>());
         header.header_size = try!(reader.read_u16::<LittleEndian>());
         header.offset_to_point_data = try!(reader.read_u32::<LittleEndian>());
         header.number_of_variable_length_records = try!(reader.read_u32::<LittleEndian>());
-        header.point_data_format_id = try!(reader.read_u8());
+        header.point_data_format = try!(PointDataFormat::from_u8(try!(reader.read_u8())));
         header.point_data_record_length = try!(reader.read_u16::<LittleEndian>());
         header.number_of_point_records = try!(reader.read_u32::<LittleEndian>());
-        header.number_of_points_by_return[0] = try!(reader.read_u32::<LittleEndian>());
-        header.number_of_points_by_return[1] = try!(reader.read_u32::<LittleEndian>());
-        header.number_of_points_by_return[2] = try!(reader.read_u32::<LittleEndian>());
-        header.number_of_points_by_return[3] = try!(reader.read_u32::<LittleEndian>());
-        header.number_of_points_by_return[4] = try!(reader.read_u32::<LittleEndian>());
-        header.scale.x = try!(reader.read_f64::<LittleEndian>());
-        header.scale.y = try!(reader.read_f64::<LittleEndian>());
-        header.scale.z = try!(reader.read_f64::<LittleEndian>());
-        header.offset.x = try!(reader.read_f64::<LittleEndian>());
-        header.offset.y = try!(reader.read_f64::<LittleEndian>());
-        header.offset.z = try!(reader.read_f64::<LittleEndian>());
-        header.max.x = try!(reader.read_f64::<LittleEndian>());
-        header.min.x = try!(reader.read_f64::<LittleEndian>());
-        header.max.y = try!(reader.read_f64::<LittleEndian>());
-        header.min.y = try!(reader.read_f64::<LittleEndian>());
-        header.max.z = try!(reader.read_f64::<LittleEndian>());
-        header.min.z = try!(reader.read_f64::<LittleEndian>());
+        for n in &mut header.number_of_points_by_return {
+            *n = try!(reader.read_u32::<LittleEndian>());
+        }
+        header.x_scale_factor = try!(reader.read_f64::<LittleEndian>());
+        header.y_scale_factor = try!(reader.read_f64::<LittleEndian>());
+        header.z_scale_factor = try!(reader.read_f64::<LittleEndian>());
+        header.x_offset = try!(reader.read_f64::<LittleEndian>());
+        header.y_offset = try!(reader.read_f64::<LittleEndian>());
+        header.z_offset = try!(reader.read_f64::<LittleEndian>());
+        header.x_max = try!(reader.read_f64::<LittleEndian>());
+        header.x_min = try!(reader.read_f64::<LittleEndian>());
+        header.y_max = try!(reader.read_f64::<LittleEndian>());
+        header.y_min = try!(reader.read_f64::<LittleEndian>());
+        header.z_max = try!(reader.read_f64::<LittleEndian>());
+        header.z_min = try!(reader.read_f64::<LittleEndian>());
         Ok(header)
+    }
+
+    /// Creates a new, empty header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::Header;
+    /// let header = Header::new();
+    /// ```
+    pub fn new() -> Header {
+        Header {
+            file_signature: [0; 4],
+            file_source_id: 0,
+            global_encoding: 0,
+            guid_data_1: 0,
+            guid_data_2: 0,
+            guid_data_3: 0,
+            guid_data_4: [0; 8],
+            version_major: 0,
+            version_minor: 0,
+            system_identifier: [0; 32],
+            generating_software: [0; 32],
+            file_creation_day_of_year: 0,
+            file_creation_year: 0,
+            header_size: 0,
+            offset_to_point_data: 0,
+            number_of_variable_length_records: 0,
+            point_data_format: PointDataFormat(0),
+            point_data_record_length: 0,
+            number_of_point_records: 0,
+            number_of_points_by_return: [0; 5],
+            x_scale_factor: 0.0,
+            y_scale_factor: 0.0,
+            z_scale_factor: 0.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+            z_offset: 0.0,
+            x_max: 0.0,
+            x_min: 0.0,
+            y_max: 0.0,
+            y_min: 0.0,
+            z_max: 0.0,
+            z_min: 0.0,
+        }
+    }
+
+    /// Writes this header to a `Write`.
+    ///
+    /// Returns the number of bytes written.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    /// use las::header::Header;
+    /// let header = Header::new();
+    /// let ref mut writer = Cursor::new(Vec::new());
+    /// let bytes_written = header.write_to(writer).unwrap();
+    /// ```
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<u16> {
+        try!(writer.write_all(&self.file_signature));
+        try!(writer.write_u16::<LittleEndian>(self.file_source_id));
+        try!(writer.write_u16::<LittleEndian>(self.global_encoding));
+        try!(writer.write_u32::<LittleEndian>(self.guid_data_1));
+        try!(writer.write_u16::<LittleEndian>(self.guid_data_2));
+        try!(writer.write_u16::<LittleEndian>(self.guid_data_3));
+        try!(writer.write_all(&self.guid_data_4));
+        try!(writer.write_u8(self.version_major));
+        try!(writer.write_u8(self.version_minor));
+        try!(writer.write_all(&self.system_identifier));
+        try!(writer.write_all(&self.generating_software));
+        try!(writer.write_u16::<LittleEndian>(self.file_creation_day_of_year));
+        try!(writer.write_u16::<LittleEndian>(self.file_creation_year));
+        try!(writer.write_u16::<LittleEndian>(self.header_size));
+        try!(writer.write_u32::<LittleEndian>(self.offset_to_point_data));
+        try!(writer.write_u32::<LittleEndian>(self.number_of_variable_length_records));
+        try!(writer.write_u8(self.point_data_format.0));
+        try!(writer.write_u16::<LittleEndian>(self.point_data_record_length));
+        try!(writer.write_u32::<LittleEndian>(self.number_of_point_records));
+        for n in &self.number_of_points_by_return {
+            try!(writer.write_u32::<LittleEndian>(*n));
+        }
+        try!(writer.write_f64::<LittleEndian>(self.x_scale_factor));
+        try!(writer.write_f64::<LittleEndian>(self.y_scale_factor));
+        try!(writer.write_f64::<LittleEndian>(self.z_scale_factor));
+        try!(writer.write_f64::<LittleEndian>(self.x_offset));
+        try!(writer.write_f64::<LittleEndian>(self.y_offset));
+        try!(writer.write_f64::<LittleEndian>(self.z_offset));
+        try!(writer.write_f64::<LittleEndian>(self.x_max));
+        try!(writer.write_f64::<LittleEndian>(self.x_min));
+        try!(writer.write_f64::<LittleEndian>(self.y_max));
+        try!(writer.write_f64::<LittleEndian>(self.y_min));
+        try!(writer.write_f64::<LittleEndian>(self.z_max));
+        try!(writer.write_f64::<LittleEndian>(self.z_min));
+        Ok(DEFAULT_BYTES_IN_HEADER)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// A wrapper around the u8 of a point data format.
+///
+/// Formats have powers, so we encapsulate that through this struct.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PointDataFormat(u8);
 
-    use std::fs::File;
+impl PointDataFormat {
+    /// Creates a point data format for this u8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::PointDataFormat;
+    /// assert!(PointDataFormat::from_u8(0).is_ok());
+    /// assert!(PointDataFormat::from_u8(1).is_ok());
+    /// assert!(PointDataFormat::from_u8(127).is_err());
+    /// ```
+    pub fn from_u8(n: u8) -> Result<PointDataFormat> {
+        if n < 4 {
+            Ok(PointDataFormat(n))
+        } else {
+            Err(LasError::InvalidPointDataFormat(n))
+        }
+    }
 
-    #[test]
-    fn header() {
-        let mut reader = File::open("data/1.2_0.las").unwrap();
-        let header = Header::new(&mut reader).unwrap();
-        assert_eq!(*b"LASF", header.file_signature);
-        assert_eq!(0, header.file_source_id);
-        assert_eq!(0, header.global_encoding);
-        assert_eq!("b8f18883-1baa-0841-bca3-6bc68e7b062e",
-                   header.project_id.as_string());
-        assert_eq!(1, header.version_major);
-        assert_eq!(2, header.version_minor);
-        assert_eq!("libLAS", header.system_identifier);
-        assert_eq!("libLAS 1.2", header.generating_software);
-        assert_eq!(78, header.file_creation_day_of_year);
-        assert_eq!(2008, header.file_creation_year);
-        assert_eq!(227, header.header_size);
-        assert_eq!(438, header.offset_to_point_data);
-        assert_eq!(2, header.number_of_variable_length_records);
-        assert_eq!(0, header.point_data_format_id);
-        assert_eq!(20, header.point_data_record_length);
-        assert_eq!(1, header.number_of_point_records);
-        assert_eq!([0, 1, 0, 0, 0], header.number_of_points_by_return);
-        assert_eq!(0.01, header.scale.x);
-        assert_eq!(0.01, header.scale.y);
-        assert_eq!(0.01, header.scale.z);
-        assert_eq!(0.0, header.offset.x);
-        assert_eq!(0.0, header.offset.y);
-        assert_eq!(0.0, header.offset.z);
-        assert_eq!(470692.447538, header.min.x);
-        assert_eq!(4602888.904642, header.min.y);
-        assert_eq!(16.0, header.min.z);
-        assert_eq!(470692.447538, header.max.x);
-        assert_eq!(4602888.904642, header.max.y);
-        assert_eq!(16.0, header.max.z);
+    /// Returns true if this point data format has time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::PointDataFormat;
+    /// assert!(!PointDataFormat::from_u8(0).unwrap().has_time());
+    /// assert!(PointDataFormat::from_u8(1).unwrap().has_time());
+    /// ```
+    pub fn has_time(&self) -> bool {
+        self.0 == 1 || self.0 == 3
+    }
+
+    /// Returns true if this point data format has color.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::PointDataFormat;
+    /// assert!(!PointDataFormat::from_u8(0).unwrap().has_color());
+    /// assert!(PointDataFormat::from_u8(2).unwrap().has_color());
+    /// ```
+    pub fn has_color(&self) -> bool {
+        self.0 == 2 || self.0 == 3
+    }
+}
+
+impl fmt::Display for PointDataFormat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

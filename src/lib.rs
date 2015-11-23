@@ -1,69 +1,53 @@
-//! Read ASPRS las files.
+//! Reads and writes point cloud data stored in the ASPRS las file format.
 
 #![deny(missing_copy_implementations, missing_debug_implementations, missing_docs, trivial_casts,
         trivial_numeric_casts, unsafe_code, unstable_features, unused_extern_crates,
         unused_import_braces, unused_qualifications)]
 
 extern crate byteorder;
-extern crate rustc_serialize;
 
-use std::error::Error;
-use std::fmt;
-use std::result;
-
-#[macro_use] pub mod macros;
 pub mod header;
-pub mod io;
+pub mod file;
 pub mod point;
-pub mod reader;
-pub mod util;
+mod io;
+mod scale;
 pub mod vlr;
 
-pub use header::Header;
-pub use point::Point;
-pub use reader::Reader;
-pub use vlr::Vlr;
+pub use file::File;
 
 /// Crate-specific errors.
 #[derive(Debug)]
 pub enum LasError {
-    /// Wrapper around a byteorder::Error.
+    /// Wraps `byteorder::Error`.
     Byteorder(byteorder::Error),
-    /// A reader found a non-null character after a null byte when reading a las string.
-    CharacterAfterNullByte,
-    /// A scan direction is either a zero or a one, nothing else.
-    InvalidScanDirection(u8),
-    /// Wrapper around an io::Error.
+    /// Invalid classification value.
+    InvalidClassification(u8),
+    /// Point number of returns was out of bounds.
+    InvalidNumberOfReturns(u8),
+    /// Unrecognized point data format.
+    InvalidPointDataFormat(u8),
+    /// Point return number was out of allowed bounds.
+    InvalidReturnNumber(u8),
+    /// Wraps `std::io::Error`.
     Io(std::io::Error),
-    /// Some sort of error occurred while reading.
-    Read(String),
+    /// Tried to write a point to a format it doesn't support.
+    PointFormat(header::PointDataFormat, String),
 }
 
-impl fmt::Display for LasError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            LasError::Byteorder(ref err) => write!(f, "Byteorder error: {}", err),
-            LasError::CharacterAfterNullByte => write!(f, "Found a character after a null byte"),
-            LasError::InvalidScanDirection(number) => write!(f, "Invalid scan direction: {}", number),
-            LasError::Io(ref err) => write!(f, "IO error: {}", err),
-            LasError::Read(ref string) => write!(f, "Read error: {}", string),
-        }
-    }
-}
-
-impl Error for LasError {
+impl std::error::Error for LasError {
     fn description(&self) -> &str {
         match *self {
             LasError::Byteorder(ref err) => err.description(),
-            LasError::CharacterAfterNullByte => "character after a null byte",
-            LasError::InvalidScanDirection(_) => "invalid scan direction",
+            LasError::InvalidClassification(_) => "invalid classification",
+            LasError::InvalidNumberOfReturns(_) => "invalid number of returns",
+            LasError::InvalidPointDataFormat(_) => "invalid point data format",
+            LasError::InvalidReturnNumber(_) => "invalid return number",
             LasError::Io(ref err) => err.description(),
-            LasError::Read(_) => "read error",
+            LasError::PointFormat(_, _) => "point format mismatch",
         }
-
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&std::error::Error> {
         match *self {
             LasError::Byteorder(ref err) => Some(err),
             LasError::Io(ref err) => Some(err),
@@ -72,9 +56,17 @@ impl Error for LasError {
     }
 }
 
-impl From<std::io::Error> for LasError {
-    fn from(err: std::io::Error) -> LasError {
-        LasError::Io(err)
+impl std::fmt::Display for LasError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            LasError::Byteorder(ref err) => write!(f, "Byteorder error: {}", err),
+            LasError::InvalidClassification(n) => write!(f, "Invalid classification: {}", n),
+            LasError::InvalidNumberOfReturns(n) => write!(f, "Invalid number of returns: {}", n),
+            LasError::InvalidPointDataFormat(n) => write!(f, "Invalid point data format: {}", n),
+            LasError::InvalidReturnNumber(n) => write!(f, "Invalid return number: {}", n),
+            LasError::Io(ref err) => write!(f, "IO error: {}", err),
+            LasError::PointFormat(format, ref field) => write!(f, "Point format mismatch for format '{}' and field '{}'", format, field),
+        }
     }
 }
 
@@ -84,5 +76,11 @@ impl From<byteorder::Error> for LasError {
     }
 }
 
-/// Crate-specific result type.
-pub type Result<T> = result::Result<T, LasError>;
+impl From<std::io::Error> for LasError {
+    fn from(err: std::io::Error) -> LasError {
+        LasError::Io(err)
+    }
+}
+
+/// Crate-specific resuls.
+pub type Result<T> = std::result::Result<T, LasError>;

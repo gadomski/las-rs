@@ -1,124 +1,240 @@
-//! Las points.
+//! las points.
 
 use super::{LasError, Result};
 
 /// A las point.
-///
-/// As we do for the `Header` we encasulate different point formats by using `Option<T>`.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Point {
-    /// The x value of the point.
-    ///
-    /// This value is assumed to not include a scaling and offset -- in other words, this is the
-    /// "true" value, not the value stored in the lasfile.
+    /// The x value of the point, as a f64.
     pub x: f64,
-    /// The y value of the point.
-    ///
-    /// This value is assumed to not include a scaling and offset -- in other words, this is the
-    /// "true" value, not the value stored in the lasfile.
+    /// The y value of the point, as a f64.
     pub y: f64,
-    /// The z value of the point.
-    ///
-    /// This value is assumed to not include a scaling and offset -- in other words, this is the
-    /// "true" value, not the value stored in the lasfile.
+    /// The z value of the point, as a f64.
     pub z: f64,
-    /// The intensity of the point.
-    pub intensity: u16,
-    /// The return number of the point for its pulse.
+    /// The pulse return magnitude.
     ///
-    /// TODO these aren't actually u8s.
-    pub return_number: u8,
-    /// The number of returns in total for the pulse that produced this point.
-    pub number_of_returns: u8,
-    /// The `ScanDirection` of the point.
+    /// This value is system-specific.
+    pub intensity: u16,
+    /// The pulse return number for this point's pulse.
+    pub return_number: ReturnNumber,
+    /// The total number of returns in this point's pulse.
+    pub number_of_returns: NumberOfReturns,
+    /// The scan direction of the mirror, forwards or backwards.
     pub scan_direction: ScanDirection,
-    /// True if this point is on the edge of a flight line.
+    /// Is this point at the edge of a flight line?
     pub edge_of_flight_line: bool,
-    /// The `Classification` of this point.
+    /// The classification of this point.
+    ///
+    /// ASPRS defines some integer-to-classification mappings.
     pub classification: Classification,
-    /// The scan angle range -- basically, the integer value of the scan angle.
+    /// Was this point created by some other means than LiDAR?
+    pub synthetic: bool,
+    /// Is this point a key point?
+    ///
+    /// If so, try not to thin it.
+    pub key_point: bool,
+    /// Should this point be included in processing?
+    ///
+    /// A.k.a. "deleted".
+    pub withheld: bool,
+    /// The truncated integer value of the scan angle.
+    ///
+    /// Negative values are left.
     pub scan_angle_rank: i8,
-    /// Custom data that the user can provide.
+    /// Data used at the user's discretion.
     pub user_data: u8,
-    /// The "file" from which this point originated.
+    /// The point source id.
     pub point_source_id: u16,
-    /// The gps time of this point.
+    /// The GPS time this point was collected.
+    ///
+    /// Optional, does not exist in all point formats.
     pub gps_time: Option<f64>,
-    /// The red channel for this point.
+    /// The red image channel, optional.
     pub red: Option<u16>,
-    /// The green channel for this point.
+    /// The green image channel, optional.
     pub green: Option<u16>,
-    /// The blue channel for this point.
+    /// The blue image channel, optional.
     pub blue: Option<u16>,
+    /// Any extra bytes that were included in the point record.
+    ///
+    /// These are legal under the standard, but they break many readers.
+    pub extra_bytes: Option<Vec<u8>>,
 }
 
-/// The scan direction of the mirror when this point was collected.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ScanDirection {
-    /// The scan was moving backward, whatever that means.
-    Backward = 0,
-    /// The scan was moving forward, whatever that means.
-    Forward = 1,
-}
-
-impl Default for ScanDirection {
-    fn default() -> ScanDirection {
-        ScanDirection::Forward
+impl Point {
+    /// Creates a new point.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Point;
+    /// let point = Point::new();
+    /// ```
+    pub fn new() -> Point {
+        Default::default()
     }
 }
 
-impl ScanDirection {
-    /// Translates a u8 into a scan direction.
+/// A custom wrapper to represent a point's return number.
+///
+/// Since the number has an upper bound, we use this wrapper to ensure those bounds.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ReturnNumber(u8);
+
+impl ReturnNumber {
+    /// Creates a return number from a u8.
     ///
-    /// Returns an error if the u8 is not zero or one.
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::ReturnNumber;
+    /// assert!(ReturnNumber::from_u8(1).is_ok());
+    /// assert!(ReturnNumber::from_u8(6).is_err());
+    /// ```
+    pub fn from_u8(n: u8) -> Result<ReturnNumber> {
+        if n < 6 {
+            Ok(ReturnNumber(n))
+        } else {
+            Err(LasError::InvalidReturnNumber(n))
+        }
+    }
+
+    /// Returns this return number as a u8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::ReturnNumber;
+    /// assert_eq!(1, ReturnNumber::from_u8(1).unwrap().as_u8());
+    /// ```
+    pub fn as_u8(&self) -> u8 {
+        self.0
+    }
+}
+
+/// A custom wrapper to represent a point's number of returns.
+///
+/// Since the number has an upper bound, we use this wrapper to ensure those bounds.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct NumberOfReturns(u8);
+
+impl NumberOfReturns {
+    /// Creates a number of returns from a u8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::NumberOfReturns;
+    /// assert!(NumberOfReturns::from_u8(0).is_ok());
+    /// assert!(NumberOfReturns::from_u8(6).is_err());
+    /// ```
+    pub fn from_u8(n: u8) -> Result<NumberOfReturns> {
+        if n < 6 {
+            Ok(NumberOfReturns(n))
+        } else {
+            Err(LasError::InvalidNumberOfReturns(n))
+        }
+    }
+
+    /// Returns this NumberOfReturns as a u8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::NumberOfReturns;
+    /// assert_eq!(1, NumberOfReturns::from_u8(1).unwrap().as_u8());
+    /// ```
+    pub fn as_u8(&self) -> u8 {
+        self.0
+    }
+}
+
+/// An enum to represent scan direction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ScanDirection {
+    /// The mirror is traveling in a negative direction, right to left.
+    Backward = 0,
+    /// The mirror is traveling in a positive direction, left to right.
+    Forward = 1,
+}
+
+impl ScanDirection {
+    /// Converts this scan direction to a u8.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::point::ScanDirection;
-    /// assert_eq!(ScanDirection::Backward, ScanDirection::from_u8(0).unwrap());
-    /// assert_eq!(ScanDirection::Forward, ScanDirection::from_u8(1).unwrap());
+    /// let forward = ScanDirection::Forward;
+    /// assert_eq!(1, forward.as_u8());
     /// ```
-    pub fn from_u8(n: u8) -> Result<ScanDirection> {
-        match n {
-            0 => Ok(ScanDirection::Backward),
-            1 => Ok(ScanDirection::Forward),
-            _ => Err(LasError::InvalidScanDirection(n)),
+    pub fn as_u8(&self) -> u8 {
+        match *self {
+            ScanDirection::Forward => 1,
+            ScanDirection::Backward => 0,
         }
     }
 }
 
-/// The classification of a point.
-///
-/// We allow mising docs on the classes because the names say it all.
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Classification {
-    CreatedNeverClassified = 0,
-    Unclassified = 1,
-    Ground = 2,
-    LowVegetation = 3,
-    MediumVegetation = 4,
-    HighVegetation = 5,
-    Building = 6,
-    LowPoint = 7,
-    ModelKeyPoint = 8,
-    Water = 9,
-    Reserved10 = 10,
-    Reserved11 = 11,
-    Overlap = 12,
-    Reserved,
-}
-
-impl Default for Classification {
-    fn default() -> Classification {
-        Classification::CreatedNeverClassified
+impl Default for ScanDirection {
+    fn default() -> ScanDirection {
+        ScanDirection::Backward
     }
 }
 
-impl From<u8> for Classification {
-    fn from(n: u8) -> Self {
-        match n {
+impl From<bool> for ScanDirection {
+    fn from(b: bool) -> ScanDirection {
+        if b {
+            ScanDirection::Forward
+        } else {
+            ScanDirection::Backward
+        }
+    }
+}
+
+/// An enum to represent classifications.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Classification {
+    /// A point is unclassified, and we haven't even tried.
+    CreatedNeverClassified,
+    /// This point could not be classified.
+    Unclassified,
+    /// Ground point.
+    Ground,
+    /// A low vegetation point, such as shrubbery.
+    LowVegetation,
+    /// Medium vegetation, like chaperelle.
+    MediumVegetation,
+    /// High vegetation, like forest.
+    HighVegetation,
+    /// A man-made building.
+    Building,
+    /// A noise point.
+    LowPoint,
+    /// A mass point, pretty synthetic.
+    ModelKeyPoint,
+    /// Water.
+    Water,
+    /// These points were culled when merging overlapping flight lines.
+    Overlap,
+    /// Reserved for ASPRS definition.
+    ///
+    /// There are several numerical values associated with `Reserved.`
+    Reserved(u8),
+}
+
+impl Classification {
+    /// Creates a classification from a u8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Classification;
+    /// assert_eq!(Classification::Ground, Classification::from_u8(2).unwrap());
+    /// assert!(Classification::from_u8(127).is_err());
+    /// ```
+    pub fn from_u8(n: u8) -> Result<Classification> {
+        Ok(match n {
             0 => Classification::CreatedNeverClassified,
             1 => Classification::Unclassified,
             2 => Classification::Ground,
@@ -129,10 +245,41 @@ impl From<u8> for Classification {
             7 => Classification::LowPoint,
             8 => Classification::ModelKeyPoint,
             9 => Classification::Water,
-            10 => Classification::Reserved10,
-            11 => Classification::Reserved11,
             12 => Classification::Overlap,
-            _ => Classification::Reserved,
-       }
+            10 | 11 | 13...31 => Classification::Reserved(n),
+            _ => return Err(LasError::InvalidClassification(n)),
+        })
+    }
+
+    /// Returns this classifications u8 value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Classification;
+    /// let classification = Classification::Ground;
+    /// assert_eq!(2, classification.as_u8());
+    /// ```
+    pub fn as_u8(&self) -> u8 {
+        match *self {
+            Classification::CreatedNeverClassified => 0,
+            Classification::Unclassified => 1,
+            Classification::Ground => 2,
+            Classification::LowVegetation => 3,
+            Classification::MediumVegetation => 4,
+            Classification::HighVegetation => 5,
+            Classification::Building => 6,
+            Classification::LowPoint => 7,
+            Classification::ModelKeyPoint => 8,
+            Classification::Water => 9,
+            Classification::Overlap => 12,
+            Classification::Reserved(n) => n,
+        }
+    }
+}
+
+impl Default for Classification {
+    fn default() -> Classification {
+        Classification::CreatedNeverClassified
     }
 }
