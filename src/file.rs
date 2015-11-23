@@ -22,6 +22,7 @@ pub struct File {
     header: Header,
     vlrs: Vec<Vlr>,
     points: Vec<Point>,
+    auto_offsets: bool,
 }
 
 impl File {
@@ -76,10 +77,11 @@ impl File {
             header: Header::new(),
             vlrs: Vec::new(),
             points: Vec::new(),
+            auto_offsets: false,
         }
     }
 
-    /// Set the scale factors on a file.
+    /// Sets the scale factors on a file.
     ///
     /// # Examples
     ///
@@ -98,7 +100,7 @@ impl File {
         self
     }
 
-    /// Set the offset values for a file.
+    /// Sets the offset values for a file.
     ///
     /// # Examples
     ///
@@ -110,6 +112,23 @@ impl File {
         self.header.x_offset = x_offset;
         self.header.y_offset = y_offset;
         self.header.z_offset = z_offset;
+        self
+    }
+
+    /// Enables auto-offsetting.
+    ///
+    /// If auto-offsetting is enabled, this file will set the header offset values to sensible
+    /// values before writing anything. This is usually easier than calculating the offsets
+    /// yourself.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::file::File;
+    /// let file = File::new().auto_offsets(true);
+    /// ```
+    pub fn auto_offsets(mut self, enable: bool) -> File {
+        self.auto_offsets = enable;
         self
     }
 
@@ -212,6 +231,12 @@ impl File {
         self.header.x_max = x_max;
         self.header.y_max = y_max;
         self.header.z_max = z_max;
+
+        if self.auto_offsets {
+            self.header.x_offset = (x_min + x_max) / 2.0;
+            self.header.y_offset = (y_min + y_max) / 2.0;
+            self.header.z_offset = (z_min + z_max) / 2.0;
+        }
 
         let mut bytes_written = try!(self.header.write_to(writer)) as usize;
         if bytes_written < self.header.header_size as usize {
