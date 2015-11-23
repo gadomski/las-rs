@@ -20,7 +20,7 @@ pub struct Header {
     ///
     /// Should always be "LASF".
     pub file_signature: [u8; 4],
-    /// The textual source of the file, e.g. "libLAS".
+    /// A numeric identifier for this file.
     pub file_source_id: u16,
     /// Unused in early version, and exapanded to help with GPS time offsets in later versions.
     pub global_encoding: u16,
