@@ -22,7 +22,6 @@ pub struct File {
     header: Header,
     vlrs: Vec<Vlr>,
     points: Vec<Point>,
-    auto_offsets: bool,
 }
 
 impl File {
@@ -77,59 +76,25 @@ impl File {
             header: Header::new(),
             vlrs: Vec::new(),
             points: Vec::new(),
-            auto_offsets: false,
         }
     }
 
-    /// Sets the scale factors on a file.
+    /// Sets the header for this file.
+    ///
+    /// Since the header contains so much metadata, we might want to construct a header elsewhere
+    /// then set it to the file just before write.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::file::File;
-    /// let file = File::new().scale_factors(0.01, 0.01, 0.01);
+    /// use las::header::Header;
+    /// let mut file = File::new();
+    /// let header = Header::new();
+    /// file.set_header(header);
     /// ```
-    pub fn scale_factors(mut self,
-                         x_scale_factor: f64,
-                         y_scale_factor: f64,
-                         z_scale_factor: f64)
-                         -> File {
-        self.header.x_scale_factor = x_scale_factor;
-        self.header.y_scale_factor = y_scale_factor;
-        self.header.z_scale_factor = z_scale_factor;
-        self
-    }
-
-    /// Sets the offset values for a file.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::file::File;
-    /// let file = File::new().offsets(1000.0, 2000.0, 100.0);
-    /// ```
-    pub fn offsets(mut self, x_offset: f64, y_offset: f64, z_offset: f64) -> File {
-        self.header.x_offset = x_offset;
-        self.header.y_offset = y_offset;
-        self.header.z_offset = z_offset;
-        self
-    }
-
-    /// Enables auto-offsetting.
-    ///
-    /// If auto-offsetting is enabled, this file will set the header offset values to sensible
-    /// values before writing anything. This is usually easier than calculating the offsets
-    /// yourself.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::file::File;
-    /// let file = File::new().auto_offsets(true);
-    /// ```
-    pub fn auto_offsets(mut self, enable: bool) -> File {
-        self.auto_offsets = enable;
-        self
+    pub fn set_header(&mut self, header: Header) {
+        self.header = header;
     }
 
     /// Returns a reference to a vector of this file's points.
@@ -168,15 +133,18 @@ impl File {
     /// use std::fs::remove_file;
     /// use las::file::File;
     /// let mut file = File::new();
-    /// file.to_path("temp.las").unwrap();
+    /// file.to_path("temp.las", true).unwrap();
     /// remove_file("temp.las");
     /// ```
-    pub fn to_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn to_path<P: AsRef<Path>>(&mut self, path: P, auto_offsets: bool) -> Result<()> {
         let ref mut writer = BufWriter::new(try!(fs::File::create(path)));
-        self.write_to(writer)
+        self.write_to(writer, auto_offsets)
     }
 
     /// Writes this las file to a `Write`.
+    ///
+    /// If auto_offsets is true, reasonable offset values will be calculated and written to the
+    /// header before the file is written.
     ///
     /// # Examples
     ///
@@ -185,9 +153,9 @@ impl File {
     /// use las::file::File;
     /// let mut file = File::from_path("data/1.0_0.las").unwrap();
     /// let ref mut cursor = Cursor::new(Vec::new());
-    /// file.write_to(cursor).unwrap();
+    /// file.write_to(cursor, true).unwrap();
     /// ```
-    pub fn write_to<W: Write>(&mut self, writer: &mut W) -> Result<()> {
+    pub fn write_to<W: Write>(&mut self, writer: &mut W, auto_offsets: bool) -> Result<()> {
         self.header.calculate_size();
         self.header.number_of_point_records = self.points.len() as u32;
         self.header.offset_to_point_data = self.header.header_size as u32 +
@@ -232,7 +200,7 @@ impl File {
         self.header.y_max = y_max;
         self.header.z_max = z_max;
 
-        if self.auto_offsets {
+        if auto_offsets {
             self.header.x_offset = (x_min + x_max) / 2.0;
             self.header.y_offset = (y_min + y_max) / 2.0;
             self.header.z_offset = (z_min + z_max) / 2.0;
@@ -331,7 +299,7 @@ mod tests {
     fn roundtrip<P: AsRef<Path>>(path: P) {
         let mut lasfile = File::from_path(path).unwrap();
         let ref mut cursor = Cursor::new(Vec::new());
-        lasfile.write_to(cursor).unwrap();
+        lasfile.write_to(cursor, false).unwrap();
         cursor.set_position(0);
         let lasfile2 = File::read_from(cursor).unwrap();
         assert_eq!(lasfile, lasfile2);
@@ -409,7 +377,7 @@ mod tests {
         point.z = 3.0;
         let mut lasfile = File::new();
         lasfile.add_point(point);
-        lasfile.to_path("temp.las").unwrap();
+        lasfile.to_path("temp.las", false).unwrap();
 
         let lasfile = File::from_path("temp.las").unwrap();
         let ref point = lasfile.points()[0];

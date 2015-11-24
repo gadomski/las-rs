@@ -15,11 +15,13 @@ mod io;
 mod scale;
 pub mod stream;
 pub mod vlr;
+pub mod writer;
 
 pub use error::Error;
 pub use file::File;
 pub use point::Point;
 pub use stream::Stream;
+pub use writer::Writer;
 
 use std::result;
 
