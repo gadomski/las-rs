@@ -130,8 +130,8 @@ impl<P: AsRef<Path>> Writer<P> {
     /// writer.close().unwrap();
     /// remove_file("temp.las").unwrap();
     /// ```
-    pub fn close(mut self) -> Result<()> {
+    pub fn close(&mut self) -> Result<()> {
         self.file.set_header(self.header);
-        self.file.to_path(self.path, self.auto_offsets)
+        self.file.to_path(&self.path, self.auto_offsets)
     }
 }
