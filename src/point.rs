@@ -1,4 +1,11 @@
-//! las points.
+//! Three-dimensional points.
+//!
+//! Inside las files, x-y-z values are stored as scaled integers. We make the design decision to
+//! keep scaling and offset information in the `Header` only, so that the x-y-z coordiantes of each
+//! `Point` object are `f64`.
+//!
+//! Optional dimensions, such as color and time, are provided as `Options`. When writing points out
+//! to a file, these options are checked iff the output point format requires those options.
 
 use Result;
 use error::Error;

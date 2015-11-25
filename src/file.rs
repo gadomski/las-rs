@@ -1,4 +1,11 @@
-//! `las` file management.
+//! Work with las files as complete units.
+//!
+//! This is a lower-level class that holds *all* of the information in a las file — it holds all of
+//! the points in memory. In the future, we might refactor/replace/re-implement this class to allow
+//! working with lasfiles without reading all of those points into memory.
+//!
+//! In general, you shouldn't use the structures in this module to read or write lasfiles — use
+//! `Reader` and `Writer` for that.
 
 use std::f64;
 use std::fs;

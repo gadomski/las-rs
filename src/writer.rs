@@ -1,4 +1,6 @@
 //! Write las files.
+//!
+//! Prefer to use `Writer` rather than manipulating files and headers yourself.
 
 use std::path::Path;
 
@@ -9,11 +11,8 @@ use point::Point;
 
 /// A las writer.
 ///
-/// This wrapper conforms to the more standard structure of requiring a filename on create, not on
-/// close.
-///
-/// I recognize that it's pretty messy to have both this and `File`, and TODO I need to clean
-/// things up.
+/// The las writer as it as implemented right now is lazy — no points are written out to the
+/// filesystem until `close` is called.
 #[derive(Debug)]
 pub struct Writer<P: AsRef<Path>> {
     auto_offsets: bool,

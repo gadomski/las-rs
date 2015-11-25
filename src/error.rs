@@ -1,4 +1,4 @@
-//! Our errors.
+//! Wrappers around other crate's errors, and our own custom errors.
 
 use std::error;
 use std::io;
@@ -8,22 +8,28 @@ use byteorder;
 
 use header;
 
-/// Crate-specific errors.
+/// Errors.
 #[derive(Debug)]
 pub enum Error {
     /// Wraps `byteorder::Error`.
     Byteorder(byteorder::Error),
-    /// Invalid classification value.
+    /// The provided `u8` does not correspond to a classification value.
     InvalidClassification(u8),
-    /// Point number of returns was out of bounds.
+    /// The las format specifies an upper bound on the number of returns for a given pulse. This
+    /// error is returned when the provided `u8` exceeds that maximum bound.
     InvalidNumberOfReturns(u8),
-    /// Unrecognized point data format.
+    /// The provided `u8` cannot be mapped onto a (suppored) point data format.
+    ///
+    /// Note that the `u8` might be allowed under a version of the las standard, but if this
+    /// library doesn't support that point format, this error will be returned.
     InvalidPointFormat(u8),
-    /// Point return number was out of allowed bounds.
+    /// Similarly to the number of returns, a point's return number has a maximum bound. This error
+    /// is returned if the `u8` exceeds that bound.
     InvalidReturnNumber(u8),
     /// Wraps `std::io::Error`.
     Io(io::Error),
-    /// Tried to write a point to a format it doesn't support.
+    /// Returned if a point cannot be translated to the required point format, due to missing
+    /// dimensions.
     PointFormat(header::PointFormat, String),
 }
 
@@ -74,4 +80,3 @@ impl From<io::Error> for Error {
         Error::Io(err)
     }
 }
-

@@ -1,7 +1,10 @@
 //! Read a las file.
 //!
-//! We don't always need to get all the points into memory at once, so this interface enables
-//! sequential access.
+//! Though right now we always read all point data into memory, in the future we may support
+//! streaming reads. This class abstracts out the reading process to make future streaming reads
+//! less impactful.
+//!
+//! Prefer to use the `Reader` class to get las data from the filesystem.
 
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};

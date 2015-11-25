@@ -1,4 +1,9 @@
-//! `las` headers describe the point format, data bounds, and other metadata.
+//! Work with las headers and the information contained therin.
+//!
+//! Headers are very important, as they describe the layout of points in the file, as well as the
+//! scaling and offset of the data in each point. Working with headers is generally a low-level
+//! operation, and downstream users should prefer to use the builder methods of `Writer` to
+//! configure behavior.
 
 use std::io::{Read, Write};
 use std::fmt;
