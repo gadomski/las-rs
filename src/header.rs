@@ -271,7 +271,7 @@ impl Header {
 ///
 /// Formats have powers, so we encapsulate that through this struct.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PointFormat(u8);
+pub struct PointFormat(pub u8);
 
 impl PointFormat {
     /// Creates a point data format for this u8.
