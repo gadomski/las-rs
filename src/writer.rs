@@ -4,7 +4,7 @@ use std::path::Path;
 
 use Result;
 use file::File;
-use header::Header;
+use header::{Header, PointFormat};
 use point::Point;
 
 /// A las writer.
@@ -93,7 +93,33 @@ impl<P: AsRef<Path>> Writer<P> {
         self
     }
 
+    /// Sets the las version for this writer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::writer::Writer;
+    /// let writer = Writer::from_path("temp.las").version(1, 2);
+    /// ```
+    pub fn version(mut self, major: u8, minor: u8) -> Writer<P> {
+        self.header.version_major = major;
+        self.header.version_minor = minor;
+        self
+    }
 
+    /// Sets the point format for this writer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::PointFormat;
+    /// use las::writer::Writer;
+    /// let writer = Writer::from_path("temp.las").point_format(PointFormat(1));
+    /// ```
+    pub fn point_format(mut self, point_format: PointFormat) -> Writer<P> {
+        self.header.point_data_format = point_format;
+        self
+    }
 
     /// Writes a point to this writer.
     ///
@@ -133,5 +159,38 @@ impl<P: AsRef<Path>> Writer<P> {
     pub fn close(&mut self) -> Result<()> {
         self.file.set_header(self.header);
         self.file.to_path(&self.path, self.auto_offsets)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fs::remove_file;
+
+    use {PointFormat, File};
+
+    #[test]
+    fn builder() {
+        let mut writer = Writer::from_path("builder.las")
+                             .scale_factors(1.0, 2.0, 3.0)
+                             .offsets(4.0, 5.0, 6.0)
+                             .version(1, 2)
+                             .point_format(PointFormat(1));
+        writer.close().unwrap();
+
+        let file = File::from_path("builder.las").unwrap();
+        let header = file.header();
+        assert_eq!(1.0, header.x_scale_factor);
+        assert_eq!(2.0, header.y_scale_factor);
+        assert_eq!(3.0, header.z_scale_factor);
+        assert_eq!(4.0, header.x_offset);
+        assert_eq!(5.0, header.y_offset);
+        assert_eq!(6.0, header.z_offset);
+        assert_eq!(1, header.version_major);
+        assert_eq!(2, header.version_minor);
+        assert_eq!(PointFormat(1), header.point_data_format);
+
+        remove_file("builder.las").unwrap();
     }
 }
