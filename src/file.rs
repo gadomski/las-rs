@@ -153,8 +153,7 @@ impl File {
     /// use std::fs::remove_file;
     /// use las::file::File;
     /// let mut file = File::new();
-    /// file.to_path("temp.las", true).unwrap();
-    /// remove_file("temp.las");
+    /// file.to_path("/dev/null", true).unwrap();
     /// ```
     pub fn to_path<P: AsRef<Path>>(&mut self, path: P, auto_offsets: bool) -> Result<()> {
         let ref mut writer = BufWriter::new(try!(fs::File::create(path)));

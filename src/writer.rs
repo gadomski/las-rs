@@ -12,10 +12,13 @@ use point::Point;
 /// A las writer.
 ///
 /// The las writer as it as implemented right now is lazy — no points are written out to the
-/// filesystem until `close` is called.
+/// filesystem until `close` is called or the writer is dropped. Note that if you rely on the
+/// `Drop` behavior for the writer, an error on write will lead to a panic. Explicitly `close` the
+/// writer to catch exceptional behavior.
 #[derive(Debug)]
 pub struct Writer<P: AsRef<Path>> {
     auto_offsets: bool,
+    closed: bool,
     file: File,
     header: Header,
     path: P,
@@ -30,11 +33,12 @@ impl<P: AsRef<Path>> Writer<P> {
     ///
     /// ```
     /// use las::writer::Writer;
-    /// let writer = Writer::from_path("temp.las");
+    /// let writer = Writer::from_path("/dev/null");
     /// ```
     pub fn from_path(path: P) -> Writer<P> {
         Writer {
             auto_offsets: false,
+            closed: false,
             file: File::new(),
             header: Header::new(),
             path: path,
@@ -47,7 +51,7 @@ impl<P: AsRef<Path>> Writer<P> {
     ///
     /// ```
     /// use las::writer::Writer;
-    /// let writer = Writer::from_path("temp.las").scale_factors(0.01, 0.01, 0.01);
+    /// let writer = Writer::from_path("/dev/null").scale_factors(0.01, 0.01, 0.01);
     /// ```
     pub fn scale_factors(mut self,
                          x_scale_factor: f64,
@@ -66,7 +70,7 @@ impl<P: AsRef<Path>> Writer<P> {
     ///
     /// ```
     /// use las::writer::Writer;
-    /// let writer = Writer::from_path("temp.las").offsets(1000.0, 2000.0, 100.0);
+    /// let writer = Writer::from_path("/dev/null").offsets(1000.0, 2000.0, 100.0);
     /// ```
     pub fn offsets(mut self, x_offset: f64, y_offset: f64, z_offset: f64) -> Writer<P> {
         self.header.x_offset = x_offset;
@@ -85,7 +89,7 @@ impl<P: AsRef<Path>> Writer<P> {
     ///
     /// ```
     /// use las::writer::Writer;
-    /// let writer = Writer::from_path("temp.las").auto_offsets(true);
+    /// let writer = Writer::from_path("/dev/null").auto_offsets(true);
     /// ```
     pub fn auto_offsets(mut self, enable: bool) -> Writer<P> {
         self.auto_offsets = enable;
@@ -98,7 +102,7 @@ impl<P: AsRef<Path>> Writer<P> {
     ///
     /// ```
     /// use las::writer::Writer;
-    /// let writer = Writer::from_path("temp.las").version(1, 2);
+    /// let writer = Writer::from_path("/dev/null").version(1, 2);
     /// ```
     pub fn version(mut self, major: u8, minor: u8) -> Writer<P> {
         self.header.version_major = major;
@@ -113,7 +117,7 @@ impl<P: AsRef<Path>> Writer<P> {
     /// ```
     /// use las::PointFormat;
     /// use las::writer::Writer;
-    /// let writer = Writer::from_path("temp.las").point_format(PointFormat(1));
+    /// let writer = Writer::from_path("/dev/null").point_format(PointFormat(1));
     /// ```
     pub fn point_format(mut self, point_format: PointFormat) -> Writer<P> {
         self.header.point_data_format = point_format;
@@ -129,7 +133,7 @@ impl<P: AsRef<Path>> Writer<P> {
     /// ```
     /// use las::writer::Writer;
     /// use las::point::Point;
-    /// let mut writer = Writer::from_path("temp.las");
+    /// let mut writer = Writer::from_path("/dev/null");
     /// writer.write_point(Point::new());
     /// ```
     pub fn write_point(&mut self, point: Point) {
@@ -150,14 +154,27 @@ impl<P: AsRef<Path>> Writer<P> {
     /// use std::fs::remove_file;
     /// use las::writer::Writer;
     /// use las::point::Point;
-    /// let mut writer = Writer::from_path("temp.las");
+    /// let mut writer = Writer::from_path("/dev/null");
     /// writer.write_point(Point::new());
     /// writer.close().unwrap();
-    /// remove_file("temp.las").unwrap();
     /// ```
     pub fn close(&mut self) -> Result<()> {
         self.file.set_header(self.header);
-        self.file.to_path(&self.path, self.auto_offsets)
+        match self.file.to_path(&self.path, self.auto_offsets) {
+            Ok(()) => {
+                self.closed = true;
+                Ok(())
+            }
+            Err(e) => Err(e)
+        }
+    }
+}
+
+impl<P: AsRef<Path>> Drop for Writer<P> {
+    fn drop(&mut self) {
+        if !self.closed {
+            self.close().unwrap_or_else(|e| panic!("Error when closing writer: {}", e))
+        }
     }
 }
 
@@ -191,5 +208,20 @@ mod tests {
         assert_eq!(PointFormat(1), header.point_data_format);
 
         remove_file("builder.las").unwrap();
+    }
+
+    #[test]
+    fn drop() {
+        {
+            Writer::from_path("writer-drop.las");
+        }
+        remove_file("writer-drop.las").expect("Drop didn't write the file");
+
+        {
+            let mut writer = Writer::from_path("writer-drop.las");
+            writer.close().unwrap();
+            remove_file("writer-drop.las").unwrap();
+        }
+        assert!(remove_file("writer-drop.las").is_err());
     }
 }
