@@ -13,7 +13,7 @@ use header::Header;
 use io::write_zeros;
 use point::Point;
 use scale::descale;
-use stream::Stream;
+use reader::Reader;
 use vlr::Vlr;
 
 /// A las file.
@@ -50,12 +50,12 @@ impl File {
     /// ```
     pub fn read_from<R: Read + Seek>(reader: R) -> Result<File> {
         let mut file = File::new();
-        let mut stream = try!(Stream::new(reader));
-        file.header = stream.header();
-        file.vlrs = (*stream.vlrs()).clone();
-        file.points.reserve(stream.npoints() as usize);
+        let mut reader = try!(Reader::new(reader));
+        file.header = reader.header();
+        file.vlrs = (*reader.vlrs()).clone();
+        file.points.reserve(reader.npoints() as usize);
         loop {
-            match try!(stream.next_point()) {
+            match try!(reader.next_point()) {
                 Some(point) => file.points.push(point),
                 None => break,
             }

@@ -1,4 +1,4 @@
-//! Read a las file like a stream.
+//! Read a las file.
 //!
 //! We don't always need to get all the points into memory at once, so this interface enables
 //! sequential access.
@@ -16,42 +16,42 @@ use point::{Classification, NumberOfReturns, Point, ReturnNumber, ScanDirection}
 use scale::scale;
 use vlr::Vlr;
 
-/// A stream of las points.
+/// A reader of las points.
 #[derive(Debug)]
-pub struct Stream<R: Read> {
+pub struct Reader<R: Read> {
     header: Header,
     vlrs: Vec<Vlr>,
     reader: R,
     nread: u32,
 }
 
-impl Stream<BufReader<File>> {
-    /// Opens a new stream for the given path.
+impl Reader<BufReader<File>> {
+    /// Opens a new reader for the given path.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::stream::Stream;
-    /// let stream = Stream::from_path("data/1.0_0.las").unwrap();
+    /// use las::reader::Reader;
+    /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Stream<BufReader<File>>> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
         let reader = BufReader::new(try!(File::open(path)));
-        Stream::new(reader)
+        Reader::new(reader)
     }
 }
 
-impl<R: Read + Seek> Stream<R> {
-    /// Creates a new stream for a given `Read` object, consuming the read.
+impl<R: Read + Seek> Reader<R> {
+    /// Creates a new reader for a given `Read` object, consuming the read.
     ///
     /// # Examples
     ///
     /// ```
     /// use std::fs::File;
-    /// use las::stream::Stream;
+    /// use las::reader::Reader;
     /// let file = File::open("data/1.0_0.las").unwrap();
-    /// let stream = Stream::new(file);
+    /// let reader = Reader::new(file);
     /// ```
-    pub fn new(mut reader: R) -> Result<Stream<R>> {
+    pub fn new(mut reader: R) -> Result<Reader<R>> {
         let header = try!(Header::read_from(&mut reader));
         let mut vlrs = Vec::with_capacity(header.number_of_variable_length_records as usize);
         let _ = try!(reader.seek(SeekFrom::Start(header.header_size as u64)));
@@ -61,7 +61,7 @@ impl<R: Read + Seek> Stream<R> {
 
         let _ = try!(reader.seek(SeekFrom::Start(header.offset_to_point_data as u64)));
 
-        Ok(Stream {
+        Ok(Reader {
             header: header,
             vlrs: vlrs,
             reader: reader,
@@ -69,16 +69,16 @@ impl<R: Read + Seek> Stream<R> {
         })
     }
 
-    /// Returns the next point in this stream.
+    /// Returns the next point in this reader.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::stream::Stream;
-    /// let mut stream = Stream::from_path("data/1.0_0.las").unwrap();
-    /// let point = stream.next_point().unwrap();
+    /// use las::reader::Reader;
+    /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
+    /// let point = reader.next_point().unwrap();
     /// assert!(point.is_some());
-    /// let point = stream.next_point().unwrap();
+    /// let point = reader.next_point().unwrap();
     /// assert!(point.is_none());
     /// ```
     pub fn next_point(&mut self) -> Result<Option<Point>> {
@@ -121,7 +121,8 @@ impl<R: Read + Seek> Stream<R> {
         let bytes_read = try!(self.reader.seek(SeekFrom::Current(0))) - start;
 
         if bytes_read < self.header.point_data_record_length as u64 {
-            let mut buf = vec![0; (self.header.point_data_record_length as u64 - bytes_read) as usize];
+            let mut buf =
+                vec![0; (self.header.point_data_record_length as u64 - bytes_read) as usize];
             try!(read_full(&mut self.reader, &mut buf[..]));
             point.extra_bytes = Some(buf);
         }
@@ -132,27 +133,27 @@ impl<R: Read + Seek> Stream<R> {
     }
 }
 
-impl<R: Read> Stream<R> {
-    /// Returns this stream's las header.
+impl<R: Read> Reader<R> {
+    /// Returns this reader's las header.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::stream::Stream;
-    /// let stream = Stream::from_path("data/1.0_0.las").unwrap();
-    /// let header = stream.header();
+    /// use las::reader::Reader;
+    /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
+    /// let header = reader.header();
     pub fn header(&self) -> Header {
         self.header
     }
 
-    /// Returns a reference to this stream's vlrs.
+    /// Returns a reference to this reader's vlrs.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::stream::Stream;
-    /// let stream = Stream::from_path("data/1.0_0.las").unwrap();
-    /// let vlrs = stream.vlrs();
+    /// use las::reader::Reader;
+    /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
+    /// let vlrs = reader.vlrs();
     pub fn vlrs(&self) -> &Vec<Vlr> {
         &self.vlrs
     }
@@ -162,24 +163,24 @@ impl<R: Read> Stream<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::stream::Stream;
-    /// let stream = Stream::from_path("data/1.0_0.las").unwrap();
-    /// assert_eq!(1, stream.npoints());
+    /// use las::reader::Reader;
+    /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
+    /// assert_eq!(1, reader.npoints());
     /// ```
     pub fn npoints(&self) -> u32 {
         self.header.number_of_point_records
     }
 
-    /// Returns true if this stream is at the end of the file.
+    /// Returns true if this reader is at the end of the file.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::stream::Stream;
-    /// let mut stream = Stream::from_path("data/1.0_0.las").unwrap();
-    /// assert!(!stream.eof());
-    /// let _ = stream.next_point().unwrap();
-    /// assert!(stream.eof());
+    /// use las::reader::Reader;
+    /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
+    /// assert!(!reader.eof());
+    /// let _ = reader.next_point().unwrap();
+    /// assert!(reader.eof());
     /// ```
     pub fn eof(&self) -> bool {
         self.nread == self.npoints()

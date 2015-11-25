@@ -7,20 +7,20 @@
 extern crate byteorder;
 extern crate time;
 
-pub mod header;
-pub mod error;
-pub mod file;
-pub mod point;
 mod io;
 mod scale;
-pub mod stream;
+pub mod error;
+pub mod file;
+pub mod header;
+pub mod point;
+pub mod reader;
 pub mod vlr;
 pub mod writer;
 
 pub use error::Error;
 pub use file::File;
 pub use point::Point;
-pub use stream::Stream;
+pub use reader::Reader;
 pub use writer::Writer;
 
 use std::result;
