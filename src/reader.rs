@@ -5,6 +5,7 @@
 
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::iter::IntoIterator;
 use std::path::Path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -184,5 +185,43 @@ impl<R: Read> Reader<R> {
     /// ```
     pub fn eof(&self) -> bool {
         self.nread == self.npoints()
+    }
+}
+
+impl<R: Read + Seek> IntoIterator for Reader<R> {
+    type Item = Point;
+    type IntoIter = ReaderIterator<R>;
+    fn into_iter(self) -> Self::IntoIter {
+        ReaderIterator { reader: self }
+    }
+}
+
+/// An iterator over the reader's points.
+///
+/// # Panics
+///
+/// This iterator will panic if something goes wrong while reading the points. If you need to catch
+/// those errors, use `Reader::next_point`.
+#[derive(Debug)]
+pub struct ReaderIterator<R: Read + Seek> {
+    reader: Reader<R>,
+}
+
+impl<R: Read + Seek> Iterator for ReaderIterator<R> {
+    type Item = Point;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.reader.next_point().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reader_as_iter() {
+        let reader = Reader::from_path("data/1.0_0.las").unwrap();
+        let points: Vec<_> = reader.into_iter().collect();
+        assert_eq!(1, points.len());
     }
 }
