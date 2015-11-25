@@ -97,6 +97,19 @@ impl File {
         self.header = header;
     }
 
+    /// Gets a reference to this file's header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::file::File;
+    /// let file = File::from_path("data/1.0_0.las").unwrap();
+    /// let header = file.header();
+    /// ```
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
     /// Returns a reference to a vector of this file's points.
     ///
     /// # Examples
