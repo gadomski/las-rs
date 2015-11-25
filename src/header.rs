@@ -62,7 +62,7 @@ pub struct Header {
     /// The number of variable length records.
     pub number_of_variable_length_records: u32,
     /// The point data format.
-    pub point_data_format: PointDataFormat,
+    pub point_data_format: PointFormat,
     /// The length of one point data record, in bytes.
     pub point_data_record_length: u16,
     /// The total number of point records.
@@ -126,7 +126,7 @@ impl Header {
         header.header_size = try!(reader.read_u16::<LittleEndian>());
         header.offset_to_point_data = try!(reader.read_u32::<LittleEndian>());
         header.number_of_variable_length_records = try!(reader.read_u32::<LittleEndian>());
-        header.point_data_format = try!(PointDataFormat::from_u8(try!(reader.read_u8())));
+        header.point_data_format = try!(PointFormat::from_u8(try!(reader.read_u8())));
         header.point_data_record_length = try!(reader.read_u16::<LittleEndian>());
         header.number_of_point_records = try!(reader.read_u32::<LittleEndian>());
         for n in &mut header.number_of_points_by_return {
@@ -182,7 +182,7 @@ impl Header {
             header_size: 0,
             offset_to_point_data: 0,
             number_of_variable_length_records: 0,
-            point_data_format: PointDataFormat(0),
+            point_data_format: PointFormat(0),
             point_data_record_length: 0,
             number_of_point_records: 0,
             number_of_points_by_return: [0; 5],
@@ -271,24 +271,24 @@ impl Header {
 ///
 /// Formats have powers, so we encapsulate that through this struct.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PointDataFormat(u8);
+pub struct PointFormat(u8);
 
-impl PointDataFormat {
+impl PointFormat {
     /// Creates a point data format for this u8.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointDataFormat;
-    /// assert!(PointDataFormat::from_u8(0).is_ok());
-    /// assert!(PointDataFormat::from_u8(1).is_ok());
-    /// assert!(PointDataFormat::from_u8(127).is_err());
+    /// use las::header::PointFormat;
+    /// assert!(PointFormat::from_u8(0).is_ok());
+    /// assert!(PointFormat::from_u8(1).is_ok());
+    /// assert!(PointFormat::from_u8(127).is_err());
     /// ```
-    pub fn from_u8(n: u8) -> Result<PointDataFormat> {
+    pub fn from_u8(n: u8) -> Result<PointFormat> {
         if n < 4 {
-            Ok(PointDataFormat(n))
+            Ok(PointFormat(n))
         } else {
-            Err(Error::InvalidPointDataFormat(n))
+            Err(Error::InvalidPointFormat(n))
         }
     }
 
@@ -297,9 +297,9 @@ impl PointDataFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointDataFormat;
-    /// assert!(!PointDataFormat::from_u8(0).unwrap().has_time());
-    /// assert!(PointDataFormat::from_u8(1).unwrap().has_time());
+    /// use las::header::PointFormat;
+    /// assert!(!PointFormat::from_u8(0).unwrap().has_time());
+    /// assert!(PointFormat::from_u8(1).unwrap().has_time());
     /// ```
     pub fn has_time(&self) -> bool {
         self.0 == 1 || self.0 == 3
@@ -310,9 +310,9 @@ impl PointDataFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointDataFormat;
-    /// assert!(!PointDataFormat::from_u8(0).unwrap().has_color());
-    /// assert!(PointDataFormat::from_u8(2).unwrap().has_color());
+    /// use las::header::PointFormat;
+    /// assert!(!PointFormat::from_u8(0).unwrap().has_color());
+    /// assert!(PointFormat::from_u8(2).unwrap().has_color());
     /// ```
     pub fn has_color(&self) -> bool {
         self.0 == 2 || self.0 == 3
@@ -323,8 +323,8 @@ impl PointDataFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointDataFormat;
-    /// assert_eq!(20, PointDataFormat::from_u8(0).unwrap().record_length());
+    /// use las::header::PointFormat;
+    /// assert_eq!(20, PointFormat::from_u8(0).unwrap().record_length());
     /// ```
     pub fn record_length(&self) -> u16 {
         match self.0 {
@@ -337,7 +337,7 @@ impl PointDataFormat {
     }
 }
 
-impl fmt::Display for PointDataFormat {
+impl fmt::Display for PointFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }

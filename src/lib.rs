@@ -19,6 +19,7 @@ pub mod writer;
 
 pub use error::Error;
 pub use file::File;
+pub use header::PointFormat;
 pub use point::Point;
 pub use reader::Reader;
 pub use writer::Writer;
