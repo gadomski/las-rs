@@ -146,6 +146,7 @@ impl<R: Read> Reader<R> {
     /// use las::reader::Reader;
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// let header = reader.header();
+    /// ```
     pub fn header(&self) -> Header {
         self.header
     }
@@ -158,6 +159,7 @@ impl<R: Read> Reader<R> {
     /// use las::reader::Reader;
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// let vlrs = reader.vlrs();
+    /// ```
     pub fn vlrs(&self) -> &Vec<Vlr> {
         &self.vlrs
     }
