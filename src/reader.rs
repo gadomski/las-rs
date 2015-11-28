@@ -138,7 +138,7 @@ impl<R: Read + Seek> Reader<R> {
 }
 
 impl<R: Read> Reader<R> {
-    /// Returns this reader's las header.
+    /// Returns a reference to this reader's las header.
     ///
     /// # Examples
     ///
@@ -147,8 +147,8 @@ impl<R: Read> Reader<R> {
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// let header = reader.header();
     /// ```
-    pub fn header(&self) -> Header {
-        self.header
+    pub fn header(&self) -> &Header {
+        &self.header
     }
 
     /// Returns a reference to this reader's vlrs.

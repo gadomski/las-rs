@@ -58,7 +58,7 @@ impl File {
     pub fn read_from<R: Read + Seek>(reader: R) -> Result<File> {
         let mut file = File::new();
         let mut reader = try!(Reader::new(reader));
-        file.header = reader.header();
+        file.header = *reader.header();
         file.vlrs = (*reader.vlrs()).clone();
         file.points.reserve(reader.npoints() as usize);
         loop {
