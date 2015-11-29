@@ -29,8 +29,9 @@ pub struct Header {
     pub file_signature: [u8; 4],
     /// A numeric identifier for this file.
     pub file_source_id: u16,
-    /// Unused in early version, and exapanded to help with GPS time offsets in later versions.
-    pub global_encoding: u16,
+    /// What is the reference system for the timestamps in each point data record? This field was
+    /// added in las 1.2.
+    pub gps_time_type: GpsTimeType,
     /// The first of four parts of the project id.
     pub guid_data_1: u32,
     /// The second of four parts of the project id.
@@ -113,7 +114,7 @@ impl Header {
         let mut header = Header::new();
         try!(read_full(reader, &mut header.file_signature));
         header.file_source_id = try!(reader.read_u16::<LittleEndian>());
-        header.global_encoding = try!(reader.read_u16::<LittleEndian>());
+        let global_encoding = try!(reader.read_u16::<LittleEndian>());
         header.guid_data_1 = try!(reader.read_u32::<LittleEndian>());
         header.guid_data_2 = try!(reader.read_u16::<LittleEndian>());
         header.guid_data_3 = try!(reader.read_u16::<LittleEndian>());
@@ -146,6 +147,11 @@ impl Header {
         header.y_min = try!(reader.read_f64::<LittleEndian>());
         header.z_max = try!(reader.read_f64::<LittleEndian>());
         header.z_min = try!(reader.read_f64::<LittleEndian>());
+
+        if header.version.has_gps_time_type() {
+            header.gps_time_type = GpsTimeType::from_global_encoding(global_encoding);
+        }
+
         Ok(header)
     }
 
@@ -170,7 +176,7 @@ impl Header {
         Header {
             file_signature: *b"LASF",
             file_source_id: 0,
-            global_encoding: 0,
+            gps_time_type: GpsTimeType::Week,
             guid_data_1: 0,
             guid_data_2: 0,
             guid_data_3: 0,
@@ -302,5 +308,56 @@ impl Version {
     /// ```
     pub fn new(major: u8, minor: u8) -> Version {
         Version { major: major, minor: minor }
+    }
+
+    /// Returns true if this las version has the gps time type field.
+    ///
+    /// GPS time type is in the global encoding flags, and was added in las 1.2.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::Version;
+    /// assert!(!Version::new(1, 1).has_gps_time_type());
+    /// assert!(Version::new(1, 2).has_gps_time_type());
+    /// ```
+    pub fn has_gps_time_type(&self) -> bool {
+        self.minor >= 2
+    }
+}
+
+/// The meaning of GPS time in point records.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GpsTimeType {
+    /// The GPS time in records is GPS week time. This is always true for versions 1.0 and 1.1.
+    Week,
+    /// The time stamp is standard GPS time minus 1e9, called adjusted standard GPS time. This
+    /// adjustment is to improve the floating point resolution.
+    AdjustedStandard,
+}
+
+impl GpsTimeType {
+    /// Returns this time type as a global encoding mask.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::GpsTimeType;
+    /// assert_eq!(0, GpsTimeType::Week.as_mask());
+    /// assert_eq!(1, GpsTimeType::AdjustedStandard.as_mask());
+    /// ```
+    pub fn as_mask(&self) -> u16 {
+        match *self {
+            GpsTimeType::Week => 0,
+            GpsTimeType::AdjustedStandard => 1,
+        }
+    }
+
+    fn from_global_encoding(global_encoding: u16) -> GpsTimeType {
+        if global_encoding & 1 == 1 {
+            GpsTimeType::AdjustedStandard
+        } else {
+            GpsTimeType::Week
+        }
     }
 }

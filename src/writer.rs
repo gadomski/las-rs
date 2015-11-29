@@ -253,7 +253,12 @@ impl<W: Seek + Write> Writer<W> {
 
         try!(writer.write_all(&header.file_signature));
         try!(writer.write_u16::<LittleEndian>(header.file_source_id));
-        try!(writer.write_u16::<LittleEndian>(header.global_encoding));
+
+        let mut global_encoding = 0;
+        if header.version.has_gps_time_type() {
+            global_encoding |= header.gps_time_type.as_mask();
+        }
+        try!(writer.write_u16::<LittleEndian>(global_encoding));
         try!(writer.write_u32::<LittleEndian>(header.guid_data_1));
         try!(writer.write_u16::<LittleEndian>(header.guid_data_2));
         try!(writer.write_u16::<LittleEndian>(header.guid_data_3));
