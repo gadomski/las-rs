@@ -1,8 +1,8 @@
 //! Variable length records.
 
-use std::io::{Read, Write};
+use std::io::Read;
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 
 use super::Result;
 use io::read_full;
@@ -83,26 +83,5 @@ impl Vlr {
     /// ```
     pub fn len(&self) -> u32 {
         DEFAULT_HEADER_LENGTH as u32 + self.record.len() as u32
-    }
-
-    /// Writes this vlr to a `Write`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use las::vlr::Vlr;
-    /// let vlr = Vlr::new();
-    /// let ref mut writer = Cursor::new(Vec::new());
-    /// vlr.write_to(writer).unwrap();
-    /// ```
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<u32> {
-        try!(writer.write_u16::<LittleEndian>(self.reserved));
-        try!(writer.write_all(&self.user_id));
-        try!(writer.write_u16::<LittleEndian>(self.record_id));
-        try!(writer.write_u16::<LittleEndian>(self.record_length_after_header));
-        try!(writer.write_all(&self.description));
-        try!(writer.write_all(&self.record[..]));
-        Ok(DEFAULT_HEADER_LENGTH as u32 + self.record_length_after_header as u32)
     }
 }

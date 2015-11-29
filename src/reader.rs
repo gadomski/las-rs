@@ -1,10 +1,4 @@
-//! Read a las file.
-//!
-//! Though right now we always read all point data into memory, in the future we may support
-//! streaming reads. This class abstracts out the reading process to make future streaming reads
-//! less impactful.
-//!
-//! Prefer to use the `Reader` class to get las data from the filesystem.
+//! Read data from a las file.
 
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
@@ -13,7 +7,7 @@ use std::path::Path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use Result;
+use {Error, Result};
 use header::Header;
 use io::read_full;
 use point::{Classification, NumberOfReturns, Point, ReturnNumber, ScanDirection};
@@ -26,7 +20,7 @@ pub struct Reader<R: Read> {
     header: Header,
     vlrs: Vec<Vlr>,
     reader: R,
-    nread: u32,
+    position: u32,
 }
 
 impl Reader<BufReader<File>> {
@@ -69,23 +63,23 @@ impl<R: Read + Seek> Reader<R> {
             header: header,
             vlrs: vlrs,
             reader: reader,
-            nread: 0,
+            position: 0,
         })
     }
 
-    /// Returns the next point in this reader.
+    /// Returns the next point in this reader, or `None` if the reader is at the end of file.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::reader::Reader;
     /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
-    /// let point = reader.next_point().unwrap();
+    /// let point = reader.read_point().unwrap();
     /// assert!(point.is_some());
-    /// let point = reader.next_point().unwrap();
+    /// let point = reader.read_point().unwrap();
     /// assert!(point.is_none());
     /// ```
-    pub fn next_point(&mut self) -> Result<Option<Point>> {
+    pub fn read_point(&mut self) -> Result<Option<Point>> {
         if self.eof() {
             return Ok(None);
         }
@@ -131,9 +125,51 @@ impl<R: Read + Seek> Reader<R> {
             point.extra_bytes = Some(buf);
         }
 
-        self.nread += 1;
+        self.position += 1;
 
         Ok(Some(point))
+    }
+
+    /// Reads all of this reader's points into a vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::reader::Reader;
+    /// let points = Reader::from_path("data/1.0_0.las").unwrap().read_all().unwrap();
+    /// ```
+    pub fn read_all(&mut self) -> Result<Vec<Point>> {
+        let mut points = Vec::with_capacity(self.header.number_of_point_records as usize);
+        loop {
+            if let Some(point) = try!(self.read_point()) {
+                points.push(point);
+            } else {
+                return Ok(points);
+            }
+        }
+    }
+
+    /// Seeks to a given point location in this reader.
+    ///
+    /// This seek is zero-indexed — seek to zero to go to the first point.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::reader::Reader;
+    /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
+    /// reader.read_all().unwrap();
+    /// reader.seek(0).unwrap();
+    /// ```
+    pub fn seek(&mut self, index: u32) -> Result<()> {
+        let result = self.reader
+                         .seek(SeekFrom::Start(self.header.offset_to_point_data as u64 +
+                                               self.header.point_data_record_length as u64 *
+                                               index as u64))
+                         .and(Ok(()))
+                         .map_err(|e| Error::from(e));
+        self.position = index;
+        result
     }
 }
 
@@ -185,11 +221,23 @@ impl<R: Read> Reader<R> {
     /// use las::reader::Reader;
     /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// assert!(!reader.eof());
-    /// let _ = reader.next_point().unwrap();
+    /// let _ = reader.read_point().unwrap();
     /// assert!(reader.eof());
     /// ```
     pub fn eof(&self) -> bool {
-        self.nread == self.npoints()
+        self.position == self.npoints()
+    }
+
+    /// Consumes this reader and returns its inner `Read`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::reader::Reader;
+    /// let file = Reader::from_path("data/1.0_0.las").unwrap().into_inner();
+    /// ```
+    pub fn into_inner(self) -> R {
+        self.reader
     }
 }
 
@@ -201,12 +249,12 @@ impl<R: Read + Seek> IntoIterator for Reader<R> {
     }
 }
 
-/// An iterator over the reader's points.
+/// An iterator over a reader's points.
 ///
 /// # Panics
 ///
 /// This iterator will panic if something goes wrong while reading the points. If you need to catch
-/// those errors, use `Reader::next_point`.
+/// those errors, iterate over the points manually.
 #[derive(Debug)]
 pub struct ReaderIterator<R: Read + Seek> {
     reader: Reader<R>,
@@ -215,7 +263,7 @@ pub struct ReaderIterator<R: Read + Seek> {
 impl<R: Read + Seek> Iterator for ReaderIterator<R> {
     type Item = Point;
     fn next(&mut self) -> Option<Self::Item> {
-        self.reader.next_point().unwrap()
+        self.reader.read_point().unwrap()
     }
 }
 
@@ -229,4 +277,30 @@ mod tests {
         let points: Vec<_> = reader.into_iter().collect();
         assert_eq!(1, points.len());
     }
+
+    #[test]
+    fn point_format_1_has_gps_time() {
+        let mut reader = Reader::from_path("data/1.0_1.las").unwrap();
+        let point = reader.read_point().unwrap().unwrap();
+        assert!(point.gps_time.is_some());
+    }
+
+    #[test]
+    fn point_format_2_has_color() {
+        let mut reader = Reader::from_path("data/1.2_2.las").unwrap();
+        let point = reader.read_point().unwrap().unwrap();
+        assert!(point.red.is_some());
+        assert!(point.green.is_some());
+        assert!(point.blue.is_some());
+    }
+
+    #[test]
+    fn seek() {
+        let mut reader = Reader::from_path("data/1.2_2.las").unwrap();
+        let point1 = reader.read_point().unwrap().unwrap();
+        reader.seek(0).unwrap();
+        let point2 = reader.read_point().unwrap().unwrap();
+        assert_eq!(point1, point2);
+    }
+
 }

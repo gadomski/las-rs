@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 use std::fmt;
 use std::iter::repeat;
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use time;
 
 use Result;
@@ -18,7 +18,7 @@ use io::read_full;
 
 /// This constant value is the bytes in your normal header. There are worlds where people put crap
 /// into headers that don't belong there, so we have to guard against this.
-const DEFAULT_BYTES_IN_HEADER: u16 = 227;
+pub const DEFAULT_BYTES_IN_HEADER: u16 = 227;
 
 /// A las header.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -204,71 +204,6 @@ impl Header {
             z_max: 0.0,
             z_min: 0.0,
         }
-    }
-
-    /// Writes this header to a `Write`.
-    ///
-    /// Returns the number of bytes written.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use las::header::Header;
-    /// let header = Header::new();
-    /// let ref mut writer = Cursor::new(Vec::new());
-    /// let bytes_written = header.write_to(writer).unwrap();
-    /// ```
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<u16> {
-        try!(writer.write_all(&self.file_signature));
-        try!(writer.write_u16::<LittleEndian>(self.file_source_id));
-        try!(writer.write_u16::<LittleEndian>(self.global_encoding));
-        try!(writer.write_u32::<LittleEndian>(self.guid_data_1));
-        try!(writer.write_u16::<LittleEndian>(self.guid_data_2));
-        try!(writer.write_u16::<LittleEndian>(self.guid_data_3));
-        try!(writer.write_all(&self.guid_data_4));
-        try!(writer.write_u8(self.version_major));
-        try!(writer.write_u8(self.version_minor));
-        try!(writer.write_all(&self.system_identifier));
-        try!(writer.write_all(&self.generating_software));
-        try!(writer.write_u16::<LittleEndian>(self.file_creation_day_of_year));
-        try!(writer.write_u16::<LittleEndian>(self.file_creation_year));
-        try!(writer.write_u16::<LittleEndian>(self.header_size));
-        try!(writer.write_u32::<LittleEndian>(self.offset_to_point_data));
-        try!(writer.write_u32::<LittleEndian>(self.number_of_variable_length_records));
-        try!(writer.write_u8(self.point_data_format.0));
-        try!(writer.write_u16::<LittleEndian>(self.point_data_record_length));
-        try!(writer.write_u32::<LittleEndian>(self.number_of_point_records));
-        for n in &self.number_of_points_by_return {
-            try!(writer.write_u32::<LittleEndian>(*n));
-        }
-        try!(writer.write_f64::<LittleEndian>(self.x_scale_factor));
-        try!(writer.write_f64::<LittleEndian>(self.y_scale_factor));
-        try!(writer.write_f64::<LittleEndian>(self.z_scale_factor));
-        try!(writer.write_f64::<LittleEndian>(self.x_offset));
-        try!(writer.write_f64::<LittleEndian>(self.y_offset));
-        try!(writer.write_f64::<LittleEndian>(self.z_offset));
-        try!(writer.write_f64::<LittleEndian>(self.x_max));
-        try!(writer.write_f64::<LittleEndian>(self.x_min));
-        try!(writer.write_f64::<LittleEndian>(self.y_max));
-        try!(writer.write_f64::<LittleEndian>(self.y_min));
-        try!(writer.write_f64::<LittleEndian>(self.z_max));
-        try!(writer.write_f64::<LittleEndian>(self.z_min));
-        Ok(DEFAULT_BYTES_IN_HEADER)
-    }
-
-    /// Calculates the size of this header and assigns it to the header structure.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::header::Header;
-    /// let mut header = Header::new();
-    /// header.calculate_size();
-    /// assert_eq!(227, header.header_size);
-    /// ```
-    pub fn calculate_size(&mut self) {
-        self.header_size = DEFAULT_BYTES_IN_HEADER
     }
 }
 

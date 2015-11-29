@@ -1,4 +1,4 @@
-//! Reads and writes point cloud data stored in the ASPRS `las` file format.
+//! Reads and writes point cloud data stored in the ASPRS **las** file format.
 //!
 //! The las file format [as defined by
 //! ASPRS](http://www.asprs.org/Committee-General/LASer-LAS-File-Format-Exchange-Activities.html)
@@ -8,13 +8,11 @@
 //!
 //! # Reading points
 //!
-//! To read a point from a las file, use `las::Reader::next_point()` (see [the Rust
-//! Book](https://doc.rust-lang.org/book/if-let.html) for information on that cryptic `if let`
-//! syntax):
+//! To read a point from a las file, use `las::Reader::read_point()`:
 //!
 //! ```
 //! let mut reader = las::Reader::from_path("data/1.0_0.las").unwrap();
-//! let point = reader.next_point().unwrap();
+//! let point = reader.read_point().unwrap();
 //! if let Some(point) = point {
 //!     println!("Read point (x={}, y={}, z={})", point.x, point.y, point.z);
 //! } else {
@@ -22,7 +20,14 @@
 //! }
 //! ```
 //!
-//! A `Reader` can be used to iterate over all points in the file:
+//! To get all the points in a las file, use `read_all`:
+//!
+//! ```
+//! # let mut reader = las::Reader::from_path("data/1.0_0.las").unwrap();
+//! let points = reader.read_all().unwrap();
+//! ```
+//!
+//! You can also use a `Reader` as an interator:
 //!
 //! ```
 //! # let mut reader = las::Reader::from_path("data/1.0_0.las").unwrap();
@@ -31,27 +36,35 @@
 //! }
 //! ```
 //!
+//! A `Reader` does not read the points into memory unless you ask it to e.g. with `read_all`.
+//!
+//!
 //! # Writing points
 //!
-//! Writing points follows a similar pattern, using `las::Writer`:
+//! You can use `las::Writer` to write points. The process is complicated a bit by the fact that
+//! the las header includes some statistics and other values that require knowledge of the entire
+//! point domain, but we want to allow the user to write a las file without having to store all the
+//! points in memory at once. This requires writing the las header twice — once before writing the
+//! points, and once after. Because of this, writing is a bit more complicated — you need to `open`
+//! the `Writer` before you can write points to it:
 //!
 //! ```
-//! let mut writer = las::Writer::from_path("/dev/null");
-//! writer.write_point(las::Point::new());
+//! let mut writer = las::Writer::from_path("/dev/null").unwrap().open().unwrap();
+//! writer.write_point(&las::Point::new()).unwrap();
 //! writer.close().unwrap();
 //! ```
 //!
-//! You can configure a `Writer` using the builder pattern:
+//! Before you open your writer, you can configure attributes of the output file, including the las
+//! version and the point format.
 //!
 //! ```
-//! let writer = las::Writer::from_path("/dev/null")
+//! let writer = las::Writer::from_path("/dev/null").unwrap()
 //!     .version(1, 2)
 //!     .point_format(las::PointFormat(1))
-//!     .offsets(1000.0, 2000.0, 100.0)
+//!     .auto_offsets(true)     // calculate and set reasonable offsets for these data
 //!     .scale_factors(0.01, 0.01, 0.01);
 //! ```
 //!
-//! Of course, see each structure's documentation for a complete listing of available methods.
 //!
 //! # Previous art
 //!
@@ -92,7 +105,6 @@ extern crate time;
 mod io;
 mod scale;
 pub mod error;
-pub mod file;
 pub mod header;
 pub mod point;
 pub mod reader;
@@ -100,7 +112,6 @@ pub mod vlr;
 pub mod writer;
 
 pub use error::Error;
-pub use file::File;
 pub use header::PointFormat;
 pub use point::Point;
 pub use reader::Reader;
