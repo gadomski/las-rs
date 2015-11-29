@@ -248,6 +248,7 @@ impl<W: Seek + Write> Writer<W> {
             header.header_size = DEFAULT_BYTES_IN_HEADER;
             header.offset_to_point_data = header.header_size as u32 +
                                           self.vlrs.iter().fold(0, |a, v| a + v.len());
+            header.point_data_record_length = header.point_data_format.record_length();
             header.number_of_variable_length_records = self.vlrs.len() as u32;
         }
 
