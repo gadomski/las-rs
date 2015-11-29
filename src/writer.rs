@@ -9,7 +9,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use time;
 
 use {Error, Result};
-use header::{DEFAULT_BYTES_IN_HEADER, Header, PointFormat};
+use header::{DEFAULT_BYTES_IN_HEADER, Header, PointFormat, Version};
 use io::write_zeros;
 use point::Point;
 use scale::descale;
@@ -167,8 +167,7 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::from_path("/dev/null").unwrap().version(1, 2);
     /// ```
     pub fn version(mut self, major: u8, minor: u8) -> Writer<W> {
-        self.header.version_major = major;
-        self.header.version_minor = minor;
+        self.header.version = Version::new(major, minor);
         self
     }
 
@@ -259,8 +258,8 @@ impl<W: Seek + Write> Writer<W> {
         try!(writer.write_u16::<LittleEndian>(header.guid_data_2));
         try!(writer.write_u16::<LittleEndian>(header.guid_data_3));
         try!(writer.write_all(&header.guid_data_4));
-        try!(writer.write_u8(header.version_major));
-        try!(writer.write_u8(header.version_minor));
+        try!(writer.write_u8(header.version.major));
+        try!(writer.write_u8(header.version.minor));
         try!(writer.write_all(&header.system_identifier));
         try!(writer.write_all(&header.generating_software));
         try!(writer.write_u16::<LittleEndian>(header.file_creation_day_of_year));
@@ -502,8 +501,8 @@ mod tests {
         assert_eq!(4.0, header.x_offset);
         assert_eq!(5.0, header.y_offset);
         assert_eq!(6.0, header.z_offset);
-        assert_eq!(1, header.version_major);
-        assert_eq!(2, header.version_minor);
+        assert_eq!(1, header.version.major);
+        assert_eq!(2, header.version.minor);
         assert_eq!(PointFormat(1), header.point_data_format);
     }
 

@@ -39,12 +39,8 @@ pub struct Header {
     pub guid_data_3: u16,
     /// The fourth of four parts of the project id.
     pub guid_data_4: [u8; 8],
-    /// The las major version.
-    ///
-    /// Should always be 1.
-    pub version_major: u8,
-    /// The las minor version.
-    pub version_minor: u8,
+    /// The las format version.
+    pub version: Version,
     /// Generally the hardware system that created the las file.
     ///
     /// Can also be the algorithm that produced the lasfile. This field is poorly defined.
@@ -122,8 +118,9 @@ impl Header {
         header.guid_data_2 = try!(reader.read_u16::<LittleEndian>());
         header.guid_data_3 = try!(reader.read_u16::<LittleEndian>());
         try!(read_full(reader, &mut header.guid_data_4));
-        header.version_major = try!(reader.read_u8());
-        header.version_minor = try!(reader.read_u8());
+        let version_major = try!(reader.read_u8());
+        let version_minor = try!(reader.read_u8());
+        header.version = Version::new(version_major, version_minor);
         try!(read_full(reader, &mut header.system_identifier));
         try!(read_full(reader, &mut header.generating_software));
         header.file_creation_day_of_year = try!(reader.read_u16::<LittleEndian>());
@@ -178,8 +175,7 @@ impl Header {
             guid_data_2: 0,
             guid_data_3: 0,
             guid_data_4: [0; 8],
-            version_major: 1,
-            version_minor: 0,
+            version: Version::new(1, 0),
             system_identifier: [0; 32],
             generating_software: generating_software,
             file_creation_day_of_year: now.tm_yday as u16,
@@ -280,5 +276,31 @@ impl PointFormat {
 impl fmt::Display for PointFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+/// The las format version.
+///
+/// Various "powers" were added to the las format with new versions, and this struct should be used
+/// to check for the presence/absence of powers.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Version {
+    /// The las major verison. Should be 1.
+    pub major: u8,
+    /// The las minor version.
+    pub minor: u8,
+}
+
+impl Version {
+    /// Creates a new version.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::header::Version;
+    /// let version = Version::new(1, 2);
+    /// ```
+    pub fn new(major: u8, minor: u8) -> Version {
+        Version { major: major, minor: minor }
     }
 }
