@@ -5,7 +5,7 @@
 //! operation, and downstream users should prefer to use the builder methods of `Writer` to
 //! configure behavior.
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::fmt;
 use std::iter::repeat;
 
