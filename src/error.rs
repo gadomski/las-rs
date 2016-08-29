@@ -64,7 +64,12 @@ impl fmt::Display for Error {
             Error::InvalidPointFormat(n) => write!(f, "Invalid point data format: {}", n),
             Error::InvalidReturnNumber(n) => write!(f, "Invalid return number: {}", n),
             Error::Io(ref err) => write!(f, "IO error: {}", err),
-            Error::PointFormat(format, ref field) => write!(f, "Point format mismatch for format '{}' and field '{}'", format, field),
+            Error::PointFormat(format, ref field) => {
+                write!(f,
+                       "Point format mismatch for format '{}' and field '{}'",
+                       format,
+                       field)
+            }
         }
     }
 }

@@ -163,11 +163,10 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn seek(&mut self, index: u32) -> Result<()> {
         let result = self.reader
-                         .seek(SeekFrom::Start(self.header.offset_to_point_data as u64 +
-                                               self.header.point_data_record_length as u64 *
-                                               index as u64))
-                         .and(Ok(()))
-                         .map_err(|e| Error::from(e));
+            .seek(SeekFrom::Start(self.header.offset_to_point_data as u64 +
+                                  self.header.point_data_record_length as u64 * index as u64))
+            .and(Ok(()))
+            .map_err(|e| Error::from(e));
         self.position = index;
         result
     }

@@ -488,14 +488,14 @@ mod tests {
     #[test]
     fn builder() {
         let writer = Writer::new(Cursor::new(Vec::new()))
-                         .scale_factors(1.0, 2.0, 3.0)
-                         .offsets(4.0, 5.0, 6.0)
-                         .version(1, 2)
-                         .point_format(PointFormat(1))
-                         .open()
-                         .unwrap()
-                         .close()
-                         .unwrap();
+            .scale_factors(1.0, 2.0, 3.0)
+            .offsets(4.0, 5.0, 6.0)
+            .version(1, 2)
+            .point_format(PointFormat(1))
+            .open()
+            .unwrap()
+            .close()
+            .unwrap();
 
         let mut cursor = writer.into_inner();
         cursor.set_position(0);

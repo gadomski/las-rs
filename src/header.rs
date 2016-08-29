@@ -167,9 +167,8 @@ impl Header {
         let name_and_version = format!("las-rs {}", env!("CARGO_PKG_VERSION")).into_bytes();
         let mut generating_software = [0; 32];
         for (c, b) in name_and_version.iter()
-                                      .chain(repeat(&0).take(generating_software.len() -
-                                                             name_and_version.len()))
-                                      .zip(generating_software.iter_mut()) {
+            .chain(repeat(&0).take(generating_software.len() - name_and_version.len()))
+            .zip(generating_software.iter_mut()) {
             *b = *c;
         }
         let now = time::now();
@@ -307,7 +306,10 @@ impl Version {
     /// let version = Version::new(1, 2);
     /// ```
     pub fn new(major: u8, minor: u8) -> Version {
-        Version { major: major, minor: minor }
+        Version {
+            major: major,
+            minor: minor,
+        }
     }
 
     /// Returns true if this las version has the gps time type field.
