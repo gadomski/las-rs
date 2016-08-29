@@ -4,8 +4,7 @@ use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use super::Result;
-use io::read_full;
+use Result;
 
 const DEFAULT_HEADER_LENGTH: u16 = 54;
 
@@ -44,12 +43,12 @@ impl Vlr {
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Vlr> {
         let mut vlr = Vlr::new();
         vlr.reserved = try!(reader.read_u16::<LittleEndian>());
-        try!(read_full(reader, &mut vlr.user_id));
+        try!(reader.read_exact(&mut vlr.user_id));
         vlr.record_id = try!(reader.read_u16::<LittleEndian>());
         vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
-        try!(read_full(reader, &mut vlr.description));
+        try!(reader.read_exact(&mut vlr.description));
         vlr.record = vec![0; vlr.record_length_after_header as usize];
-        try!(read_full(reader, &mut vlr.record));
+        try!(reader.read_exact(&mut vlr.record));
         Ok(vlr)
     }
 

@@ -10,7 +10,6 @@ use time;
 
 use {Error, Result};
 use header::{DEFAULT_BYTES_IN_HEADER, Header, PointFormat, Version};
-use io::write_zeros;
 use point::Point;
 use scale::descale;
 use vlr::Vlr;
@@ -203,7 +202,7 @@ impl<W: Seek + Write> Writer<W> {
         bytes += try!(self.write_vlrs());
         bytes = self.header.offset_to_point_data - bytes;
         if bytes > 0 {
-            try!(write_zeros(&mut self.writer, bytes as usize));
+            try!(self.writer.write_all(&vec![0; bytes as usize][..]));
         }
 
         Ok(OpenWriter {
@@ -294,7 +293,7 @@ impl<W: Seek + Write> Writer<W> {
 
         let bytes = header.header_size - DEFAULT_BYTES_IN_HEADER;
         if bytes > 0 {
-            try!(write_zeros(writer, bytes as usize));
+            try!(writer.write_all(&vec![0; bytes as usize][..]));
         }
 
         Ok(header.header_size)

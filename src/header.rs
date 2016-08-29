@@ -14,7 +14,6 @@ use time;
 
 use Result;
 use error::Error;
-use io::read_full;
 
 /// This constant value is the bytes in your normal header. There are worlds where people put crap
 /// into headers that don't belong there, so we have to guard against this.
@@ -112,18 +111,18 @@ impl Header {
     /// ```
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Header> {
         let mut header = Header::new();
-        try!(read_full(reader, &mut header.file_signature));
+        try!(reader.read_exact(&mut header.file_signature));
         header.file_source_id = try!(reader.read_u16::<LittleEndian>());
         let global_encoding = try!(reader.read_u16::<LittleEndian>());
         header.guid_data_1 = try!(reader.read_u32::<LittleEndian>());
         header.guid_data_2 = try!(reader.read_u16::<LittleEndian>());
         header.guid_data_3 = try!(reader.read_u16::<LittleEndian>());
-        try!(read_full(reader, &mut header.guid_data_4));
+        try!(reader.read_exact(&mut header.guid_data_4));
         let version_major = try!(reader.read_u8());
         let version_minor = try!(reader.read_u8());
         header.version = Version::new(version_major, version_minor);
-        try!(read_full(reader, &mut header.system_identifier));
-        try!(read_full(reader, &mut header.generating_software));
+        try!(reader.read_exact(&mut header.system_identifier));
+        try!(reader.read_exact(&mut header.generating_software));
         header.file_creation_day_of_year = try!(reader.read_u16::<LittleEndian>());
         header.file_creation_year = try!(reader.read_u16::<LittleEndian>());
         header.header_size = try!(reader.read_u16::<LittleEndian>());

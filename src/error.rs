@@ -4,15 +4,11 @@ use std::error;
 use std::io;
 use std::fmt;
 
-use byteorder;
-
 use header;
 
 /// Errors.
 #[derive(Debug)]
 pub enum Error {
-    /// Wraps `byteorder::Error`.
-    Byteorder(byteorder::Error),
     /// The provided `u8` does not correspond to a classification value.
     InvalidClassification(u8),
     /// The las format specifies an upper bound on the number of returns for a given pulse. This
@@ -36,7 +32,6 @@ pub enum Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::Byteorder(ref err) => err.description(),
             Error::InvalidClassification(_) => "invalid classification",
             Error::InvalidNumberOfReturns(_) => "invalid number of returns",
             Error::InvalidPointFormat(_) => "invalid point data format",
@@ -48,7 +43,6 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::Byteorder(ref err) => Some(err),
             Error::Io(ref err) => Some(err),
             _ => None,
         }
@@ -58,7 +52,6 @@ impl error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::Byteorder(ref err) => write!(f, "Byteorder error: {}", err),
             Error::InvalidClassification(n) => write!(f, "Invalid classification: {}", n),
             Error::InvalidNumberOfReturns(n) => write!(f, "Invalid number of returns: {}", n),
             Error::InvalidPointFormat(n) => write!(f, "Invalid point data format: {}", n),
@@ -71,12 +64,6 @@ impl fmt::Display for Error {
                        field)
             }
         }
-    }
-}
-
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        Error::Byteorder(err)
     }
 }
 

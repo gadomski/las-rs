@@ -15,5 +15,5 @@ keywords = ["lidar", "pointcloud", "las", "gis", "ASPRS"]
 license = "MIT"
 
 [dependencies]
-byteorder = "0.4"
+byteorder = "0.5"
 time = "0.1"

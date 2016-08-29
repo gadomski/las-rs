@@ -102,7 +102,6 @@
 extern crate byteorder;
 extern crate time;
 
-mod io;
 mod scale;
 pub mod error;
 pub mod header;

@@ -9,7 +9,6 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use {Error, Result};
 use header::Header;
-use io::read_full;
 use point::{Classification, NumberOfReturns, Point, ReturnNumber, ScanDirection};
 use scale::scale;
 use vlr::Vlr;
@@ -121,7 +120,7 @@ impl<R: Read + Seek> Reader<R> {
         if bytes_read < self.header.point_data_record_length as u64 {
             let mut buf =
                 vec![0; (self.header.point_data_record_length as u64 - bytes_read) as usize];
-            try!(read_full(&mut self.reader, &mut buf[..]));
+            try!(self.reader.read_exact(&mut buf[..]));
             point.extra_bytes = Some(buf);
         }
 
