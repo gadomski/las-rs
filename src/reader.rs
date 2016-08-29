@@ -93,7 +93,7 @@ impl<R: Read + Seek> Reader<R> {
                         self.header.y_offset);
         point.z = scale(try!(self.reader.read_i32::<LittleEndian>()),
                         self.header.z_scale_factor,
-                        self.header.x_offset);
+                        self.header.z_offset);
         point.intensity = try!(self.reader.read_u16::<LittleEndian>());
         let byte = try!(self.reader.read_u8());
         point.return_number = try!(ReturnNumber::from_u8(byte & 0b00000111));
@@ -303,4 +303,12 @@ mod tests {
         assert_eq!(point1, point2);
     }
 
+    #[test]
+    fn one_point() {
+        let mut reader = Reader::from_path("data/one-point.las").unwrap();
+        let point = reader.read_point().unwrap().unwrap();
+        assert!((point.x + 139.3173).abs() < 1e-2);
+        assert!((point.y + 239.3297).abs() < 1e-2);
+        assert!((point.z + 10.4930).abs() < 1e-2);
+    }
 }
