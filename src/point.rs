@@ -75,7 +75,7 @@ impl Point {
     /// # Examples
     ///
     /// ```
-    /// use las::point::Point;
+    /// use las::Point;
     /// let point = Point::new();
     /// ```
     pub fn new() -> Point {
@@ -95,7 +95,7 @@ impl ReturnNumber {
     /// # Examples
     ///
     /// ```
-    /// use las::point::ReturnNumber;
+    /// use las::ReturnNumber;
     /// assert!(ReturnNumber::from_u8(1).is_ok());
     /// assert!(ReturnNumber::from_u8(6).is_err());
     /// ```
@@ -112,7 +112,7 @@ impl ReturnNumber {
     /// # Examples
     ///
     /// ```
-    /// use las::point::ReturnNumber;
+    /// use las::ReturnNumber;
     /// assert_eq!(1, ReturnNumber::from_u8(1).unwrap().as_u8());
     /// ```
     pub fn as_u8(&self) -> u8 {
@@ -132,7 +132,7 @@ impl NumberOfReturns {
     /// # Examples
     ///
     /// ```
-    /// use las::point::NumberOfReturns;
+    /// use las::NumberOfReturns;
     /// assert!(NumberOfReturns::from_u8(0).is_ok());
     /// assert!(NumberOfReturns::from_u8(6).is_err());
     /// ```
@@ -149,7 +149,7 @@ impl NumberOfReturns {
     /// # Examples
     ///
     /// ```
-    /// use las::point::NumberOfReturns;
+    /// use las::NumberOfReturns;
     /// assert_eq!(1, NumberOfReturns::from_u8(1).unwrap().as_u8());
     /// ```
     pub fn as_u8(&self) -> u8 {
@@ -172,7 +172,7 @@ impl ScanDirection {
     /// # Examples
     ///
     /// ```
-    /// use las::point::ScanDirection;
+    /// use las::ScanDirection;
     /// let forward = ScanDirection::Forward;
     /// assert_eq!(1, forward.as_u8());
     /// ```
@@ -237,7 +237,7 @@ impl Classification {
     /// # Examples
     ///
     /// ```
-    /// use las::point::Classification;
+    /// use las::Classification;
     /// assert_eq!(Classification::Ground, Classification::from_u8(2).unwrap());
     /// assert!(Classification::from_u8(127).is_err());
     /// ```
@@ -264,7 +264,7 @@ impl Classification {
     /// # Examples
     ///
     /// ```
-    /// use las::point::Classification;
+    /// use las::Classification;
     /// let classification = Classification::Ground;
     /// assert_eq!(2, classification.as_u8());
     /// ```

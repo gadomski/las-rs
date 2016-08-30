@@ -28,7 +28,7 @@ impl Reader<BufReader<File>> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
@@ -44,7 +44,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// ```
     /// use std::fs::File;
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let file = File::open("data/1.0_0.las").unwrap();
     /// let reader = Reader::new(file);
     /// ```
@@ -71,7 +71,7 @@ impl<R: Read + Seek> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// let point = reader.read_point().unwrap();
     /// assert!(point.is_some());
@@ -134,7 +134,7 @@ impl<R: Read + Seek> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let points = Reader::from_path("data/1.0_0.las").unwrap().read_all().unwrap();
     /// ```
     pub fn read_all(&mut self) -> Result<Vec<Point>> {
@@ -155,7 +155,7 @@ impl<R: Read + Seek> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// reader.read_all().unwrap();
     /// reader.seek(0).unwrap();
@@ -177,7 +177,7 @@ impl<R: Read> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// let header = reader.header();
     /// ```
@@ -190,7 +190,7 @@ impl<R: Read> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// let vlrs = reader.vlrs();
     /// ```
@@ -203,7 +203,7 @@ impl<R: Read> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// assert_eq!(1, reader.npoints());
     /// ```
@@ -216,7 +216,7 @@ impl<R: Read> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
     /// assert!(!reader.eof());
     /// let _ = reader.read_point().unwrap();
@@ -231,7 +231,7 @@ impl<R: Read> Reader<R> {
     /// # Examples
     ///
     /// ```
-    /// use las::reader::Reader;
+    /// use las::Reader;
     /// let file = Reader::from_path("data/1.0_0.las").unwrap().into_inner();
     /// ```
     pub fn into_inner(self) -> R {

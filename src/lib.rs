@@ -102,21 +102,20 @@
 extern crate byteorder;
 extern crate time;
 
+mod error;
+mod header;
+mod point;
+mod reader;
 mod scale;
-pub mod error;
-pub mod header;
-pub mod point;
-pub mod reader;
-pub mod vlr;
-pub mod writer;
+mod vlr;
+mod writer;
 
 pub use error::Error;
-pub use header::PointFormat;
-pub use point::Point;
+pub use header::{Header, GpsTimeType, PointFormat, Version};
+pub use point::{ScanDirection, Classification, NumberOfReturns, ReturnNumber, Point};
 pub use reader::Reader;
+pub use vlr::Vlr;
 pub use writer::Writer;
 
-use std::result;
-
 /// Crate-specific resuls.
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;

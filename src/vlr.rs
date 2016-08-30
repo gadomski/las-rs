@@ -33,8 +33,8 @@ impl Vlr {
     /// ```
     /// use std::fs::File;
     /// use std::io::{Seek, SeekFrom};
-    /// use las::header::Header;
-    /// use las::vlr::Vlr;
+    /// use las::Header;
+    /// use las::Vlr;
     /// let ref mut reader = File::open("data/1.0_0.las").unwrap();
     /// let header = Header::read_from(reader).unwrap();
     /// reader.seek(SeekFrom::Start(header.header_size as u64)).unwrap();
@@ -57,7 +57,7 @@ impl Vlr {
     /// # Examples
     ///
     /// ```
-    /// use las::vlr::Vlr;
+    /// use las::Vlr;
     /// let vlr = Vlr::new();
     /// ```
     pub fn new() -> Vlr {
@@ -76,7 +76,7 @@ impl Vlr {
     /// # Examples
     ///
     /// ```
-    /// use las::vlr::Vlr;
+    /// use las::Vlr;
     /// let vlr = Vlr::new();
     /// assert_eq!(54, vlr.len());
     /// ```

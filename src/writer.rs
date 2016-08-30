@@ -30,7 +30,7 @@ impl Writer<BufWriter<File>> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Writer<BufWriter<File>>> {
@@ -47,7 +47,7 @@ impl<W: Seek + Write> Writer<W> {
     ///
     /// ```
     /// use std::fs::File;
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let file = File::create("/dev/null").unwrap();
     /// let writer = Writer::new(file);
     /// ```
@@ -68,8 +68,8 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::header::Header;
-    /// use las::writer::Writer;
+    /// use las::Header;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().header(Header::new());
     /// ```
     pub fn header(mut self, header: Header) -> Writer<W> {
@@ -85,7 +85,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().freeze_header(true);
     /// ```
     pub fn freeze_header(mut self, freeze_header: bool) -> Writer<W> {
@@ -98,7 +98,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().vlrs(Vec::new());
     /// ```
     pub fn vlrs(mut self, vlrs: Vec<Vlr>) -> Writer<W> {
@@ -111,7 +111,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().scale_factors(0.01, 0.01, 0.01);
     /// ```
     pub fn scale_factors(mut self,
@@ -130,7 +130,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().offsets(1000.0, 2000.0, 100.0);
     /// ```
     pub fn offsets(mut self, x_offset: f64, y_offset: f64, z_offset: f64) -> Writer<W> {
@@ -149,7 +149,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().auto_offsets(true);
     /// ```
     pub fn auto_offsets(mut self, enable: bool) -> Writer<W> {
@@ -162,7 +162,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().version(1, 2);
     /// ```
     pub fn version(mut self, major: u8, minor: u8) -> Writer<W> {
@@ -176,7 +176,7 @@ impl<W: Seek + Write> Writer<W> {
     ///
     /// ```
     /// use las::PointFormat;
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap().point_format(PointFormat(1));
     /// ```
     pub fn point_format(mut self, point_format: PointFormat) -> Writer<W> {
@@ -192,7 +192,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let mut writer = Writer::from_path("/dev/null").unwrap().open().unwrap();
     /// ```
     pub fn open(mut self) -> Result<OpenWriter<W>> {
@@ -223,7 +223,7 @@ impl<W: Seek + Write> Writer<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let file = Writer::from_path("/dev/null").unwrap().into_inner();
     /// ```
     pub fn into_inner(self) -> W {
@@ -396,8 +396,7 @@ impl<W: Seek + Write> OpenWriter<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::point::Point;
-    /// use las::writer::Writer;
+    /// use las::{Point, Writer};
     /// let mut writer = Writer::from_path("/dev/null").unwrap().open().unwrap();
     /// writer.write_point(&Point::new()).unwrap();
     /// ```
@@ -432,7 +431,7 @@ impl<W: Seek + Write> OpenWriter<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// Writer::from_path("/dev/null").unwrap().open().unwrap()
     ///     .write_points(&Vec::new()).unwrap();
     /// ```
@@ -453,7 +452,7 @@ impl<W: Seek + Write> OpenWriter<W> {
     /// # Examples
     ///
     /// ```
-    /// use las::writer::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null").unwrap()
     ///     .open().unwrap()
     ///     .close().unwrap();

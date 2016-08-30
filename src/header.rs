@@ -105,7 +105,7 @@ impl Header {
     ///
     /// ```
     /// use std::fs::File;
-    /// use las::header::Header;
+    /// use las::Header;
     /// let ref mut file = File::open("data/1.0_0.las").unwrap();
     /// let header = Header::read_from(file);
     /// ```
@@ -159,7 +159,7 @@ impl Header {
     /// # Examples
     ///
     /// ```
-    /// use las::header::Header;
+    /// use las::Header;
     /// let header = Header::new();
     /// ```
     pub fn new() -> Header {
@@ -219,7 +219,7 @@ impl PointFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointFormat;
+    /// use las::PointFormat;
     /// assert!(PointFormat::from_u8(0).is_ok());
     /// assert!(PointFormat::from_u8(1).is_ok());
     /// assert!(PointFormat::from_u8(127).is_err());
@@ -237,7 +237,7 @@ impl PointFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointFormat;
+    /// use las::PointFormat;
     /// assert!(!PointFormat::from_u8(0).unwrap().has_time());
     /// assert!(PointFormat::from_u8(1).unwrap().has_time());
     /// ```
@@ -250,7 +250,7 @@ impl PointFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointFormat;
+    /// use las::PointFormat;
     /// assert!(!PointFormat::from_u8(0).unwrap().has_color());
     /// assert!(PointFormat::from_u8(2).unwrap().has_color());
     /// ```
@@ -263,7 +263,7 @@ impl PointFormat {
     /// # Examples
     ///
     /// ```
-    /// use las::header::PointFormat;
+    /// use las::PointFormat;
     /// assert_eq!(20, PointFormat::from_u8(0).unwrap().record_length());
     /// ```
     pub fn record_length(&self) -> u16 {
@@ -301,7 +301,7 @@ impl Version {
     /// # Examples
     ///
     /// ```
-    /// use las::header::Version;
+    /// use las::Version;
     /// let version = Version::new(1, 2);
     /// ```
     pub fn new(major: u8, minor: u8) -> Version {
@@ -318,7 +318,7 @@ impl Version {
     /// # Examples
     ///
     /// ```
-    /// use las::header::Version;
+    /// use las::Version;
     /// assert!(!Version::new(1, 1).has_gps_time_type());
     /// assert!(Version::new(1, 2).has_gps_time_type());
     /// ```
@@ -343,7 +343,7 @@ impl GpsTimeType {
     /// # Examples
     ///
     /// ```
-    /// use las::header::GpsTimeType;
+    /// use las::GpsTimeType;
     /// assert_eq!(0, GpsTimeType::Week.as_mask());
     /// assert_eq!(1, GpsTimeType::AdjustedStandard.as_mask());
     /// ```
