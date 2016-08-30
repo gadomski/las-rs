@@ -1,7 +1,8 @@
 sudo: false
-language: rust
-after_success:
-    - test $TRAVIS_PULL_REQUEST == "false" && test $TRAVIS_BRANCH == "master" && bash deploy-docs.sh
-env:
-  global:
-    secure: ENy/SzE4IWrhZsXd4eYe6ot024nvz6iu6n/n9vaV2qYI0QVnrroRq9mR+gVPSfaft/zxK5nvUfBa7moOUxerMUF0lMGhHNNCzSzxa1Hc5Yr/JbMwdLps/U0r1e4MsCeP0aik+0gCWE9cG0YzneJqr9WHnOQIji6U3d8WHaoSKoMorAwccFARWn7YtkuPmmLd5cOgmukORUrAi9vjOu2IA3xCbuW3jbEFPP+C6dlYemJ7uohroxxhg1Mu7vwiwwU7eTAbRNjCZShm8+k2p0zfn0Ks9WACagNbfE1rn0FWUEnHVQWI3CJJeMqfiJH+17DwZjAHtzSSLFx3OnP3DrIHmUQtWVmeTurG9eFg1Z92eVgwzGkQ8mdztCI2MIIVHHYQWdOw9a0Duecyk2si4WFFcCPeKJAUDrYsDdhYNP7P/czO3ZmTuFZ/Vs2pK6rSiBy0QEtpHNxFWVrFxMt1Zcw6ba6A4ZJC4qrD3gcpxQyacJusbQ9AIrFpduM5tef2TCH4GUnuzwNWQQQBtpfu5YC6OTlC6F/f9a8azR4jXD8cz/1gEUb1mp+BDBLxU3MCM/5YwsXkT+OWICIYkeo4Z4Jt056cRG929Fk2C3BRuvvv0WflZ57K+OHDEDd+/wMkII7IVYBi7ODXuSKPB/jUHJF2r3kTMrJTf3hF8Un/gw4dp3M=
+rust:
+  - stable
+  - beta
+  - nightly
+matrix:
+  allow_failures:
+    - rust: nightly
