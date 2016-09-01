@@ -1,364 +1,83 @@
-//! Work with las headers and the information contained therin.
-//!
-//! Headers are very important, as they describe the layout of points in the file, as well as the
-//! scaling and offset of the data in each point. Working with headers is generally a low-level
-//! operation, and downstream users should prefer to use the builder methods of `Writer` to
-//! configure behavior.
+use chrono::{Date, UTC};
 
-use std::io::Read;
-use std::fmt;
-use std::iter::repeat;
+use global_encoding::GlobalEncoding;
+use point::Format;
+use utils::{Bounds, Triple};
+use version::Version;
+use vlr::Vlr;
 
-use byteorder::{LittleEndian, ReadBytesExt};
-use time;
+const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-use Result;
-use error::Error;
-
-/// This constant value is the bytes in your normal header. There are worlds where people put crap
-/// into headers that don't belong there, so we have to guard against this.
-pub const DEFAULT_BYTES_IN_HEADER: u16 = 227;
-
-/// A las header.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// The LAS header.
+#[derive(Clone, Debug)]
 pub struct Header {
-    /// The las file signature.
+    /// The file source ID.
     ///
-    /// Should always be "LASF".
-    pub file_signature: [u8; 4],
-    /// A numeric identifier for this file.
-    pub file_source_id: u16,
-    /// What is the reference system for the timestamps in each point data record? This field was
-    /// added in las 1.2.
-    pub gps_time_type: GpsTimeType,
-    /// The first of four parts of the project id.
-    pub guid_data_1: u32,
-    /// The second of four parts of the project id.
-    pub guid_data_2: u16,
-    /// The third of four parts of the project id.
-    pub guid_data_3: u16,
-    /// The fourth of four parts of the project id.
-    pub guid_data_4: [u8; 8],
-    /// The las format version.
+    /// This does not exist for LAS 1.0 files.
+    pub file_source_id: Option<u16>,
+    /// The global encoding.
+    ///
+    /// This does not exist for LAS 1.1 and 1.0 files.
+    pub global_encoding: Option<GlobalEncoding>,
+    /// The project id number.
+    pub project_id: [u8; 16],
+    /// The LAS version.
     pub version: Version,
-    /// Generally the hardware system that created the las file.
-    ///
-    /// Can also be the algorithm that produced the lasfile. This field is poorly defined.
-    pub system_identifier: [u8; 32],
-    /// The software the generated the las file.
+    /// The system identifier.
+    pub system_id: [u8; 32],
+    /// The generating software.
     pub generating_software: [u8; 32],
-    /// The day of the year, indexed to 1.
-    pub file_creation_day_of_year: u16,
-    /// The year of file creation.
-    pub file_creation_year: u16,
-    /// The size of the las header.
+    /// The day of file creation.
+    pub file_creation_date: Date<UTC>,
+    /// The point format.
+    pub point_format: Format,
+    /// The number of extra bytes in the point beyond the standard.
+    pub extra_bytes: u16,
+    /// The number of points.
     ///
-    /// Softwares are technically allowed to add custom extensions to the las header, which would
-    /// then affect this header size, but that is discouraged as such support is not universal.
-    pub header_size: u16,
-    /// The byte offset to the beginning of point data.
-    ///
-    /// Includes the size of the header and the variable length records.
-    pub offset_to_point_data: u32,
-    /// The number of variable length records.
-    pub number_of_variable_length_records: u32,
-    /// The point data format.
-    pub point_data_format: PointFormat,
-    /// The length of one point data record, in bytes.
-    pub point_data_record_length: u16,
-    /// The total number of point records.
-    pub number_of_point_records: u32,
-    /// The number of point records of each return number.
-    ///
-    /// This only supports five returns per pulse.
-    pub number_of_points_by_return: [u32; 5],
-    /// The x scale factor for each point.
-    pub x_scale_factor: f64,
-    /// The y scale factor for each point.
-    pub y_scale_factor: f64,
-    /// The z scale factor for each point.
-    pub z_scale_factor: f64,
-    /// The x offset for each point.
-    pub x_offset: f64,
-    /// The y offset for each point.
-    pub y_offset: f64,
-    /// The z offset for each point.
-    pub z_offset: f64,
-    /// The maximum x value.
-    pub x_max: f64,
-    /// The minimum x value.
-    pub x_min: f64,
-    /// The maximum y value.
-    pub y_max: f64,
-    /// The minimum y value.
-    pub y_min: f64,
-    /// The maximum z value.
-    pub z_max: f64,
-    /// The minimum z value.
-    pub z_min: f64,
+    /// This value is taken from the header and is notoriously inaccurate.
+    pub point_count: u32,
+    /// The number of points by return count.
+    pub point_count_by_return: [u32; 5],
+    /// The scaling that is applied to points as they are read.
+    pub scale: Triple<f64>,
+    /// The offset of the points, in each dimension.
+    pub offset: Triple<f64>,
+    /// The three-dimensional bounds, from the header.
+    pub bounds: Bounds<f64>,
+    /// Variable length records.
+    pub vlrs: Vec<Vlr>,
+    /// Arbitrary byte padding between the header + VLRs and the points.
+    pub padding: u32,
 }
 
-impl Header {
-    /// Reads a header from a `Read`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::fs::File;
-    /// use las::Header;
-    /// let ref mut file = File::open("data/1.0_0.las").unwrap();
-    /// let header = Header::read_from(file);
-    /// ```
-    pub fn read_from<R: Read>(reader: &mut R) -> Result<Header> {
-        let mut header = Header::new();
-        try!(reader.read_exact(&mut header.file_signature));
-        header.file_source_id = try!(reader.read_u16::<LittleEndian>());
-        let global_encoding = try!(reader.read_u16::<LittleEndian>());
-        header.guid_data_1 = try!(reader.read_u32::<LittleEndian>());
-        header.guid_data_2 = try!(reader.read_u16::<LittleEndian>());
-        header.guid_data_3 = try!(reader.read_u16::<LittleEndian>());
-        try!(reader.read_exact(&mut header.guid_data_4));
-        let version_major = try!(reader.read_u8());
-        let version_minor = try!(reader.read_u8());
-        header.version = Version::new(version_major, version_minor);
-        try!(reader.read_exact(&mut header.system_identifier));
-        try!(reader.read_exact(&mut header.generating_software));
-        header.file_creation_day_of_year = try!(reader.read_u16::<LittleEndian>());
-        header.file_creation_year = try!(reader.read_u16::<LittleEndian>());
-        header.header_size = try!(reader.read_u16::<LittleEndian>());
-        header.offset_to_point_data = try!(reader.read_u32::<LittleEndian>());
-        header.number_of_variable_length_records = try!(reader.read_u32::<LittleEndian>());
-        header.point_data_format = try!(PointFormat::from_u8(try!(reader.read_u8())));
-        header.point_data_record_length = try!(reader.read_u16::<LittleEndian>());
-        header.number_of_point_records = try!(reader.read_u32::<LittleEndian>());
-        for n in &mut header.number_of_points_by_return {
-            *n = try!(reader.read_u32::<LittleEndian>());
-        }
-        header.x_scale_factor = try!(reader.read_f64::<LittleEndian>());
-        header.y_scale_factor = try!(reader.read_f64::<LittleEndian>());
-        header.z_scale_factor = try!(reader.read_f64::<LittleEndian>());
-        header.x_offset = try!(reader.read_f64::<LittleEndian>());
-        header.y_offset = try!(reader.read_f64::<LittleEndian>());
-        header.z_offset = try!(reader.read_f64::<LittleEndian>());
-        header.x_max = try!(reader.read_f64::<LittleEndian>());
-        header.x_min = try!(reader.read_f64::<LittleEndian>());
-        header.y_max = try!(reader.read_f64::<LittleEndian>());
-        header.y_min = try!(reader.read_f64::<LittleEndian>());
-        header.z_max = try!(reader.read_f64::<LittleEndian>());
-        header.z_min = try!(reader.read_f64::<LittleEndian>());
-
-        if header.version.has_gps_time_type() {
-            header.gps_time_type = GpsTimeType::from_global_encoding(global_encoding);
-        }
-
-        Ok(header)
-    }
-
-    /// Creates a new, empty header.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Header;
-    /// let header = Header::new();
-    /// ```
-    pub fn new() -> Header {
-        let name_and_version = format!("las-rs {}", env!("CARGO_PKG_VERSION")).into_bytes();
+impl Default for Header {
+    fn default() -> Header {
+        let format = Format::from(0);
+        let generating_software_string = format!("las-rs {}", env!("CARGO_PKG_VERSION"));
         let mut generating_software = [0; 32];
-        for (c, b) in name_and_version.iter()
-            .chain(repeat(&0).take(generating_software.len() - name_and_version.len()))
-            .zip(generating_software.iter_mut()) {
-            *b = *c;
+        for (target, source) in generating_software.iter_mut()
+            .zip(generating_software_string.bytes()) {
+            *target = source;
         }
-        let now = time::now();
         Header {
-            file_signature: *b"LASF",
-            file_source_id: 0,
-            gps_time_type: GpsTimeType::Week,
-            guid_data_1: 0,
-            guid_data_2: 0,
-            guid_data_3: 0,
-            guid_data_4: [0; 8],
-            version: Version::new(1, 0),
-            system_identifier: [0; 32],
+            file_source_id: Some(0),
+            global_encoding: Some(Default::default()),
+            project_id: Default::default(),
+            version: Version::new(1, 2),
+            system_id: DEFAULT_SYSTEM_ID,
             generating_software: generating_software,
-            file_creation_day_of_year: now.tm_yday as u16,
-            file_creation_year: now.tm_year as u16,
-            header_size: 0,
-            offset_to_point_data: 0,
-            number_of_variable_length_records: 0,
-            point_data_format: PointFormat(0),
-            point_data_record_length: 0,
-            number_of_point_records: 0,
-            number_of_points_by_return: [0; 5],
-            x_scale_factor: 1.0,
-            y_scale_factor: 1.0,
-            z_scale_factor: 1.0,
-            x_offset: 0.0,
-            y_offset: 0.0,
-            z_offset: 0.0,
-            x_max: 0.0,
-            x_min: 0.0,
-            y_max: 0.0,
-            y_min: 0.0,
-            z_max: 0.0,
-            z_min: 0.0,
-        }
-    }
-}
-
-/// A wrapper around the u8 of a point data format.
-///
-/// Formats have powers, so we encapsulate that through this struct.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PointFormat(pub u8);
-
-impl PointFormat {
-    /// Creates a point data format for this u8.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::PointFormat;
-    /// assert!(PointFormat::from_u8(0).is_ok());
-    /// assert!(PointFormat::from_u8(1).is_ok());
-    /// assert!(PointFormat::from_u8(127).is_err());
-    /// ```
-    pub fn from_u8(n: u8) -> Result<PointFormat> {
-        if n < 4 {
-            Ok(PointFormat(n))
-        } else {
-            Err(Error::InvalidPointFormat(n))
-        }
-    }
-
-    /// Returns true if this point data format has time.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::PointFormat;
-    /// assert!(!PointFormat::from_u8(0).unwrap().has_time());
-    /// assert!(PointFormat::from_u8(1).unwrap().has_time());
-    /// ```
-    pub fn has_time(&self) -> bool {
-        self.0 == 1 || self.0 == 3
-    }
-
-    /// Returns true if this point data format has color.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::PointFormat;
-    /// assert!(!PointFormat::from_u8(0).unwrap().has_color());
-    /// assert!(PointFormat::from_u8(2).unwrap().has_color());
-    /// ```
-    pub fn has_color(&self) -> bool {
-        self.0 == 2 || self.0 == 3
-    }
-
-    /// Returns the record length for this point data format.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::PointFormat;
-    /// assert_eq!(20, PointFormat::from_u8(0).unwrap().record_length());
-    /// ```
-    pub fn record_length(&self) -> u16 {
-        match self.0 {
-            0 => 20,
-            1 => 28,
-            2 => 26,
-            3 => 34,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl fmt::Display for PointFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-/// The las format version.
-///
-/// Various "powers" were added to the las format with new versions, and this struct should be used
-/// to check for the presence/absence of powers.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Version {
-    /// The las major verison. Should be 1.
-    pub major: u8,
-    /// The las minor version.
-    pub minor: u8,
-}
-
-impl Version {
-    /// Creates a new version.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Version;
-    /// let version = Version::new(1, 2);
-    /// ```
-    pub fn new(major: u8, minor: u8) -> Version {
-        Version {
-            major: major,
-            minor: minor,
-        }
-    }
-
-    /// Returns true if this las version has the gps time type field.
-    ///
-    /// GPS time type is in the global encoding flags, and was added in las 1.2.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Version;
-    /// assert!(!Version::new(1, 1).has_gps_time_type());
-    /// assert!(Version::new(1, 2).has_gps_time_type());
-    /// ```
-    pub fn has_gps_time_type(&self) -> bool {
-        self.minor >= 2
-    }
-}
-
-/// The meaning of GPS time in point records.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum GpsTimeType {
-    /// The GPS time in records is GPS week time. This is always true for versions 1.0 and 1.1.
-    Week,
-    /// The time stamp is standard GPS time minus 1e9, called adjusted standard GPS time. This
-    /// adjustment is to improve the floating point resolution.
-    AdjustedStandard,
-}
-
-impl GpsTimeType {
-    /// Returns this time type as a global encoding mask.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::GpsTimeType;
-    /// assert_eq!(0, GpsTimeType::Week.as_mask());
-    /// assert_eq!(1, GpsTimeType::AdjustedStandard.as_mask());
-    /// ```
-    pub fn as_mask(&self) -> u16 {
-        match *self {
-            GpsTimeType::Week => 0,
-            GpsTimeType::AdjustedStandard => 1,
-        }
-    }
-
-    fn from_global_encoding(global_encoding: u16) -> GpsTimeType {
-        if global_encoding & 1 == 1 {
-            GpsTimeType::AdjustedStandard
-        } else {
-            GpsTimeType::Week
+            file_creation_date: UTC::today(),
+            point_format: format,
+            extra_bytes: 0,
+            point_count: 0,
+            point_count_by_return: Default::default(),
+            scale: Triple::new(1., 1., 1.),
+            offset: Triple::new(0., 0., 0.),
+            bounds: Default::default(),
+            vlrs: Vec::new(),
+            padding: 0,
         }
     }
 }

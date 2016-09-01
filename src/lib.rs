@@ -1,121 +1,104 @@
-//! Reads and writes point cloud data stored in the ASPRS **las** file format.
+//! Native library for reading and writing the [ASPRS
+//! LAS](https://www.asprs.org/committee-general/laser-las-file-format-exchange-activities.html)
+//! data exchange format.
 //!
-//! The las file format [as defined by
-//! ASPRS](http://www.asprs.org/Committee-General/LASer-LAS-File-Format-Exchange-Activities.html)
-//! is the de-facto standard for transmission of point cloud data collected by
-//! [LiDAR](https://en.wikipedia.org/wiki/Lidar) sensors. This is a Rust library that reads and writes
-//! `las` files.
+//! The LAS data exchange format is designed for transmitting and storing
+//! [LiDAR](https://en.wikipedia.org/wiki/Lidar) data.
 //!
 //! # Reading points
 //!
-//! To read a point from a las file, use `las::Reader::read_point()`:
+//! Use a `Reader` to read one or more points:
 //!
 //! ```
-//! let mut reader = las::Reader::from_path("data/1.0_0.las").unwrap();
-//! let point = reader.read_point().unwrap();
-//! if let Some(point) = point {
-//!     println!("Read point (x={}, y={}, z={})", point.x, point.y, point.z);
-//! } else {
-//!     println!("End of file");
+//! use las::Reader;
+//! let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
+//! // Points from `Reader::read` are provided as a `Result<Option<Point>>`
+//! let point = reader.read().unwrap().unwrap();
+//! // Use `.iter_mut` to iterate over points, provided as `Result<Point>`.
+//! for point in reader.iter_mut() {
+//!     let point = point.unwrap();
+//!     let x = point.x;
+//!     // etc.
 //! }
 //! ```
-//!
-//! To get all the points in a las file, use `read_all`:
-//!
-//! ```
-//! # let mut reader = las::Reader::from_path("data/1.0_0.las").unwrap();
-//! let points = reader.read_all().unwrap();
-//! ```
-//!
-//! You can also use a `Reader` as an interator:
-//!
-//! ```
-//! # let mut reader = las::Reader::from_path("data/1.0_0.las").unwrap();
-//! for point in reader {
-//!     println!("Another point!");
-//! }
-//! ```
-//!
-//! A `Reader` does not read the points into memory unless you ask it to e.g. with `read_all`.
-//!
 //!
 //! # Writing points
 //!
-//! You can use `las::Writer` to write points. The process is complicated a bit by the fact that
-//! the las header includes some statistics and other values that require knowledge of the entire
-//! point domain, but we want to allow the user to write a las file without having to store all the
-//! points in memory at once. This requires writing the las header twice — once before writing the
-//! points, and once after. Because of this, writing is a bit more complicated — you need to `open`
-//! the `Writer` before you can write points to it:
+//! A `Writer` writes points to a `Read`. If you're comfortable with reasonable default settings,
+//! use a `Writer` directly:
 //!
 //! ```
-//! let mut writer = las::Writer::from_path("/dev/null").unwrap().open().unwrap();
-//! writer.write_point(&las::Point::new()).unwrap();
-//! writer.close().unwrap();
+//! use std::io::Cursor;
+//! use las::{Point, Writer};
+//! let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
+//! let mut point: Point = Default::default();
+//! point.x = 1.;
+//! // etc.
+//! writer.write(point).unwrap();
 //! ```
 //!
-//! Before you open your writer, you can configure attributes of the output file, including the las
-//! version and the point format.
+//! In order to configure the `Writer`, i.e. by setting the LAS version or point format, use a
+//! `Builder`:
 //!
 //! ```
-//! let writer = las::Writer::from_path("/dev/null").unwrap()
-//!     .version(1, 2)
-//!     .point_format(las::PointFormat(1))
-//!     .auto_offsets(true)     // calculate and set reasonable offsets for these data
-//!     .scale_factors(0.01, 0.01, 0.01);
+//! # use std::io::Cursor;
+//! use las::{Builder, point, Version};
+//! let writer = Builder::new()
+//!     .point_format(point::Format::from(1))
+//!     .version(Version::new(1, 2))
+//!     .writer(Cursor::new(Vec::new())).unwrap();
 //! ```
 //!
+//! There are no file-based operations on a `Writer`. To write data to a file, you have to create
+//! the file yourself:
 //!
-//! # Previous art
+//! ```
+//! # use las::Writer;
+//! use std::fs::File;
+//! let writer = Writer::default(File::create("/dev/null").unwrap()).unwrap();
+//! ```
 //!
-//! Several software libraries already exist to read and write las files:
+//! A `Writer` implements `Drop`, which it uses to re-write the header with the point count and
+//! other metadata when the `Writer` goes out of scope. If this header re-write fails, a panic will
+//! result. If is unacceptable, you can manually close to the `Writer` and prevent any re-writing:
 //!
-//! - [LAStools](http://www.cs.unc.edu/~isenburg/lastools/) is a sortof open source library that was
-//! the first major player in the space, and remains highly used. LAStools is written in C++ and it
-//! has (as its name implies) many tools on top of simple format reading and writing. It does not
-//! really present a usable software API, so it is more of a toolkit than an upstream dependency.
-//! - [libLAS](http://www.liblas.org/) is another C++ library and set of executables that mirrors
-//! much of the functionality of LAStools, but with a bit cleaner software engineering. libLAS is
-//! not under active development, and so is a bit feature-lacking, e.g. it does not support las
-//! formats 1.3 and 1.4. It has been largely superseded by PDAL (see below).
-//! - [Laspy](http://laspy.readthedocs.org/en/latest/) is a native Python las reader and writer.
-//! - [PDAL](http://www.pdal.io/) is a higher-level point cloud data format translation library
-//! that includes las support, including support for versions 1.3 and 1.4. Like LAStools, PDAL
-//! inclues a broad suite of additional tooling above and beyond simple data translation. PDAL is
-//! under active development.
-//!
-//! There are also numerous commercial products that can read and write las files.
-//!
-//! # Why another las library?
-//!
-//! This project started as a hobby project as a way to explore both Rust and the las format.
-//! However, due to the lack of a simple las library with a stable and modern C api, reading las
-//! data in Rust required writing something from scratch.
-//!
-//! In the long term, it might be possible to provide C bindings to this library, to provide that
-//! modern C api that other projects can use.
+//! ```
+//! # use std::io::Cursor;
+//! # use las::Writer;
+//! {
+//!     let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
+//!     writer.close().unwrap();
+//! } // `close` is not called
+//! ```
 
-#![deny(missing_copy_implementations, missing_debug_implementations, missing_docs, trivial_casts,
-        trivial_numeric_casts, unsafe_code, unstable_features, unused_extern_crates,
+#![deny(missing_docs,
+        missing_debug_implementations, missing_copy_implementations,
+        trivial_casts, trivial_numeric_casts,
+        unsafe_code,
+        unstable_features,
         unused_import_braces, unused_qualifications)]
 
 extern crate byteorder;
-extern crate time;
+extern crate chrono;
+
+pub mod global_encoding;
+pub mod point;
+pub mod utils;
 
 mod error;
 mod header;
-mod point;
 mod reader;
-mod scale;
+mod version;
 mod vlr;
 mod writer;
 
 pub use error::Error;
-pub use header::{Header, GpsTimeType, PointFormat, Version};
-pub use point::{ScanDirection, Classification, NumberOfReturns, ReturnNumber, Point};
+pub use header::Header;
+pub use point::Point;
 pub use reader::Reader;
+pub use writer::{Builder, Writer};
+pub use version::Version;
 pub use vlr::Vlr;
-pub use writer::Writer;
 
-/// Crate-specific resuls.
+/// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;

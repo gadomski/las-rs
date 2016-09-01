@@ -1,19 +1,15 @@
 [package]
 name = "las"
-version = "0.3.4"
+version = "0.4.0"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
 description = "Read and write point clouds stored in the ASPRS las file format."
-
-documentation = "http://gadomski.github.io/las-rs"
+documentation = "https://docs.rs/las"
 homepage = "https://github.com/gadomski/las-rs"
 repository = "https://github.com/gadomski/las-rs"
-
 readme = "README.md"
-
 keywords = ["lidar", "pointcloud", "las", "gis", "ASPRS"]
-
 license = "MIT"
 
 [dependencies]
 byteorder = "0.5"
-time = "0.1"
+chrono = "0.2"

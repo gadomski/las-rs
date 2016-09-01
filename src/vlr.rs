@@ -1,86 +1,25 @@
-//! Variable length records.
+const HEADER_LENGTH: u32 = 54;
 
-use std::io::Read;
-
-use byteorder::{LittleEndian, ReadBytesExt};
-
-use Result;
-
-const DEFAULT_HEADER_LENGTH: u16 = 54;
-
-/// A variable length record
-#[derive(Clone, Debug, PartialEq)]
+/// Variable length record.
+#[derive(Clone, Debug)]
 pub struct Vlr {
-    /// Reserved for future use.
-    pub reserved: u16,
-    /// ASCII data that identifies the record.
+    /// ASCII data which identifies the user assocaiated with the record.
+    ///
+    /// These are registered with ASPRS.
     pub user_id: [u8; 16],
-    /// Integer id for this record type.
+    /// Dependent on user id.
     pub record_id: u16,
-    /// The number of bytes in the actual record data.
-    pub record_length_after_header: u16,
-    /// A textual description of this record.
+    /// The length of the record after the standard header.
+    pub record_length: u16,
+    /// Textual description of the VLR>
     pub description: [u8; 32],
-    /// The record data themselves.
-    pub record: Vec<u8>,
+    /// The data contained within the vlr.
+    pub data: Vec<u8>,
 }
 
 impl Vlr {
-    /// Reads a Vlr from a `Read`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::fs::File;
-    /// use std::io::{Seek, SeekFrom};
-    /// use las::Header;
-    /// use las::Vlr;
-    /// let ref mut reader = File::open("data/1.0_0.las").unwrap();
-    /// let header = Header::read_from(reader).unwrap();
-    /// reader.seek(SeekFrom::Start(header.header_size as u64)).unwrap();
-    /// let vlr = Vlr::read_from(reader);
-    /// ```
-    pub fn read_from<R: Read>(reader: &mut R) -> Result<Vlr> {
-        let mut vlr = Vlr::new();
-        vlr.reserved = try!(reader.read_u16::<LittleEndian>());
-        try!(reader.read_exact(&mut vlr.user_id));
-        vlr.record_id = try!(reader.read_u16::<LittleEndian>());
-        vlr.record_length_after_header = try!(reader.read_u16::<LittleEndian>());
-        try!(reader.read_exact(&mut vlr.description));
-        vlr.record = vec![0; vlr.record_length_after_header as usize];
-        try!(reader.read_exact(&mut vlr.record));
-        Ok(vlr)
-    }
-
-    /// Creates a new, empty `Vlr`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Vlr;
-    /// let vlr = Vlr::new();
-    /// ```
-    pub fn new() -> Vlr {
-        Vlr {
-            reserved: 0,
-            user_id: [0; 16],
-            record_id: 0,
-            record_length_after_header: 0,
-            description: [0; 32],
-            record: Vec::new(),
-        }
-    }
-
-    /// Returns the length of this variable length record in bytes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Vlr;
-    /// let vlr = Vlr::new();
-    /// assert_eq!(54, vlr.len());
-    /// ```
+    /// Returns the total length of the VLR.
     pub fn len(&self) -> u32 {
-        DEFAULT_HEADER_LENGTH as u32 + self.record.len() as u32
+        self.data.len() as u32 + HEADER_LENGTH
     }
 }
