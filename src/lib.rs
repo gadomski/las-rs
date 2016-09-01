@@ -49,13 +49,14 @@
 //!     .writer(Cursor::new(Vec::new())).unwrap();
 //! ```
 //!
-//! There are no file-based operations on a `Writer`. To write data to a file, you have to create
-//! the file yourself:
+//! Convenience methods are provided for writing LAS data to a file:
 //!
 //! ```
-//! # use las::Writer;
-//! use std::fs::File;
-//! let writer = Writer::default(File::create("/dev/null").unwrap()).unwrap();
+//! # use las::{Writer, Builder};
+//! // Use the default writer:
+//! let writer = Writer::from_path("/dev/null").unwrap();
+//! // Allows configuration before open:
+//! let writer = Builder::new().writer_from_path("/dev/null").unwrap();
 //! ```
 //!
 //! A `Writer` implements `Drop`, which it uses to re-write the header with the point count and

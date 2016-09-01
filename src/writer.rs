@@ -3,7 +3,9 @@
 //! Simple writes can be done with a `Writer`, but if you need to configure your output file, use a
 //! `Builder`.
 
-use std::io::{Seek, SeekFrom, Write};
+use std::fs::File;
+use std::io::{BufWriter, Seek, SeekFrom, Write};
+use std::path::Path;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use chrono::Datelike;
@@ -105,6 +107,18 @@ impl Builder {
     pub fn writer<W: Seek + Write>(&self, write: W) -> Result<Writer<W>> {
         Writer::new(self, write)
     }
+
+    /// Creates a `Writer` that will write out data to the path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Builder;
+    /// let writer = Builder::new().writer_from_path("/dev/null").unwrap();
+    /// ```
+    pub fn writer_from_path<P: AsRef<Path>>(&self, path: P) -> Result<Writer<BufWriter<File>>> {
+        File::create(path).map_err(Error::from).and_then(|f| self.writer(BufWriter::new(f)))
+    }
 }
 
 impl Default for Builder {
@@ -126,6 +140,20 @@ pub struct Writer<W: Seek + Write> {
     point_count: u32,
     point_count_by_return: [u32; 5],
     write: W,
+}
+
+impl Writer<BufWriter<File>> {
+    /// Creates a default `Writer` that will write points out to a file at the path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Writer;
+    /// let writer = Writer::from_path("/dev/null").unwrap();
+    /// ```
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Writer<BufWriter<File>>> {
+        File::create(path).map_err(Error::from).and_then(|f| Writer::default(BufWriter::new(f)))
+    }
 }
 
 impl<W: Seek + Write> Writer<W> {
@@ -575,5 +603,15 @@ mod tests {
         cursor.set_position(0);
         let point = Reader::new(cursor).unwrap().read_to_end().unwrap().pop().unwrap();
         assert_eq!(b"Hello", &point.extra_bytes[..]);
+    }
+
+    #[test]
+    fn writer_from_path() {
+        assert!(Writer::from_path("/dev/null").is_ok());
+    }
+
+    #[test]
+    fn builder_writer_for_path() {
+        assert!(Builder::new().writer_from_path("/dev/null").is_ok());
     }
 }
