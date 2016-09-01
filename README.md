@@ -6,5 +6,5 @@ las-rs
 Read [ASPRS las files](http://www.asprs.org/Committee-General/LASer-LAS-File-Format-Exchange-Activities.html) natively with rust.
 
 ```toml
-las = "0.3"
+las = "0.4"
 ```
