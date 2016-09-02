@@ -81,6 +81,8 @@
 
 extern crate byteorder;
 extern crate chrono;
+#[macro_use]
+extern crate log;
 
 pub mod global_encoding;
 pub mod point;

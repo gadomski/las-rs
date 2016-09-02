@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// LAS version.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Version {
@@ -69,6 +71,12 @@ impl Version {
 impl Default for Version {
     fn default() -> Version {
         Version::new(1, 2)
+    }
+}
+
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
     }
 }
 

@@ -13,3 +13,4 @@ license = "MIT"
 [dependencies]
 byteorder = "0.5"
 chrono = "0.2"
+log = "0.3"

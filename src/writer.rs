@@ -280,12 +280,13 @@ impl<W: Seek + Write> Writer<W> {
             if let Some(file_source_id) = header.file_source_id {
                 file_source_id
             } else {
-                // TODO info
+                info!("Writer doesn't have a file source id, so writing zero");
                 0
             }
         } else {
             if header.file_source_id.is_some() {
-                // TODO warn
+                warn!("Version {} does not support file source id, writing zero instead",
+                      header.version);
             }
             0
         };
