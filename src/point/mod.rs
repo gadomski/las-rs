@@ -14,6 +14,8 @@ pub use point::number_of_returns::NumberOfReturns;
 pub use point::return_number::ReturnNumber;
 pub use point::scan_direction::ScanDirection;
 
+use std::fmt;
+
 /// LAS point data.
 #[derive(Debug, Default)]
 pub struct Point {
@@ -50,6 +52,12 @@ pub struct Point {
     pub color: Option<Color>,
     /// Any extra bytes associated with this point.
     pub extra_bytes: Vec<u8>,
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Point at ({:.2},{:.2},{:.2})", self.x, self.y, self.z)
+    }
 }
 
 /// The color associated with a point.

@@ -1,5 +1,7 @@
 //! Global properties about LAS data.
 
+use std::fmt;
+
 const MASK: u16 = 1;
 
 /// Global properties about the file.
@@ -46,6 +48,15 @@ pub enum GpsTime {
     Week,
     /// GPS time is standard GPS time (satellite GPS time) minus 1e9.
     Standard,
+}
+
+impl fmt::Display for GpsTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            GpsTime::Week => write!(f, "GPS week time"),
+            GpsTime::Standard => write!(f, "GPS standard time"),
+        }
+    }
 }
 
 #[cfg(test)]

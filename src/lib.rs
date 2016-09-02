@@ -60,8 +60,9 @@
 //! ```
 //!
 //! A `Writer` implements `Drop`, which it uses to re-write the header with the point count and
-//! other metadata when the `Writer` goes out of scope. If this header re-write fails, a panic will
-//! result. If is unacceptable, you can manually close to the `Writer` and prevent any re-writing:
+//! other metadata when the `Writer` goes out of scope. If this header re-write fails, an error
+//! will be printed to the logs but the thread will not panic. If is unacceptable, you can close
+//! the `Writer` yourself and prevent any re-writing on drop:
 //!
 //! ```
 //! # use std::io::Cursor;

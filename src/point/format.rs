@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// Point record format type.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Format(u8);
@@ -82,6 +84,12 @@ impl From<u8> for Format {
 impl From<Format> for u8 {
     fn from(format: Format) -> u8 {
         format.0
+    }
+}
+
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Point format {}", self.0)
     }
 }
 

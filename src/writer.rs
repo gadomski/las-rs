@@ -11,6 +11,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use chrono::Datelike;
 
 use {Error, Result};
+use global_encoding::{GlobalEncoding, GpsTime};
 use header::Header;
 use point::{Color, Format, Point, utils};
 use reader::Reader;
@@ -62,6 +63,22 @@ impl Builder {
     /// ```
     pub fn file_source_id(mut self, file_source_id: u16) -> Builder {
         self.header.file_source_id = Some(file_source_id);
+        self
+    }
+
+    /// Sets the global encoding.
+    ///
+    /// This field was added in LAS 1.1.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Builder;
+    /// use las::global_encoding::GlobalEncoding;
+    /// let builder = Builder::new().global_encoding(GlobalEncoding::from(1));
+    /// ```
+    pub fn global_encoding(mut self, global_encoding: GlobalEncoding) -> Builder {
+        self.header.global_encoding = Some(global_encoding);
         self
     }
 
@@ -280,7 +297,7 @@ impl<W: Seek + Write> Writer<W> {
             if let Some(file_source_id) = header.file_source_id {
                 file_source_id
             } else {
-                info!("Writer doesn't have a file source id, so writing zero");
+                info!("Writer doesn't have a file source id, writing zero");
                 0
             }
         } else {
@@ -291,9 +308,25 @@ impl<W: Seek + Write> Writer<W> {
             0
         };
         try!(self.write.write_u16::<LittleEndian>(file_source_id));
-        // TODO we downcast time here, so we should do a conversion or error
-        try!(self.write
-            .write_u16::<LittleEndian>(header.global_encoding.map(|g| g.into()).unwrap_or(0)));
+        let global_encoding = if header.version.has_global_encoding() {
+            if let Some(global_encoding) = header.global_encoding {
+                global_encoding.into()
+            } else {
+                info!("Writer doesn't have a global encoding, writing zero");
+                0
+            }
+        } else {
+            if let Some(global_encoding) = header.global_encoding {
+                match global_encoding.gps_time {
+                    GpsTime::Standard => {
+                        return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
+                    }
+                    _ => {}
+                };
+            }
+            0
+        };
+        try!(self.write.write_u16::<LittleEndian>(global_encoding));
         try!(self.write.write(&header.project_id));
         try!(self.write.write_u8(header.version.major));
         try!(self.write.write_u8(header.version.minor));
@@ -369,7 +402,9 @@ impl<W: Seek + Write> Writer<W> {
 impl<W: Seek + Write> Drop for Writer<W> {
     fn drop(&mut self) {
         if !self.closed {
-            self.close().expect("Error while closing writer in `Drop`")
+            if let Err(err) = self.close() {
+                error!("Error while dropping writer: {}", err);
+            }
         }
     }
 }
@@ -381,6 +416,7 @@ mod tests {
     use std::fs::File;
     use std::io::{Cursor, Read};
 
+    use global_encoding::GlobalEncoding;
     use point::{Classification, Color, Format, NumberOfReturns, Point, ReturnNumber, ScanDirection};
     use reader::Reader;
     use utils::Bounds;
@@ -646,5 +682,14 @@ mod tests {
         Builder::new().file_source_id(1).version(Version::new(1, 0)).writer(&mut cursor).unwrap();
         cursor.set_position(0);
         assert!(Reader::new(cursor).is_ok());
+    }
+
+    #[test]
+    fn disallow_global_encoding_downcast() {
+        assert!(Builder::new()
+            .global_encoding(GlobalEncoding::from(1))
+            .version(Version::new(1, 0))
+            .writer(Cursor::new(Vec::new()))
+            .is_err());
     }
 }

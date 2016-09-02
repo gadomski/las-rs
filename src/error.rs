@@ -1,15 +1,19 @@
+use std::error;
+use std::fmt;
 use std::io;
 use std::str;
 
+use global_encoding::GpsTime;
 use point::{Format, Point};
+use version::Version;
 
 /// Crate-specific error enum.
 #[derive(Debug)]
 pub enum Error {
     /// The `Writer` is closed and cannot be written to.
     ClosedWriter,
-    /// Wrapper around `std::str::Utf8Error`.
-    Utf8(str::Utf8Error),
+    /// The `GpsTime` is not supported by this version.
+    GpsTimeMismatch(Version, GpsTime),
     /// The file signature was not "LASF".
     InvalidFileSignature(String),
     /// The point data record length is less than the point format demands.
@@ -30,6 +34,8 @@ pub enum Error {
     ///
     /// It might be valid, but we just can't handle it.
     UnsupportedPointFormat(Format),
+    /// Wrapper around `std::str::Utf8Error`.
+    Utf8(str::Utf8Error),
 }
 
 impl From<io::Error> for Error {
@@ -41,5 +47,71 @@ impl From<io::Error> for Error {
 impl From<str::Utf8Error> for Error {
     fn from(err: str::Utf8Error) -> Error {
         Error::Utf8(err)
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::ClosedWriter => "the writer is closed",
+            Error::GpsTimeMismatch(_, _) => "mismatch between version and gps time",
+            Error::InvalidFileSignature(_) => "file signature was not LASF",
+            Error::InvalidPointDataRecordLength(_, _) => "the point data record length is impossible (probably too short)",
+            Error::Io(ref err) => err.description(),
+            Error::MissingColor(_, _) => "color was required by the point format, but the point did not have color",
+            Error::MissingGpsTime(_, _) => "gps time was required by the point format, but the point did not have gps time",
+            Error::NotAscii(_) => "the string is not ascii",
+            Error::NotNulFilled(_) => "the slice is not filled with nuls after the last character",
+            Error::ReservedIsNotZero => "the reserved field is not zero",
+            Error::UnsupportedPointFormat(_) => "the point format is not supported by this library",
+            Error::Utf8(ref err) => err.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::Io(ref err) => Some(err),
+            Error::Utf8(ref err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::ClosedWriter => write!(f, "The writer is closed"),
+            Error::GpsTimeMismatch(version, gps_time) => {
+                write!(f, "{} does not support {}", version, gps_time)
+            }
+            Error::InvalidFileSignature(ref s) => {
+                write!(f, "File signature must be LASF, found '{}'", s)
+            }
+            Error::InvalidPointDataRecordLength(format, length) => {
+                write!(f,
+                       "{} (with length {}) cannot support a point data record length of {}",
+                       format,
+                       format.record_length(),
+                       length)
+            }
+            Error::Io(ref err) => write!(f, "IO error: {}", err),
+            Error::MissingColor(format, ref point) => {
+                write!(f,
+                       "{} requires color, but {} doesn't have it",
+                       format,
+                       point)
+            }
+            Error::MissingGpsTime(format, ref point) => {
+                write!(f,
+                       "{} requires gps time, but {} doesn't have it",
+                       format,
+                       point)
+            }
+            Error::NotAscii(ref s) => write!(f, "This string is not ASCII: {}", s),
+            Error::NotNulFilled(ref v) => write!(f, "This slice is not filled with nuls: {:?}", v),
+            Error::ReservedIsNotZero => write!(f, "The reserved field is not zero"),
+            Error::UnsupportedPointFormat(format) => write!(f, "{} is not suppored", format),
+            Error::Utf8(ref err) => write!(f, "UTF8 error: {}", err),
+        }
     }
 }
