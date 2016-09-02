@@ -126,25 +126,18 @@ impl<R: Read + Seek> Reader<R> {
         let minz = try!(read.read_f64::<LittleEndian>());
         let bounds = Bounds::new(minx, miny, minz, maxx, maxy, maxz);
 
-        let mut vlrs = Vec::with_capacity(num_vlrs as usize);
-        for _ in 0..num_vlrs {
-            try!(read.read_u16::<LittleEndian>()); // reserved
-            let mut user_id = [0; 16];
-            try!(read.read_exact(&mut user_id));
-            let record_id = try!(read.read_u16::<LittleEndian>());
-            let record_length = try!(read.read_u16::<LittleEndian>());
-            let mut description = [0; 32];
-            try!(read.read_exact(&mut description));
-            let mut data = Vec::new();
-            try!((&mut read).take(record_length as u64).read_to_end(&mut data));
-            vlrs.push(Vlr {
-                user_id: user_id,
-                record_id: record_id,
-                record_length: record_length,
-                description: description,
-                data: data,
-            });
-        }
+        let vlrs = try!((0..num_vlrs)
+            .map(|_| {
+                let mut vlr: Vlr = Default::default();
+                try!(read.read_u16::<LittleEndian>()); // reserved
+                try!(read.read_exact(&mut vlr.user_id));
+                vlr.record_id = try!(read.read_u16::<LittleEndian>());
+                vlr.record_length = try!(read.read_u16::<LittleEndian>());
+                try!(read.read_exact(&mut vlr.description));
+                try!((&mut read).take(vlr.record_length as u64).read_to_end(&mut vlr.data));
+                Ok(vlr)
+            })
+            .collect::<Result<Vec<Vlr>>>());
 
         try!(read.seek(SeekFrom::Start(offset_to_data as u64)));
 

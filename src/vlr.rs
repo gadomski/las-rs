@@ -1,7 +1,7 @@
 const HEADER_LENGTH: u32 = 54;
 
 /// Variable length record.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Vlr {
     /// ASCII data which identifies the user assocaiated with the record.
     ///
