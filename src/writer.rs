@@ -166,6 +166,12 @@ impl<W: Seek + Write> Writer<W> {
         }
     }
 
+    fn new(builder: &Builder, write: W) -> Result<Writer<W>> {
+        let mut writer = Writer::from(builder, write);
+        try!(writer.write_header());
+        Ok(writer)
+    }
+
     /// Creates a new default writer.
     ///
     /// # Examples
@@ -177,12 +183,6 @@ impl<W: Seek + Write> Writer<W> {
     /// ```
     pub fn default(write: W) -> Result<Writer<W>> {
         Builder::new().writer(write)
-    }
-
-    fn new(builder: &Builder, write: W) -> Result<Writer<W>> {
-        let mut writer = Writer::from(builder, write);
-        try!(writer.write_header());
-        Ok(writer)
     }
 
     /// Writes a point.
