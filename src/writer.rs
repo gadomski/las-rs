@@ -17,8 +17,6 @@ use reader::Reader;
 use utils::{Bounds, Triple};
 use version::Version;
 
-const HEADER_SIZE: u16 = 227;
-
 /// Configure a `Writer`.
 #[derive(Debug)]
 pub struct Builder {
@@ -276,11 +274,11 @@ impl<W: Seek + Write> Writer<W> {
         try!(self.write.write(&header.generating_software));
         try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.ordinal() as u16));
         try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.year() as u16));
-        try!(self.write.write_u16::<LittleEndian>(HEADER_SIZE));
+        try!(self.write.write_u16::<LittleEndian>(header.header_size));
         try!(self.write
             .write_u32::<LittleEndian>(header.vlrs
                 .iter()
-                .fold(header.padding + HEADER_SIZE as u32,
+                .fold(header.padding + header.header_size as u32,
                       |acc, vlr| acc + vlr.len())));
         try!(self.write.write_u32::<LittleEndian>(header.vlrs.len() as u32));
         try!(self.write.write_u8(header.point_format.into()));

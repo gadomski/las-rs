@@ -6,6 +6,7 @@ use utils::{Bounds, Triple};
 use version::Version;
 use vlr::Vlr;
 
+const HEADER_SIZE: u16 = 227;
 const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -28,6 +29,8 @@ pub struct Header {
     pub system_id: [u8; 32],
     /// The generating software.
     pub generating_software: [u8; 32],
+    /// The size of the header.
+    pub header_size: u16,
     /// The day of file creation.
     pub file_creation_date: Date<UTC>,
     /// The point format.
@@ -68,6 +71,7 @@ impl Default for Header {
             version: Version::new(1, 2),
             system_id: DEFAULT_SYSTEM_ID,
             generating_software: generating_software,
+            header_size: HEADER_SIZE,
             file_creation_date: UTC::today(),
             point_format: format,
             extra_bytes: 0,

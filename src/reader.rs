@@ -156,6 +156,7 @@ impl<R: Read + Seek> Reader<R> {
                 version: version,
                 system_id: system_id,
                 generating_software: generating_software,
+                header_size: header_size,
                 file_creation_date: file_creation_date,
                 point_format: point_format,
                 extra_bytes: extra_bytes as u16,
