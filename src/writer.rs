@@ -50,6 +50,21 @@ impl Builder {
         Builder { header: reader.header.clone() }
     }
 
+    /// Sets the file source id.
+    ///
+    /// This field was added in LAS 1.1.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Builder;
+    /// let builder = Builder::new().file_source_id(1);
+    /// ```
+    pub fn file_source_id(mut self, file_source_id: u16) -> Builder {
+        self.header.file_source_id = Some(file_source_id);
+        self
+    }
+
     /// Sets the LAS version.
     ///
     /// # Examples
@@ -261,9 +276,20 @@ impl<W: Seek + Write> Writer<W> {
         let header = &self.header;
         try!(self.write.seek(SeekFrom::Start(0)));
         try!(self.write.write(b"LASF"));
-        // TODO we shouldn't write bits if we're going to a version that doesn't have a file source
-        // id
-        try!(self.write.write_u16::<LittleEndian>(header.file_source_id.unwrap_or(0)));
+        let file_source_id = if header.version.has_file_source_id() {
+            if let Some(file_source_id) = header.file_source_id {
+                file_source_id
+            } else {
+                // TODO info
+                0
+            }
+        } else {
+            if header.file_source_id.is_some() {
+                // TODO warn
+            }
+            0
+        };
+        try!(self.write.write_u16::<LittleEndian>(file_source_id));
         // TODO we downcast time here, so we should do a conversion or error
         try!(self.write
             .write_u16::<LittleEndian>(header.global_encoding.map(|g| g.into()).unwrap_or(0)));
@@ -611,5 +637,13 @@ mod tests {
     #[test]
     fn builder_writer_for_path() {
         assert!(Builder::new().writer_from_path("/dev/null").is_ok());
+    }
+
+    #[test]
+    fn wipe_filesource_id() {
+        let mut cursor = Cursor::new(Vec::new());
+        Builder::new().file_source_id(1).version(Version::new(1, 0)).writer(&mut cursor).unwrap();
+        cursor.set_position(0);
+        assert!(Reader::new(cursor).is_ok());
     }
 }
