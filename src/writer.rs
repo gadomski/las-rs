@@ -222,7 +222,7 @@ impl<W: Seek + Write> Writer<W> {
             .write_u8(u8::from(point.return_number) | u8::from(point.number_of_returns) |
                       u8::from(point.scan_direction) |
                       utils::edge_of_flight_line_u8(point.edge_of_flight_line)));
-        try!(self.write.write_u8(u8::from(point.classification)));
+        try!(self.write.write_u8(point.classification.into()));
         try!(self.write.write_i8(point.scan_angle_rank));
         try!(self.write.write_u8(point.user_data));
         try!(self.write.write_u16::<LittleEndian>(point.point_source_id));
