@@ -1,12 +1,10 @@
 use std::fs::File;
-use std::io::{self, BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
-
-use byteorder::{LittleEndian, ReadBytesExt};
 
 use {Error, Result};
 use header::{Header, ReadHeader};
-use point::{Classification, Color, NumberOfReturns, Point, ReturnNumber, ScanDirection, utils};
+use point::{Point, ReadPoint};
 use vlr::{ReadVlr, Vlr};
 
 /// Takes bytes and turns them into points and associated metadata.
@@ -73,68 +71,10 @@ impl<R: Read + Seek> Reader<R> {
     /// assert!(reader.read().unwrap().is_none());
     /// ```
     pub fn read(&mut self) -> Result<Option<Point>> {
-        let x = match self.read.read_i32::<LittleEndian>() {
-            Ok(n) => self.header.transforms.x.direct(n),
-            Err(err) => {
-                return if err.kind() == io::ErrorKind::UnexpectedEof {
-                    Ok(None)
-                } else {
-                    Err(Error::from(err))
-                }
-            }
-        };
-        let y = self.header.transforms.y.direct(try!(self.read.read_i32::<LittleEndian>()));
-        let z = self.header.transforms.z.direct(try!(self.read.read_i32::<LittleEndian>()));
-        let intensity = try!(self.read.read_u16::<LittleEndian>());
-        let byte = try!(self.read.read_u8());
-        let return_number = ReturnNumber::from(byte);
-        let number_of_returns = NumberOfReturns::from(byte);
-        let scan_direction = ScanDirection::from(byte);
-        let edge_of_flight_line = utils::edge_of_flight_line(byte);
-        let classification = Classification::from(try!(self.read.read_u8()), self.header.version);
-        let scan_angle_rank = try!(self.read.read_i8());
-        let user_data = try!(self.read.read_u8());
-        let point_source_id = try!(self.read.read_u16::<LittleEndian>());
-        let gps_time = if self.header.point_format.has_gps_time() {
-            Some(try!(self.read.read_f64::<LittleEndian>()))
-        } else {
-            None
-        };
-        let color = if self.header.point_format.has_color() {
-            let red = try!(self.read.read_u16::<LittleEndian>());
-            let green = try!(self.read.read_u16::<LittleEndian>());
-            let blue = try!(self.read.read_u16::<LittleEndian>());
-            Some(Color {
-                red: red,
-                green: green,
-                blue: blue,
-            })
-        } else {
-            None
-        };
-        let mut extra_bytes = Vec::new();
-        if self.header.extra_bytes > 0 {
-            try!((&mut self.read)
-                .take(self.header.extra_bytes as u64)
-                .read_to_end(&mut extra_bytes));
-        }
-        Ok(Some(Point {
-            x: x,
-            y: y,
-            z: z,
-            intensity: intensity,
-            return_number: return_number,
-            number_of_returns: number_of_returns,
-            scan_direction: scan_direction,
-            edge_of_flight_line: edge_of_flight_line,
-            classification: classification,
-            scan_angle_rank: scan_angle_rank,
-            user_data: user_data,
-            point_source_id: point_source_id,
-            gps_time: gps_time,
-            color: color,
-            extra_bytes: extra_bytes,
-        }))
+        self.read.read_point(self.header.transforms,
+                             self.header.point_format,
+                             self.header.version,
+                             self.header.extra_bytes)
     }
 
     /// Creates a vector with all the points in this lasfile.

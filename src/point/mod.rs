@@ -7,12 +7,14 @@ mod format;
 mod number_of_returns;
 mod return_number;
 mod scan_direction;
+mod traits;
 
 pub use point::classification::{ASPRSClassification, Classification};
 pub use point::format::Format;
 pub use point::number_of_returns::NumberOfReturns;
 pub use point::return_number::ReturnNumber;
 pub use point::scan_direction::ScanDirection;
+pub use point::traits::ReadPoint;
 
 use std::fmt;
 
