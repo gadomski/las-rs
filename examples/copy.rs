@@ -17,6 +17,7 @@ fn main() {
         .writer(File::create(outfile).expect("Unable to open outfile"))
         .expect("Unable to create writer");
     for point in reader.iter_mut() {
-        writer.write(point.expect("Error while reading point")).expect("Error while writing point");
+        writer.write(&point.expect("Error while reading point"))
+            .expect("Error while writing point");
     }
 }

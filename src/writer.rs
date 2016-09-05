@@ -235,13 +235,13 @@ impl<W: Seek + Write> Writer<W> {
     /// use std::io::Cursor;
     /// # use las::Writer;
     /// let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-    /// writer.write(Default::default()).unwrap();
+    /// writer.write(&Default::default()).unwrap();
     /// ```
-    pub fn write(&mut self, point: Point) -> Result<()> {
+    pub fn write(&mut self, point: &Point) -> Result<()> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        try!(self.write.write_point(&point,
+        try!(self.write.write_point(point,
                                     self.header.transforms,
                                     self.header.point_format,
                                     self.header.extra_bytes));
@@ -279,9 +279,9 @@ impl<W: Seek + Write> Writer<W> {
     /// use std::io::Cursor;
     /// # use las::Writer;
     /// let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-    /// assert!(writer.write(Default::default()).is_ok());
+    /// assert!(writer.write(&Default::default()).is_ok());
     /// writer.close().unwrap();
-    /// assert!(writer.write(Default::default()).is_err());
+    /// assert!(writer.write(&Default::default()).is_err());
     /// ```
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
@@ -398,7 +398,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -412,7 +412,7 @@ mod tests {
         {
             let mut writer =
                 Builder::new().point_format(Format::from(1)).writer(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -426,7 +426,7 @@ mod tests {
         {
             let mut writer =
                 Builder::new().point_format(Format::from(2)).writer(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -440,7 +440,7 @@ mod tests {
         {
             let mut writer =
                 Builder::new().point_format(Format::from(3)).writer(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -454,7 +454,7 @@ mod tests {
             Builder::new().point_format(Format::from(1)).writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.gps_time = None;
-        assert!(writer.write(point).is_err());
+        assert!(writer.write(&point).is_err());
     }
 
     #[test]
@@ -463,7 +463,7 @@ mod tests {
             Builder::new().point_format(Format::from(2)).writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.color = None;
-        assert!(writer.write(point).is_err());
+        assert!(writer.write(&point).is_err());
     }
 
     #[test]
@@ -471,7 +471,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         assert_eq!(1, Reader::new(cursor).unwrap().header.point_count);
@@ -482,8 +482,8 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -497,7 +497,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let reader = Reader::new(cursor).unwrap();
@@ -508,7 +508,7 @@ mod tests {
     fn close_the_writer() {
         let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
         writer.close().is_ok();
-        assert!(writer.write(point()).is_err());
+        assert!(writer.write(&point()).is_err());
         assert!(writer.close().is_err());
     }
 
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn write_zero_return_number() {
         let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-        writer.write(Default::default()).unwrap();
+        writer.write(&Default::default()).unwrap();
     }
 
     #[test]
@@ -534,7 +534,7 @@ mod tests {
             let mut writer = Builder::new().extra_bytes(5).writer(&mut cursor).unwrap();
             let mut point = point();
             point.extra_bytes = b"Hello".to_vec();
-            writer.write(point).unwrap();
+            writer.write(&point).unwrap();
         }
         cursor.set_position(0);
         let point = Reader::new(cursor).unwrap().read_to_end().unwrap().pop().unwrap();
