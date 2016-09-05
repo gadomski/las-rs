@@ -113,10 +113,6 @@ impl<R: Read> ReadHeader for R {
         let offset_to_point_data = try!(self.read_u32::<LittleEndian>());
         let num_vlrs = try!(self.read_u32::<LittleEndian>());
         let point_format = Format::from(try!(self.read_u8()));
-        // TODO make reading a header less error-ful
-        if !point_format.is_supported() {
-            return Err(Error::UnsupportedPointFormat(point_format));
-        }
         let point_data_record_length = try!(self.read_u16::<LittleEndian>());
         let extra_bytes: i32 = point_data_record_length as i32 -
                                point_format.record_length() as i32;
