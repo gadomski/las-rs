@@ -74,7 +74,7 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn read(&mut self) -> Result<Option<Point>> {
         let x = match self.read.read_i32::<LittleEndian>() {
-            Ok(n) => n as f64 * self.header.scale.x + self.header.offset.x,
+            Ok(n) => self.header.transforms.x.direct(n),
             Err(err) => {
                 return if err.kind() == io::ErrorKind::UnexpectedEof {
                     Ok(None)
@@ -83,10 +83,8 @@ impl<R: Read + Seek> Reader<R> {
                 }
             }
         };
-        let y = try!(self.read.read_i32::<LittleEndian>()) as f64 * self.header.scale.y +
-                self.header.offset.y;
-        let z = try!(self.read.read_i32::<LittleEndian>()) as f64 * self.header.scale.z +
-                self.header.offset.z;
+        let y = self.header.transforms.y.direct(try!(self.read.read_i32::<LittleEndian>()));
+        let z = self.header.transforms.z.direct(try!(self.read.read_i32::<LittleEndian>()));
         let intensity = try!(self.read.read_u16::<LittleEndian>());
         let byte = try!(self.read.read_u8());
         let return_number = ReturnNumber::from(byte);
@@ -194,7 +192,7 @@ mod tests {
     use std::io::{Cursor, Read, Seek};
 
     use point::{Point, ScanDirection};
-    use utils::{ToLasStr, Triple};
+    use utils::ToLasStr;
     use version::Version;
 
     fn check_point(point: &Point) {
@@ -389,12 +387,6 @@ mod tests {
     fn reader_read_to_end() {
         let points = Reader::from_path("data/1.0_0.las").unwrap().read_to_end().unwrap();
         assert_eq!(1, points.len());
-    }
-
-    #[test]
-    fn reader_offset() {
-        let offset = Reader::from_path("data/1.0_0.las").unwrap().header.offset;
-        assert_eq!(Triple::new(0., 0., 0.), offset);
     }
 
     #[test]

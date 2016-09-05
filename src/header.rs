@@ -6,7 +6,7 @@ use chrono::{Date, TimeZone, UTC};
 use {Error, Result};
 use global_encoding::GlobalEncoding;
 use point::Format;
-use utils::{Bounds, Triple};
+use utils::{Bounds, LinearTransform, Triple};
 use version::Version;
 
 const HEADER_SIZE: u16 = 227;
@@ -50,10 +50,8 @@ pub struct Header {
     pub point_count: u32,
     /// The number of points by return count.
     pub point_count_by_return: [u32; 5],
-    /// The scaling that is applied to points as they are read.
-    pub scale: Triple<f64>,
-    /// The offset of the points, in each dimension.
-    pub offset: Triple<f64>,
+    /// The offsets and scaling that is applied to points as they are read.
+    pub transforms: Triple<LinearTransform>,
     /// The three-dimensional bounds, from the header.
     pub bounds: Bounds<f64>,
 }
@@ -82,8 +80,7 @@ impl Default for Header {
             extra_bytes: 0,
             point_count: 0,
             point_count_by_return: Default::default(),
-            scale: Triple::new(1., 1., 1.),
-            offset: Triple::new(0., 0., 0.),
+            transforms: Default::default(),
             bounds: Default::default(),
         }
     }
@@ -152,17 +149,15 @@ impl<R: Read> ReadHeader for R {
         for entry in point_count_by_return.iter_mut() {
             *entry = try!(self.read_u32::<LittleEndian>());
         }
-        // TODO mush scale and offset together
-        let scale = Triple {
-            x: try!(self.read_f64::<LittleEndian>()),
-            y: try!(self.read_f64::<LittleEndian>()),
-            z: try!(self.read_f64::<LittleEndian>()),
-        };
-        let offset = Triple {
-            x: try!(self.read_f64::<LittleEndian>()),
-            y: try!(self.read_f64::<LittleEndian>()),
-            z: try!(self.read_f64::<LittleEndian>()),
-        };
+        let scalex = try!(self.read_f64::<LittleEndian>());
+        let scaley = try!(self.read_f64::<LittleEndian>());
+        let scalez = try!(self.read_f64::<LittleEndian>());
+        let offsetx = try!(self.read_f64::<LittleEndian>());
+        let offsety = try!(self.read_f64::<LittleEndian>());
+        let offsetz = try!(self.read_f64::<LittleEndian>());
+        let transforms: Triple<LinearTransform> = Triple::new((scalex, offsetx).into(),
+                                                              (scaley, offsety).into(),
+                                                              (scalez, offsetz).into());
         let maxx = try!(self.read_f64::<LittleEndian>());
         let minx = try!(self.read_f64::<LittleEndian>());
         let maxy = try!(self.read_f64::<LittleEndian>());
@@ -185,8 +180,7 @@ impl<R: Read> ReadHeader for R {
             extra_bytes: extra_bytes as u16,
             point_count: point_count,
             point_count_by_return: point_count_by_return,
-            scale: scale,
-            offset: offset,
+            transforms: transforms,
             bounds: bounds,
         })
     }

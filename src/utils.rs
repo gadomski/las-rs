@@ -7,7 +7,7 @@ use std::str;
 use {Error, Result};
 
 /// x, y, and z values in one struct.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Triple<T: Copy> {
     /// The x value of the triple.
     pub x: T,
@@ -194,8 +194,10 @@ impl ToLasStr for [u8] {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct LinearTransform {
-    scale: f64,
-    offset: f64,
+    /// The mutiplicative constant.
+    pub scale: f64,
+    /// The additive constant.
+    pub offset: f64,
 }
 
 impl LinearTransform {
@@ -208,7 +210,7 @@ impl LinearTransform {
     /// let transform = LinearTransform::from((2., 1.));
     /// assert_eq!(7., transform.direct(3));
     /// ```
-    pub fn direct(&self, n: u32) -> f64 {
+    pub fn direct(&self, n: i32) -> f64 {
         self.scale * n as f64 + self.offset
     }
 
@@ -223,11 +225,19 @@ impl LinearTransform {
     /// let transform = LinearTransform::from((2., 1.));
     /// assert_eq!(3, transform.inverse(7.));
     /// ```
-    pub fn inverse(&self, n: f64) -> u32 {
-        ((n - self.offset) / self.scale) as u32
+    pub fn inverse(&self, n: f64) -> i32 {
+        ((n - self.offset) / self.scale) as i32
     }
 }
 
+impl Default for LinearTransform {
+    fn default() -> LinearTransform {
+        LinearTransform {
+            scale: 1.,
+            offset: 0.,
+        }
+    }
+}
 
 impl From<(f64, f64)> for LinearTransform {
     fn from((scale, offset): (f64, f64)) -> LinearTransform {

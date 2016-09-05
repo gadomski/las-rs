@@ -241,24 +241,9 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        try!(self.write
-            .write_i32::<LittleEndian>(((point.x - self.header.offset.x) /
-                                        self.header
-                    .scale
-                    .x)
-                .round() as i32));
-        try!(self.write
-            .write_i32::<LittleEndian>(((point.y - self.header.offset.y) /
-                                        self.header
-                    .scale
-                    .y)
-                .round() as i32));
-        try!(self.write
-            .write_i32::<LittleEndian>(((point.z - self.header.offset.z) /
-                                        self.header
-                    .scale
-                    .z)
-                .round() as i32));
+        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.x.inverse(point.x)));
+        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.y.inverse(point.y)));
+        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.z.inverse(point.z)));
         try!(self.write.write_u16::<LittleEndian>(point.intensity));
         try!(self.write
             .write_u8(u8::from(point.return_number) | u8::from(point.number_of_returns) |
@@ -355,12 +340,12 @@ impl<W: Seek + Write> Writer<W> {
         for &count in &self.point_count_by_return {
             try!(self.write.write_u32::<LittleEndian>(count));
         }
-        try!(self.write.write_f64::<LittleEndian>(header.scale.x));
-        try!(self.write.write_f64::<LittleEndian>(header.scale.y));
-        try!(self.write.write_f64::<LittleEndian>(header.scale.z));
-        try!(self.write.write_f64::<LittleEndian>(header.offset.x));
-        try!(self.write.write_f64::<LittleEndian>(header.offset.y));
-        try!(self.write.write_f64::<LittleEndian>(header.offset.z));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.scale));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.scale));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.scale));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.offset));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.offset));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.offset));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.max.x));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.min.x));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.max.y));
