@@ -7,12 +7,10 @@ use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use byteorder::{LittleEndian, WriteBytesExt};
-
 use {Error, Result};
 use global_encoding::GlobalEncoding;
 use header::{Header, WriteHeader};
-use point::{Color, Format, Point, utils};
+use point::{Format, Point, WritePoint};
 use reader::Reader;
 use utils::{Bounds, Triple};
 use version::Version;
@@ -228,7 +226,10 @@ impl<W: Seek + Write> Writer<W> {
 
     /// Writes a point.
     ///
+    /// TODO take a reference
+    ///
     /// # Examples
+    ///
     ///
     /// ```
     /// use std::io::Cursor;
@@ -240,37 +241,10 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.x.inverse(point.x)));
-        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.y.inverse(point.y)));
-        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.z.inverse(point.z)));
-        try!(self.write.write_u16::<LittleEndian>(point.intensity));
-        try!(self.write
-            .write_u8(u8::from(point.return_number) | u8::from(point.number_of_returns) |
-                      u8::from(point.scan_direction) |
-                      utils::edge_of_flight_line_u8(point.edge_of_flight_line)));
-        try!(self.write.write_u8(point.classification.into()));
-        try!(self.write.write_i8(point.scan_angle_rank));
-        try!(self.write.write_u8(point.user_data));
-        try!(self.write.write_u16::<LittleEndian>(point.point_source_id));
-        if self.header.point_format.has_gps_time() {
-            match point.gps_time {
-                Some(time) => try!(self.write.write_f64::<LittleEndian>(time)),
-                None => return Err(Error::MissingGpsTime(self.header.point_format, point)),
-            }
-        }
-        if self.header.point_format.has_color() {
-            match point.color {
-                Some(Color { red, green, blue }) => {
-                    try!(self.write.write_u16::<LittleEndian>(red));
-                    try!(self.write.write_u16::<LittleEndian>(green));
-                    try!(self.write.write_u16::<LittleEndian>(blue));
-                }
-                None => return Err(Error::MissingColor(self.header.point_format, point)),
-            }
-        }
-        if self.header.extra_bytes > 0 {
-            try!(self.write.write_all(point.extra_bytes.as_slice()));
-        }
+        try!(self.write.write_point(&point,
+                                    self.header.transforms,
+                                    self.header.point_format,
+                                    self.header.extra_bytes));
         self.point_count += 1;
         if point.return_number.is_valid() {
             self.point_count_by_return[u8::from(point.return_number) as usize - 1] += 1;
