@@ -44,8 +44,8 @@
 //! # use std::io::Cursor;
 //! use las::Builder;
 //! let mut builder = Builder::new();
-//! builder.header.point_format = 1.into();
-//! builder.header.version = (1, 2).into();
+//! builder.point_format = 1.into();
+//! builder.version = (1, 2).into();
 //! let writer = builder.writer(Cursor::new(Vec::new())).unwrap();
 //! ```
 //!

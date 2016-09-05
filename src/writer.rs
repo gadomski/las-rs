@@ -49,7 +49,7 @@ impl<W: Seek + Write> Writer<W> {
         Writer {
             bounds: Default::default(),
             closed: false,
-            header: builder.header,
+            header: builder.into(),
             point_count: Default::default(),
             point_count_by_return: Default::default(),
             vlrs: builder.vlrs.clone(),
@@ -271,7 +271,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut builder = Builder::new();
-            builder.header.point_format = 1.into();
+            builder.point_format = 1.into();
             let mut writer = builder.writer(&mut cursor).unwrap();
             writer.write(&point()).unwrap();
         }
@@ -286,7 +286,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut builder = Builder::new();
-            builder.header.point_format = 2.into();
+            builder.point_format = 2.into();
             let mut writer = builder.writer(&mut cursor).unwrap();
             writer.write(&point()).unwrap();
         }
@@ -301,7 +301,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut builder = Builder::new();
-            builder.header.point_format = 3.into();
+            builder.point_format = 3.into();
             let mut writer = builder.writer(&mut cursor).unwrap();
             writer.write(&point()).unwrap();
         }
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn try_write_point_format_1_no_time() {
         let mut builder = Builder::new();
-        builder.header.point_format = 1.into();
+        builder.point_format = 1.into();
         let mut writer = builder.writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.gps_time = None;
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn try_write_point_format_2_no_color() {
         let mut builder = Builder::new();
-        builder.header.point_format = 2.into();
+        builder.point_format = 2.into();
         let mut writer = builder.writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.color = None;
@@ -381,7 +381,7 @@ mod tests {
     fn write_version() {
         let mut cursor = Cursor::new(Vec::new());
         let mut builder = Builder::new();
-        builder.header.version = (1, 0).into();
+        builder.version = (1, 0).into();
         builder.writer(&mut cursor).unwrap();
         cursor.set_position(0);
         assert_eq!(Version::from((1, 0)),
@@ -399,7 +399,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut builder = Builder::new();
-            builder.header.extra_bytes = 5;
+            builder.extra_bytes = 5;
             let mut writer = builder.writer(&mut cursor).unwrap();
             let mut point = point();
             point.extra_bytes = b"Hello".to_vec();
@@ -423,16 +423,16 @@ mod tests {
     #[test]
     fn disallow_file_source_id_wipe() {
         let mut builder = Builder::new();
-        builder.header.file_source_id = 1;
-        builder.header.version = (1, 0).into();
+        builder.file_source_id = 1;
+        builder.version = (1, 0).into();
         assert!(builder.writer(Cursor::new(Vec::new())).is_err());
     }
 
     #[test]
     fn disallow_global_encoding_downcast() {
         let mut builder = Builder::new();
-        builder.header.global_encoding = 1.into();
-        builder.header.version = (1, 0).into();
+        builder.global_encoding = 1.into();
+        builder.version = (1, 0).into();
         assert!(builder.writer(Cursor::new(Vec::new())).is_err());
     }
 }
