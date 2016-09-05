@@ -226,8 +226,6 @@ impl<W: Seek + Write> Writer<W> {
 
     /// Writes a point.
     ///
-    /// TODO take a reference
-    ///
     /// # Examples
     ///
     ///
