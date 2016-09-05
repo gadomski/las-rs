@@ -3,16 +3,10 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use chrono::{TimeZone, UTC};
 
 use {Error, Result};
-use global_encoding::GlobalEncoding;
-use header::Header;
-use point::{Classification, Color, Format, NumberOfReturns, Point, ReturnNumber, ScanDirection,
-            utils};
-use utils::{Bounds, Triple};
-use version::Version;
-use vlr::Vlr;
+use header::{Header, ReadHeader};
+use point::{Classification, Color, NumberOfReturns, Point, ReturnNumber, ScanDirection, utils};
 
 /// Takes bytes and turns them into points and associated metadata.
 #[derive(Debug)]
@@ -54,114 +48,10 @@ impl<R: Read + Seek> Reader<R> {
     /// let reader = Reader::new(Cursor::new(buf));
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
-        let mut file_signature = String::new();
-        try!((&mut read).take(4).read_to_string(&mut file_signature));
-        if file_signature != "LASF" {
-            return Err(Error::InvalidFileSignature(file_signature));
-        }
-        let file_source_id = try!(read.read_u16::<LittleEndian>());
-        let global_encoding = try!(read.read_u16::<LittleEndian>());
-        let mut project_id = [0; 16];
-        try!(read.read_exact(&mut project_id));
-        let version = Version::new(try!(read.read_u8()), try!(read.read_u8()));
-
-        if !version.has_file_source_id() && file_source_id != 0 {
-            return Err(Error::ReservedIsNotZero);
-        }
-        let file_source_id = if version.has_file_source_id() {
-            Some(file_source_id)
-        } else if file_source_id == 0 {
-            None
-        } else {
-            return Err(Error::ReservedIsNotZero);
-        };
-        let global_encoding = if version.has_global_encoding() {
-            Some(GlobalEncoding::from(global_encoding))
-        } else if global_encoding == 0 {
-            None
-        } else {
-            return Err(Error::ReservedIsNotZero);
-        };
-
-        let mut system_id = [0; 32];
-        try!(read.read_exact(&mut system_id));
-        let mut generating_software = [0; 32];
-        try!(read.read_exact(&mut generating_software));
-        let day = try!(read.read_u16::<LittleEndian>());
-        let year = try!(read.read_u16::<LittleEndian>());
-        let file_creation_date = UTC.yo(year as i32, day as u32);
-        let header_size = try!(read.read_u16::<LittleEndian>());
-        let offset_to_data = try!(read.read_u32::<LittleEndian>());
-        let num_vlrs = try!(read.read_u32::<LittleEndian>());
-        let point_format = Format::from(try!(read.read_u8()));
-        if !point_format.is_supported() {
-            return Err(Error::UnsupportedPointFormat(point_format));
-        }
-        let point_data_record_length = try!(read.read_u16::<LittleEndian>());
-        let extra_bytes: i32 = point_data_record_length as i32 -
-                               point_format.record_length() as i32;
-        if extra_bytes < 0 {
-            return Err(Error::InvalidPointDataRecordLength(point_format, point_data_record_length));
-        }
-        let point_count = try!(read.read_u32::<LittleEndian>());
-        let mut point_count_by_return = [0; 5];
-        for entry in point_count_by_return.iter_mut() {
-            *entry = try!(read.read_u32::<LittleEndian>());
-        }
-        let scale = Triple {
-            x: try!(read.read_f64::<LittleEndian>()),
-            y: try!(read.read_f64::<LittleEndian>()),
-            z: try!(read.read_f64::<LittleEndian>()),
-        };
-        let offset = Triple {
-            x: try!(read.read_f64::<LittleEndian>()),
-            y: try!(read.read_f64::<LittleEndian>()),
-            z: try!(read.read_f64::<LittleEndian>()),
-        };
-        let maxx = try!(read.read_f64::<LittleEndian>());
-        let minx = try!(read.read_f64::<LittleEndian>());
-        let maxy = try!(read.read_f64::<LittleEndian>());
-        let miny = try!(read.read_f64::<LittleEndian>());
-        let maxz = try!(read.read_f64::<LittleEndian>());
-        let minz = try!(read.read_f64::<LittleEndian>());
-        let bounds = Bounds::new(minx, miny, minz, maxx, maxy, maxz);
-
-        let vlrs = try!((0..num_vlrs)
-            .map(|_| {
-                let mut vlr: Vlr = Default::default();
-                try!(read.read_u16::<LittleEndian>()); // reserved
-                try!(read.read_exact(&mut vlr.user_id));
-                vlr.record_id = try!(read.read_u16::<LittleEndian>());
-                vlr.record_length = try!(read.read_u16::<LittleEndian>());
-                try!(read.read_exact(&mut vlr.description));
-                try!((&mut read).take(vlr.record_length as u64).read_to_end(&mut vlr.data));
-                Ok(vlr)
-            })
-            .collect::<Result<Vec<Vlr>>>());
-
-        try!(read.seek(SeekFrom::Start(offset_to_data as u64)));
-
+        let header = try!(read.read_header());
+        try!(read.seek(SeekFrom::Start(header.offset_to_data as u64)));
         Ok(Reader {
-            header: Header {
-                file_source_id: file_source_id,
-                global_encoding: global_encoding,
-                project_id: project_id,
-                version: version,
-                system_id: system_id,
-                generating_software: generating_software,
-                header_size: header_size,
-                file_creation_date: file_creation_date,
-                point_format: point_format,
-                extra_bytes: extra_bytes as u16,
-                point_count: point_count,
-                point_count_by_return: point_count_by_return,
-                scale: scale,
-                offset: offset,
-                bounds: bounds,
-                padding: offset_to_data -
-                         vlrs.iter().fold(header_size as u32, |acc, vlr| acc + vlr.len()),
-                vlrs: vlrs,
-            },
+            header: header,
             read: read,
         })
     }
