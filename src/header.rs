@@ -56,6 +56,26 @@ pub struct Header {
     pub bounds: Bounds<f64>,
 }
 
+impl Header {
+    fn validate(&self) -> Result<()> {
+        if !self.version.has_file_source_id() && self.file_source_id != 0 {
+            return Err(Error::InvalidHeader(format!("{} cannot not have a file source id (file source id: {})",
+                                                    self.version,
+                                                    self.file_source_id)));
+        }
+        if !self.version.has_global_encoding() {
+            match self.global_encoding.gps_time {
+                GpsTime::Standard => {
+                    return Err(Error::InvalidHeader(format!("{} does not support standard GPS time",
+                                                            self.version)));
+                }
+                _ => {}
+            };
+        };
+        Ok(())
+    }
+}
+
 impl Default for Header {
     fn default() -> Header {
         let format = Format::from(0);
@@ -167,25 +187,10 @@ pub trait WriteHeader {
 
 impl<W: Write> WriteHeader for W {
     fn write_header(&mut self, header: Header) -> Result<()> {
+        try!(header.validate());
         // TODO constant
         try!(self.write(b"LASF"));
-        let file_source_id = if !header.version.has_file_source_id() &&
-                                header.file_source_id != 0 {
-            warn!("Version {} does not support file source id, writing zero instead",
-                  header.version);
-            0
-        } else {
-            header.file_source_id
-        };
-        try!(self.write_u16::<LittleEndian>(file_source_id));
-        if !header.version.has_global_encoding() {
-            match header.global_encoding.gps_time {
-                GpsTime::Standard => {
-                    return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
-                }
-                _ => {}
-            };
-        };
+        try!(self.write_u16::<LittleEndian>(header.file_source_id));
         try!(self.write_u16::<LittleEndian>(header.global_encoding.into()));
         try!(self.write(&header.project_id));
         try!(self.write_u8(header.version.major));

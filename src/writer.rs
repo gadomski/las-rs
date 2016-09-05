@@ -578,15 +578,12 @@ mod tests {
     }
 
     #[test]
-    fn wipe_filesource_id() {
-        let mut cursor = Cursor::new(Vec::new());
-        Builder::new()
+    fn disallow_file_source_id_wipe() {
+        assert!(Builder::new()
             .file_source_id(1)
             .version(Version::from((1, 0)))
-            .writer(&mut cursor)
-            .unwrap();
-        cursor.set_position(0);
-        assert!(Reader::new(cursor).is_ok());
+            .writer(Cursor::new(Vec::new()))
+            .is_err());
     }
 
     #[test]
