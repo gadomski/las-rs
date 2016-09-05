@@ -14,6 +14,8 @@ const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 
                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /// The LAS header.
+///
+/// TODO make sure we're not explicitly cloneing it anywhere
 #[derive(Clone, Copy, Debug)]
 pub struct Header {
     /// The file source ID.

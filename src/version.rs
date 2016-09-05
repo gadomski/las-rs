@@ -1,6 +1,8 @@
 use std::fmt;
 
 /// LAS version.
+///
+/// TODO implement from `(u8, u8)`
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Version {
     /// The major version.
