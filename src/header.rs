@@ -8,14 +8,13 @@ use global_encoding::GlobalEncoding;
 use point::Format;
 use utils::{Bounds, Triple};
 use version::Version;
-use vlr::Vlr;
 
 const HEADER_SIZE: u16 = 227;
 const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /// The LAS header.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Header {
     /// The file source ID.
     ///
@@ -36,7 +35,9 @@ pub struct Header {
     /// The size of the header.
     pub header_size: u16,
     /// The byte offset to the beginning of point data.
-    pub offset_to_data: u32,
+    pub offset_to_point_data: u32,
+    /// The number of VLRs.
+    pub num_vlrs: u32,
     /// The day of file creation.
     pub file_creation_date: Date<UTC>,
     /// The point format.
@@ -55,10 +56,6 @@ pub struct Header {
     pub offset: Triple<f64>,
     /// The three-dimensional bounds, from the header.
     pub bounds: Bounds<f64>,
-    /// Variable length records.
-    pub vlrs: Vec<Vlr>,
-    /// Arbitrary byte padding between the header + VLRs and the points.
-    pub padding: u32,
 }
 
 impl Default for Header {
@@ -78,7 +75,8 @@ impl Default for Header {
             system_id: DEFAULT_SYSTEM_ID,
             generating_software: generating_software,
             header_size: HEADER_SIZE,
-            offset_to_data: HEADER_SIZE as u32,
+            offset_to_point_data: HEADER_SIZE as u32,
+            num_vlrs: 0,
             file_creation_date: UTC::today(),
             point_format: format,
             extra_bytes: 0,
@@ -87,8 +85,6 @@ impl Default for Header {
             scale: Triple::new(1., 1., 1.),
             offset: Triple::new(0., 0., 0.),
             bounds: Default::default(),
-            vlrs: Vec::new(),
-            padding: 0,
         }
     }
 }
@@ -138,7 +134,7 @@ impl<R: Read> ReadHeader for R {
         let year = try!(self.read_u16::<LittleEndian>());
         let file_creation_date = UTC.yo(year as i32, day as u32);
         let header_size = try!(self.read_u16::<LittleEndian>());
-        let offset_to_data = try!(self.read_u32::<LittleEndian>());
+        let offset_to_point_data = try!(self.read_u32::<LittleEndian>());
         let num_vlrs = try!(self.read_u32::<LittleEndian>());
         let point_format = Format::from(try!(self.read_u8()));
         // TODO make reading a header less error-ful
@@ -174,20 +170,6 @@ impl<R: Read> ReadHeader for R {
         let maxz = try!(self.read_f64::<LittleEndian>());
         let minz = try!(self.read_f64::<LittleEndian>());
         let bounds = Bounds::new(minx, miny, minz, maxx, maxy, maxz);
-
-        // TODO read VLRs seperately
-        let vlrs = try!((0..num_vlrs)
-            .map(|_| {
-                let mut vlr: Vlr = Default::default();
-                try!(self.read_u16::<LittleEndian>()); // reserved
-                try!(self.read_exact(&mut vlr.user_id));
-                vlr.record_id = try!(self.read_u16::<LittleEndian>());
-                vlr.record_length = try!(self.read_u16::<LittleEndian>());
-                try!(self.read_exact(&mut vlr.description));
-                try!(self.take(vlr.record_length as u64).read_to_end(&mut vlr.data));
-                Ok(vlr)
-            })
-            .collect::<Result<Vec<Vlr>>>());
         Ok(Header {
             file_source_id: file_source_id,
             global_encoding: global_encoding,
@@ -196,7 +178,8 @@ impl<R: Read> ReadHeader for R {
             system_id: system_id,
             generating_software: generating_software,
             header_size: header_size,
-            offset_to_data: offset_to_data,
+            offset_to_point_data: offset_to_point_data,
+            num_vlrs: num_vlrs,
             file_creation_date: file_creation_date,
             point_format: point_format,
             extra_bytes: extra_bytes as u16,
@@ -205,9 +188,6 @@ impl<R: Read> ReadHeader for R {
             scale: scale,
             offset: offset,
             bounds: bounds,
-            padding: offset_to_data -
-                     vlrs.iter().fold(header_size as u32, |acc, vlr| acc + vlr.len()),
-            vlrs: vlrs,
         })
     }
 }

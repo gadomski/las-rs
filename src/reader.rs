@@ -7,12 +7,15 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use {Error, Result};
 use header::{Header, ReadHeader};
 use point::{Classification, Color, NumberOfReturns, Point, ReturnNumber, ScanDirection, utils};
+use vlr::{ReadVlr, Vlr};
 
 /// Takes bytes and turns them into points and associated metadata.
 #[derive(Debug)]
 pub struct Reader<R> {
     /// LAS header.
     pub header: Header,
+    /// Variable length records.
+    pub vlrs: Vec<Vlr>,
     read: R,
 }
 
@@ -49,9 +52,11 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let header = try!(read.read_header());
-        try!(read.seek(SeekFrom::Start(header.offset_to_data as u64)));
+        let vlrs = try!((0..header.num_vlrs).map(|_| read.read_vlr()).collect());
+        try!(read.seek(SeekFrom::Start(header.offset_to_point_data as u64)));
         Ok(Reader {
             header: header,
+            vlrs: vlrs,
             read: read,
         })
     }
@@ -394,17 +399,15 @@ mod tests {
 
     #[test]
     fn reader_vlrs() {
-        let vlrs = Reader::from_path("data/1.0_0.las").unwrap().header.vlrs;
+        let vlrs = Reader::from_path("data/1.0_0.las").unwrap().vlrs;
         assert_eq!(2, vlrs.len());
         let vlr = &vlrs[0];
         assert_eq!("LASF_Projection", vlr.user_id.to_las_str().unwrap());
         assert_eq!(34735, vlr.record_id);
-        assert_eq!(64, vlr.record_length);
         assert_eq!("", vlr.description.to_las_str().unwrap());
         let vlr = &vlrs[1];
         assert_eq!("LASF_Projection", vlr.user_id.to_las_str().unwrap());
         assert_eq!(34737, vlr.record_id);
-        assert_eq!(39, vlr.record_length);
         assert_eq!("", vlr.description.to_las_str().unwrap());
     }
 
