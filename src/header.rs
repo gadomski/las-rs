@@ -44,12 +44,8 @@ pub struct Header {
     ///
     /// This library *always* writes points immediately after the last VLR, but that is not always
     /// true for files in the wild.
-    ///
-    /// TODO test writing offset_to_point_data
     pub offset_to_point_data: u32,
     /// The number of VLRs.
-    ///
-    /// TODO test writing the number of VLRs
     pub num_vlrs: u32,
     /// The day of file creation.
     pub file_creation_date: Date<UTC>,

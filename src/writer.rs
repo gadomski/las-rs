@@ -46,13 +46,15 @@ impl Writer<BufWriter<File>> {
 
 impl<W: Seek + Write> Writer<W> {
     fn from(builder: &Builder, write: W) -> Writer<W> {
+        let vlrs = builder.vlrs.clone();
+        let header: Header = builder.into();
         Writer {
             bounds: Default::default(),
             closed: false,
-            header: builder.into(),
+            header: header,
             point_count: Default::default(),
             point_count_by_return: Default::default(),
-            vlrs: builder.vlrs.clone(),
+            vlrs: vlrs,
             write: write,
         }
     }
@@ -118,7 +120,6 @@ impl<W: Seek + Write> Writer<W> {
     }
 
     fn write_header(&mut self) -> Result<()> {
-        // TODO test point count by return, offsets, etc
         self.header.point_count = self.point_count;
         self.header.point_count_by_return = self.point_count_by_return;
         self.header.bounds = self.bounds;
@@ -447,5 +448,20 @@ mod tests {
         cursor.set_position(0);
         let reader = Reader::new(cursor).unwrap();
         assert_eq!([1, 0, 0, 0, 0], reader.header.point_count_by_return);
+    }
+
+    #[test]
+    fn add_vlr() {
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut builder = Builder::new();
+            builder.vlrs.push(Default::default());
+            let mut writer = builder.writer(&mut cursor).unwrap();
+            writer.write(&point()).unwrap();
+        }
+        cursor.set_position(0);
+        let mut reader = Reader::new(cursor).unwrap();
+        assert_eq!(1, reader.header.num_vlrs);
+        assert!(reader.read_to_end().is_ok());
     }
 }

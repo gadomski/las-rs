@@ -104,9 +104,38 @@ impl<'a> From<&'a Builder> for Header {
         header.version = builder.version;
         header.system_id = builder.system_id;
         header.generating_software = builder.generating_software;
+        header.offset_to_point_data = builder.vlrs
+            .iter()
+            .fold(header.header_size as u32, |acc, vlr| acc + vlr.len());
+        header.num_vlrs = builder.vlrs.len() as u32;
         header.point_format = builder.point_format;
         header.transforms = builder.transforms;
         header.extra_bytes = builder.extra_bytes;
         header
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use header::Header;
+
+    #[test]
+    fn offset_to_point_data() {
+        let mut builder = Builder::new();
+        let header: Header = (&builder).into();
+        assert_eq!(227, header.offset_to_point_data);
+        builder.vlrs.push(Default::default());
+        let header: Header = (&builder).into();
+        assert_eq!(281, header.offset_to_point_data);
+    }
+
+    #[test]
+    fn num_vlrs() {
+        let mut builder = Builder::new();
+        builder.vlrs.push(Default::default());
+        let header: Header = (&builder).into();
+        assert_eq!(1, header.num_vlrs);
     }
 }
