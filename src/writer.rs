@@ -292,16 +292,6 @@ impl<W: Seek + Write> Writer<W> {
         for vlr in &self.vlrs {
             try!(self.write.write_vlr(vlr));
         }
-        // TODO refactor
-        let location = self.vlrs
-            .iter()
-            .fold(self.header.header_size as u32,
-                  |acc, vlr| acc + vlr.len()) as i64;
-        let padding = self.header.offset_to_point_data as i64 - location;
-        if padding > 0 {
-            let padding = vec![0; padding as usize];
-            try!(self.write.write(&padding));
-        }
         Ok(())
     }
 
@@ -343,8 +333,7 @@ impl<W: Seek + Write> Drop for Writer<W> {
 mod tests {
     use super::*;
 
-    use std::fs::File;
-    use std::io::{Cursor, Read};
+    use std::io::Cursor;
 
     use global_encoding::GlobalEncoding;
     use point::{Classification, Color, Format, NumberOfReturns, Point, ReturnNumber, ScanDirection};
@@ -556,24 +545,6 @@ mod tests {
         cursor.set_position(0);
         assert_eq!(Version::from((1, 0)),
                    Reader::new(&mut cursor).unwrap().header.version);
-    }
-
-    #[test]
-    fn write_bitwise_exact() {
-        let mut buffer = Vec::new();
-        File::open("data/1.0_0.las").unwrap().read_to_end(&mut buffer).unwrap();
-        let mut original = Cursor::new(buffer);
-        let mut secondary = Cursor::new(Vec::new());
-        {
-            let mut reader = Reader::new(&mut original).unwrap();
-            let mut writer = Builder::from_reader(&reader).writer(&mut secondary).unwrap();
-            for point in reader.iter_mut() {
-                writer.write(point.unwrap()).unwrap();
-            }
-        }
-        let original = original.into_inner();
-        let secondary = secondary.into_inner();
-        assert_eq!(original.len(), secondary.len());
     }
 
     #[test]
