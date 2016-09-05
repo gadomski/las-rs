@@ -120,6 +120,7 @@ impl<W: Seek + Write> Writer<W> {
     fn write_header(&mut self) -> Result<()> {
         // TODO test point count by return, offsets, etc
         self.header.point_count = self.point_count;
+        self.header.point_count_by_return = self.point_count_by_return;
         self.header.bounds = self.bounds;
         try!(self.write.seek(SeekFrom::Start(0)));
         try!(self.write.write_header(self.header));
@@ -434,5 +435,17 @@ mod tests {
         builder.global_encoding = 1.into();
         builder.version = (1, 0).into();
         assert!(builder.writer(Cursor::new(Vec::new())).is_err());
+    }
+
+    #[test]
+    fn point_count_by_return_type() {
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = Writer::default(&mut cursor).unwrap();
+            writer.write(&point()).unwrap();
+        }
+        cursor.set_position(0);
+        let reader = Reader::new(cursor).unwrap();
+        assert_eq!([1, 0, 0, 0, 0], reader.header.point_count_by_return);
     }
 }
