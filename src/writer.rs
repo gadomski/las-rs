@@ -16,7 +16,7 @@ use point::{Color, Format, Point, utils};
 use reader::Reader;
 use utils::{Bounds, Triple};
 use version::Version;
-use vlr::Vlr;
+use vlr::{Vlr, WriteVlr};
 
 /// Configure a `Writer`.
 #[derive(Debug)]
@@ -290,12 +290,7 @@ impl<W: Seek + Write> Writer<W> {
         try!(self.write.seek(SeekFrom::Start(0)));
         try!(self.write.write_header(self.header));
         for vlr in &self.vlrs {
-            try!(self.write.write_u16::<LittleEndian>(0)); // reserved
-            try!(self.write.write(&vlr.user_id));
-            try!(self.write.write_u16::<LittleEndian>(vlr.record_id));
-            try!(self.write.write_u16::<LittleEndian>(vlr.data.len() as u16));
-            try!(self.write.write(&vlr.description));
-            try!(self.write.write(&vlr.data));
+            try!(self.write.write_vlr(vlr));
         }
         // TODO refactor
         let location = self.vlrs

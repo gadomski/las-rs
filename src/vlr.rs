@@ -1,6 +1,6 @@
-use std::io::Read;
+use std::io::{Read, Write};
 
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use Result;
 
@@ -49,5 +49,21 @@ impl<R: Read> ReadVlr for R {
             description: description,
             data: data,
         })
+    }
+}
+
+pub trait WriteVlr {
+    fn write_vlr(&mut self, vlr: &Vlr) -> Result<()>;
+}
+
+impl<W: Write> WriteVlr for W {
+    fn write_vlr(&mut self, vlr: &Vlr) -> Result<()> {
+        try!(self.write_u16::<LittleEndian>(0)); // reserved
+        try!(self.write(&vlr.user_id));
+        try!(self.write_u16::<LittleEndian>(vlr.record_id));
+        try!(self.write_u16::<LittleEndian>(vlr.data.len() as u16));
+        try!(self.write(&vlr.description));
+        try!(self.write(&vlr.data));
+        Ok(())
     }
 }
