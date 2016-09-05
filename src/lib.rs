@@ -45,7 +45,7 @@
 //! use las::{Builder, point, Version};
 //! let writer = Builder::new()
 //!     .point_format(point::Format::from(1))
-//!     .version(Version::new(1, 2))
+//!     .version(Version::from((1, 2)))
 //!     .writer(Cursor::new(Vec::new())).unwrap();
 //! ```
 //!

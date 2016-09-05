@@ -97,7 +97,7 @@ impl Builder {
     /// ```
     /// # use las::Builder;
     /// use las::Version;
-    /// let builder = Builder::new().version(Version::new(1, 2));
+    /// let builder = Builder::new().version(Version::from((1, 2)));
     /// ```
     pub fn version(mut self, version: Version) -> Builder {
         self.header.version = version;
@@ -412,7 +412,7 @@ mod tests {
             number_of_returns: NumberOfReturns::from(0b00010000),
             scan_direction: ScanDirection::Positive,
             edge_of_flight_line: false,
-            classification: Classification::from(2, Version::new(1, 2)),
+            classification: Classification::from(2, (1, 2).into()),
             scan_angle_rank: 2,
             user_data: 3,
             point_source_id: 4,
@@ -602,9 +602,9 @@ mod tests {
     #[test]
     fn write_version() {
         let mut cursor = Cursor::new(Vec::new());
-        Builder::new().version(Version::new(1, 0)).writer(&mut cursor).unwrap();
+        Builder::new().version((1, 0).into()).writer(&mut cursor).unwrap();
         cursor.set_position(0);
-        assert_eq!(Version::new(1, 0),
+        assert_eq!(Version::from((1, 0)),
                    Reader::new(&mut cursor).unwrap().header.version);
     }
 
@@ -659,7 +659,11 @@ mod tests {
     #[test]
     fn wipe_filesource_id() {
         let mut cursor = Cursor::new(Vec::new());
-        Builder::new().file_source_id(1).version(Version::new(1, 0)).writer(&mut cursor).unwrap();
+        Builder::new()
+            .file_source_id(1)
+            .version(Version::from((1, 0)))
+            .writer(&mut cursor)
+            .unwrap();
         cursor.set_position(0);
         assert!(Reader::new(cursor).is_ok());
     }
@@ -668,7 +672,7 @@ mod tests {
     fn disallow_global_encoding_downcast() {
         assert!(Builder::new()
             .global_encoding(GlobalEncoding::from(1))
-            .version(Version::new(1, 0))
+            .version(Version::from((1, 0)))
             .writer(Cursor::new(Vec::new()))
             .is_err());
     }

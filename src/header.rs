@@ -69,7 +69,7 @@ impl Default for Header {
             file_source_id: 0,
             global_encoding: Default::default(),
             project_id: Default::default(),
-            version: Version::new(1, 2),
+            version: Default::default(),
             system_id: DEFAULT_SYSTEM_ID,
             generating_software: generating_software,
             header_size: HEADER_SIZE,
@@ -101,7 +101,7 @@ impl<R: Read> ReadHeader for R {
         let global_encoding = try!(self.read_u16::<LittleEndian>());
         let mut project_id = [0; 16];
         try!(self.read_exact(&mut project_id));
-        let version = Version::new(try!(self.read_u8()), try!(self.read_u8()));
+        let version = (try!(self.read_u8()), try!(self.read_u8())).into();
         let mut system_id = [0; 32];
         try!(self.read_exact(&mut system_id));
         let mut generating_software = [0; 32];

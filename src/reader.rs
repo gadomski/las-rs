@@ -270,11 +270,11 @@ mod tests {
 
     #[test]
     fn reader_version() {
-        assert_eq!(Version::new(1, 0),
+        assert_eq!(Version::from((1, 0)),
                    Reader::from_path("data/1.0_0.las").unwrap().header.version);
-        assert_eq!(Version::new(1, 1),
+        assert_eq!(Version::from((1, 1)),
                    Reader::from_path("data/1.1_0.las").unwrap().header.version);
-        assert_eq!(Version::new(1, 2),
+        assert_eq!(Version::from((1, 2)),
                    Reader::from_path("data/1.2_0.las").unwrap().header.version);
     }
 

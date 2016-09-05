@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn classification_from() {
         assert_eq!(Classification::Optional(2),
-                   Classification::from(2, Version::new(1, 0)));
+                   Classification::from(2, Version::from((1, 0))));
         fn mandatory(s: bool, k: bool, w: bool) -> Classification {
             Classification::Mandatory {
                 classification: ASPRSClassification::Ground,
@@ -172,12 +172,12 @@ mod tests {
             }
         };
         assert_eq!(mandatory(false, false, false),
-                   Classification::from(2, Version::new(1, 1)));
+                   Classification::from(2, Version::from((1, 1))));
         assert_eq!(mandatory(true, false, false),
-                   Classification::from(0b00100010, Version::new(1, 1)));
+                   Classification::from(0b00100010, Version::from((1, 1))));
         assert_eq!(mandatory(false, true, false),
-                   Classification::from(0b01000010, Version::new(1, 1)));
+                   Classification::from(0b01000010, Version::from((1, 1))));
         assert_eq!(mandatory(false, false, true),
-                   Classification::from(0b10000010, Version::new(1, 1)));
+                   Classification::from(0b10000010, Version::from((1, 1))));
     }
 }
