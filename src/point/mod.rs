@@ -14,12 +14,12 @@ pub use point::format::Format;
 pub use point::number_of_returns::NumberOfReturns;
 pub use point::return_number::ReturnNumber;
 pub use point::scan_direction::ScanDirection;
-pub use point::traits::ReadPoint;
+pub use point::traits::{ReadPoint, WritePoint};
 
 use std::fmt;
 
 /// LAS point data.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Point {
     /// The x-coordinate of the point.
     pub x: f64,

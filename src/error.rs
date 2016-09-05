@@ -3,17 +3,17 @@ use std::fmt;
 use std::io;
 use std::str;
 
-use global_encoding::GpsTime;
 use point::{Format, Point};
-use version::Version;
 
 /// Crate-specific error enum.
 #[derive(Debug)]
 pub enum Error {
     /// The `Writer` is closed and cannot be written to.
     ClosedWriter,
-    /// The `GpsTime` is not supported by this version.
-    GpsTimeMismatch(Version, GpsTime),
+    /// The header is invalid.
+    ///
+    /// This is usually a field being set that can't be set for that verison.
+    InvalidHeader(String),
     /// The file signature was not "LASF".
     InvalidFileSignature(String),
     /// The point data record length is less than the point format demands.
@@ -48,7 +48,7 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::ClosedWriter => "the writer is closed",
-            Error::GpsTimeMismatch(_, _) => "mismatch between version and gps time",
+            Error::InvalidHeader(_) => "the header is invalid",
             Error::InvalidFileSignature(_) => "file signature was not LASF",
             Error::InvalidPointDataRecordLength(_, _) => "the point data record length is impossible (probably too short)",
             Error::Io(ref err) => err.description(),
@@ -73,9 +73,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::ClosedWriter => write!(f, "The writer is closed"),
-            Error::GpsTimeMismatch(version, gps_time) => {
-                write!(f, "{} does not support {}", version, gps_time)
-            }
+            Error::InvalidHeader(ref s) => write!(f, "Invalid header: {}", s),
             Error::InvalidFileSignature(ref s) => {
                 write!(f, "File signature must be LASF, found '{}'", s)
             }

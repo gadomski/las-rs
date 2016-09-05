@@ -7,17 +7,14 @@ use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use byteorder::{LittleEndian, WriteBytesExt};
-use chrono::Datelike;
-
 use {Error, Result};
-use global_encoding::{GlobalEncoding, GpsTime};
-use header::Header;
-use point::{Color, Format, Point, utils};
+use global_encoding::GlobalEncoding;
+use header::{Header, WriteHeader};
+use point::{Format, Point, WritePoint};
 use reader::Reader;
 use utils::{Bounds, Triple};
 use version::Version;
-use vlr::Vlr;
+use vlr::{Vlr, WriteVlr};
 
 /// Configure a `Writer`.
 #[derive(Debug)]
@@ -229,49 +226,25 @@ impl<W: Seek + Write> Writer<W> {
 
     /// Writes a point.
     ///
+    /// TODO take a reference
+    ///
     /// # Examples
+    ///
     ///
     /// ```
     /// use std::io::Cursor;
     /// # use las::Writer;
     /// let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-    /// writer.write(Default::default()).unwrap();
+    /// writer.write(&Default::default()).unwrap();
     /// ```
-    pub fn write(&mut self, point: Point) -> Result<()> {
+    pub fn write(&mut self, point: &Point) -> Result<()> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.x.inverse(point.x)));
-        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.y.inverse(point.y)));
-        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.z.inverse(point.z)));
-        try!(self.write.write_u16::<LittleEndian>(point.intensity));
-        try!(self.write
-            .write_u8(u8::from(point.return_number) | u8::from(point.number_of_returns) |
-                      u8::from(point.scan_direction) |
-                      utils::edge_of_flight_line_u8(point.edge_of_flight_line)));
-        try!(self.write.write_u8(point.classification.into()));
-        try!(self.write.write_i8(point.scan_angle_rank));
-        try!(self.write.write_u8(point.user_data));
-        try!(self.write.write_u16::<LittleEndian>(point.point_source_id));
-        if self.header.point_format.has_gps_time() {
-            match point.gps_time {
-                Some(time) => try!(self.write.write_f64::<LittleEndian>(time)),
-                None => return Err(Error::MissingGpsTime(self.header.point_format, point)),
-            }
-        }
-        if self.header.point_format.has_color() {
-            match point.color {
-                Some(Color { red, green, blue }) => {
-                    try!(self.write.write_u16::<LittleEndian>(red));
-                    try!(self.write.write_u16::<LittleEndian>(green));
-                    try!(self.write.write_u16::<LittleEndian>(blue));
-                }
-                None => return Err(Error::MissingColor(self.header.point_format, point)),
-            }
-        }
-        if self.header.extra_bytes > 0 {
-            try!(self.write.write_all(point.extra_bytes.as_slice()));
-        }
+        try!(self.write.write_point(point,
+                                    self.header.transforms,
+                                    self.header.point_format,
+                                    self.header.extra_bytes));
         self.point_count += 1;
         if point.return_number.is_valid() {
             self.point_count_by_return[u8::from(point.return_number) as usize - 1] += 1;
@@ -285,72 +258,13 @@ impl<W: Seek + Write> Writer<W> {
     }
 
     fn write_header(&mut self) -> Result<()> {
-        let header = &self.header;
+        // TODO test point count by return, offsets, etc
+        self.header.point_count = self.point_count;
+        self.header.bounds = self.bounds;
         try!(self.write.seek(SeekFrom::Start(0)));
-        try!(self.write.write(b"LASF"));
-        let file_source_id = if !header.version.has_file_source_id() &&
-                                header.file_source_id != 0 {
-            warn!("Version {} does not support file source id, writing zero instead",
-                  header.version);
-            0
-        } else {
-            header.file_source_id
-        };
-        try!(self.write.write_u16::<LittleEndian>(file_source_id));
-        if !header.version.has_global_encoding() {
-            match header.global_encoding.gps_time {
-                GpsTime::Standard => {
-                    return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
-                }
-                _ => {}
-            };
-        };
-        try!(self.write.write_u16::<LittleEndian>(header.global_encoding.into()));
-        try!(self.write.write(&header.project_id));
-        try!(self.write.write_u8(header.version.major));
-        try!(self.write.write_u8(header.version.minor));
-        try!(self.write.write(&header.system_id));
-        try!(self.write.write(&header.generating_software));
-        try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.ordinal() as u16));
-        try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.year() as u16));
-        try!(self.write.write_u16::<LittleEndian>(header.header_size));
-        // TODO compute offset to point data before writing
-        try!(self.write.write_u32::<LittleEndian>(header.offset_to_point_data));
-        try!(self.write.write_u32::<LittleEndian>(self.vlrs.len() as u32));
-        try!(self.write.write_u8(header.point_format.into()));
-        try!(self.write
-            .write_u16::<LittleEndian>(header.point_format.record_length() + header.extra_bytes));
-        try!(self.write.write_u32::<LittleEndian>(self.point_count));
-        for &count in &self.point_count_by_return {
-            try!(self.write.write_u32::<LittleEndian>(count));
-        }
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.scale));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.scale));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.scale));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.offset));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.offset));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.offset));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.max.x));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.min.x));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.max.y));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.min.y));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.max.z));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.min.z));
+        try!(self.write.write_header(self.header));
         for vlr in &self.vlrs {
-            try!(self.write.write_u16::<LittleEndian>(0)); // reserved
-            try!(self.write.write(&vlr.user_id));
-            try!(self.write.write_u16::<LittleEndian>(vlr.record_id));
-            try!(self.write.write_u16::<LittleEndian>(vlr.data.len() as u16));
-            try!(self.write.write(&vlr.description));
-            try!(self.write.write(&vlr.data));
-        }
-        // TODO refactor
-        let location =
-            self.vlrs.iter().fold(header.header_size as u32, |acc, vlr| acc + vlr.len()) as i64;
-        let padding = header.offset_to_point_data as i64 - location;
-        if padding > 0 {
-            let padding = vec![0; padding as usize];
-            try!(self.write.write(&padding));
+            try!(self.write.write_vlr(vlr));
         }
         Ok(())
     }
@@ -365,9 +279,9 @@ impl<W: Seek + Write> Writer<W> {
     /// use std::io::Cursor;
     /// # use las::Writer;
     /// let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-    /// assert!(writer.write(Default::default()).is_ok());
+    /// assert!(writer.write(&Default::default()).is_ok());
     /// writer.close().unwrap();
-    /// assert!(writer.write(Default::default()).is_err());
+    /// assert!(writer.write(&Default::default()).is_err());
     /// ```
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
@@ -393,8 +307,7 @@ impl<W: Seek + Write> Drop for Writer<W> {
 mod tests {
     use super::*;
 
-    use std::fs::File;
-    use std::io::{Cursor, Read};
+    use std::io::Cursor;
 
     use global_encoding::GlobalEncoding;
     use point::{Classification, Color, Format, NumberOfReturns, Point, ReturnNumber, ScanDirection};
@@ -485,7 +398,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -499,7 +412,7 @@ mod tests {
         {
             let mut writer =
                 Builder::new().point_format(Format::from(1)).writer(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -513,7 +426,7 @@ mod tests {
         {
             let mut writer =
                 Builder::new().point_format(Format::from(2)).writer(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -527,7 +440,7 @@ mod tests {
         {
             let mut writer =
                 Builder::new().point_format(Format::from(3)).writer(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -541,7 +454,7 @@ mod tests {
             Builder::new().point_format(Format::from(1)).writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.gps_time = None;
-        assert!(writer.write(point).is_err());
+        assert!(writer.write(&point).is_err());
     }
 
     #[test]
@@ -550,7 +463,7 @@ mod tests {
             Builder::new().point_format(Format::from(2)).writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.color = None;
-        assert!(writer.write(point).is_err());
+        assert!(writer.write(&point).is_err());
     }
 
     #[test]
@@ -558,7 +471,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         assert_eq!(1, Reader::new(cursor).unwrap().header.point_count);
@@ -569,8 +482,8 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let mut reader = Reader::new(cursor).unwrap();
@@ -584,7 +497,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(point()).unwrap();
+            writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
         let reader = Reader::new(cursor).unwrap();
@@ -595,7 +508,7 @@ mod tests {
     fn close_the_writer() {
         let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
         writer.close().is_ok();
-        assert!(writer.write(point()).is_err());
+        assert!(writer.write(&point()).is_err());
         assert!(writer.close().is_err());
     }
 
@@ -609,27 +522,9 @@ mod tests {
     }
 
     #[test]
-    fn write_bitwise_exact() {
-        let mut buffer = Vec::new();
-        File::open("data/1.0_0.las").unwrap().read_to_end(&mut buffer).unwrap();
-        let mut original = Cursor::new(buffer);
-        let mut secondary = Cursor::new(Vec::new());
-        {
-            let mut reader = Reader::new(&mut original).unwrap();
-            let mut writer = Builder::from_reader(&reader).writer(&mut secondary).unwrap();
-            for point in reader.iter_mut() {
-                writer.write(point.unwrap()).unwrap();
-            }
-        }
-        let original = original.into_inner();
-        let secondary = secondary.into_inner();
-        assert_eq!(original.len(), secondary.len());
-    }
-
-    #[test]
     fn write_zero_return_number() {
         let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-        writer.write(Default::default()).unwrap();
+        writer.write(&Default::default()).unwrap();
     }
 
     #[test]
@@ -639,7 +534,7 @@ mod tests {
             let mut writer = Builder::new().extra_bytes(5).writer(&mut cursor).unwrap();
             let mut point = point();
             point.extra_bytes = b"Hello".to_vec();
-            writer.write(point).unwrap();
+            writer.write(&point).unwrap();
         }
         cursor.set_position(0);
         let point = Reader::new(cursor).unwrap().read_to_end().unwrap().pop().unwrap();
@@ -657,15 +552,12 @@ mod tests {
     }
 
     #[test]
-    fn wipe_filesource_id() {
-        let mut cursor = Cursor::new(Vec::new());
-        Builder::new()
+    fn disallow_file_source_id_wipe() {
+        assert!(Builder::new()
             .file_source_id(1)
             .version(Version::from((1, 0)))
-            .writer(&mut cursor)
-            .unwrap();
-        cursor.set_position(0);
-        assert!(Reader::new(cursor).is_ok());
+            .writer(Cursor::new(Vec::new()))
+            .is_err());
     }
 
     #[test]

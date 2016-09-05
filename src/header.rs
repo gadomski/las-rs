@@ -1,14 +1,15 @@
-use std::io::Read;
+use std::io::{Read, Write};
 
-use byteorder::{LittleEndian, ReadBytesExt};
-use chrono::{Date, TimeZone, UTC};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use chrono::{Date, Datelike, TimeZone, UTC};
 
 use {Error, Result};
-use global_encoding::GlobalEncoding;
+use global_encoding::{GlobalEncoding, GpsTime};
 use point::Format;
-use utils::{Bounds, LinearTransform, Triple};
+use utils::{Bounds, LinearTransform, ToLasStr, Triple};
 use version::Version;
 
+const FILE_SIGNATURE: &'static [u8] = b"LASF";
 const HEADER_SIZE: u16 = 227;
 const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -56,6 +57,26 @@ pub struct Header {
     pub bounds: Bounds<f64>,
 }
 
+impl Header {
+    fn validate(&self) -> Result<()> {
+        if !self.version.has_file_source_id() && self.file_source_id != 0 {
+            return Err(Error::InvalidHeader(format!("{} cannot not have a file source id (file source id: {})",
+                                                    self.version,
+                                                    self.file_source_id)));
+        }
+        if !self.version.has_global_encoding() {
+            match self.global_encoding.gps_time {
+                GpsTime::Standard => {
+                    return Err(Error::InvalidHeader(format!("{} does not support standard GPS time",
+                                                            self.version)));
+                }
+                _ => {}
+            };
+        };
+        Ok(())
+    }
+}
+
 impl Default for Header {
     fn default() -> Header {
         let format = Format::from(0);
@@ -92,10 +113,10 @@ pub trait ReadHeader {
 
 impl<R: Read> ReadHeader for R {
     fn read_header(&mut self) -> Result<Header> {
-        let mut file_signature = String::new();
-        try!(self.take(4).read_to_string(&mut file_signature));
-        if file_signature != "LASF" {
-            return Err(Error::InvalidFileSignature(file_signature));
+        let mut file_signature = [0; 4];
+        try!(self.read_exact(&mut file_signature));
+        if file_signature != FILE_SIGNATURE {
+            return Err(Error::InvalidFileSignature(try!(file_signature.to_las_str()).to_string()));
         }
         let file_source_id = try!(self.read_u16::<LittleEndian>());
         let global_encoding = try!(self.read_u16::<LittleEndian>());
@@ -158,5 +179,47 @@ impl<R: Read> ReadHeader for R {
             transforms: transforms,
             bounds: bounds,
         })
+    }
+}
+
+pub trait WriteHeader {
+    fn write_header(&mut self, header: Header) -> Result<()>;
+}
+
+impl<W: Write> WriteHeader for W {
+    fn write_header(&mut self, header: Header) -> Result<()> {
+        try!(header.validate());
+        try!(self.write(FILE_SIGNATURE));
+        try!(self.write_u16::<LittleEndian>(header.file_source_id));
+        try!(self.write_u16::<LittleEndian>(header.global_encoding.into()));
+        try!(self.write(&header.project_id));
+        try!(self.write_u8(header.version.major));
+        try!(self.write_u8(header.version.minor));
+        try!(self.write(&header.system_id));
+        try!(self.write(&header.generating_software));
+        try!(self.write_u16::<LittleEndian>(header.file_creation_date.ordinal() as u16));
+        try!(self.write_u16::<LittleEndian>(header.file_creation_date.year() as u16));
+        try!(self.write_u16::<LittleEndian>(header.header_size));
+        try!(self.write_u32::<LittleEndian>(header.offset_to_point_data));
+        try!(self.write_u32::<LittleEndian>(header.num_vlrs));
+        try!(self.write_u8(header.point_format.into()));
+        try!(self.write_u16::<LittleEndian>(header.point_format.record_length() + header.extra_bytes));
+        try!(self.write_u32::<LittleEndian>(header.point_count));
+        for &count in &header.point_count_by_return {
+            try!(self.write_u32::<LittleEndian>(count));
+        }
+        try!(self.write_f64::<LittleEndian>(header.transforms.x.scale));
+        try!(self.write_f64::<LittleEndian>(header.transforms.y.scale));
+        try!(self.write_f64::<LittleEndian>(header.transforms.z.scale));
+        try!(self.write_f64::<LittleEndian>(header.transforms.x.offset));
+        try!(self.write_f64::<LittleEndian>(header.transforms.y.offset));
+        try!(self.write_f64::<LittleEndian>(header.transforms.z.offset));
+        try!(self.write_f64::<LittleEndian>(header.bounds.max.x));
+        try!(self.write_f64::<LittleEndian>(header.bounds.min.x));
+        try!(self.write_f64::<LittleEndian>(header.bounds.max.y));
+        try!(self.write_f64::<LittleEndian>(header.bounds.min.y));
+        try!(self.write_f64::<LittleEndian>(header.bounds.max.z));
+        try!(self.write_f64::<LittleEndian>(header.bounds.min.z));
+        Ok(())
     }
 }

@@ -34,7 +34,7 @@
 //! let mut point: Point = Default::default();
 //! point.x = 1.;
 //! // etc.
-//! writer.write(point).unwrap();
+//! writer.write(&point).unwrap();
 //! ```
 //!
 //! In order to configure the `Writer`, i.e. by setting the LAS version or point format, use a
