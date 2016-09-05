@@ -28,8 +28,6 @@ pub enum Error {
     NotAscii(String),
     /// The buffer was not filled with nuls after the last ASCII character.
     NotNulFilled(Vec<u8>),
-    /// The reserved field is not zero.
-    ReservedIsNotZero,
     /// The point format is not supported by this library.
     ///
     /// It might be valid, but we just can't handle it.
@@ -62,7 +60,6 @@ impl error::Error for Error {
             Error::MissingGpsTime(_, _) => "gps time was required by the point format, but the point did not have gps time",
             Error::NotAscii(_) => "the string is not ascii",
             Error::NotNulFilled(_) => "the slice is not filled with nuls after the last character",
-            Error::ReservedIsNotZero => "the reserved field is not zero",
             Error::UnsupportedPointFormat(_) => "the point format is not supported by this library",
             Error::Utf8(ref err) => err.description(),
         }
@@ -109,7 +106,6 @@ impl fmt::Display for Error {
             }
             Error::NotAscii(ref s) => write!(f, "This string is not ASCII: {}", s),
             Error::NotNulFilled(ref v) => write!(f, "This slice is not filled with nuls: {:?}", v),
-            Error::ReservedIsNotZero => write!(f, "The reserved field is not zero"),
             Error::UnsupportedPointFormat(format) => write!(f, "{} is not suppored", format),
             Error::Utf8(ref err) => write!(f, "UTF8 error: {}", err),
         }

@@ -70,7 +70,7 @@ impl Builder {
     /// let builder = Builder::new().file_source_id(1);
     /// ```
     pub fn file_source_id(mut self, file_source_id: u16) -> Builder {
-        self.header.file_source_id = Some(file_source_id);
+        self.header.file_source_id = file_source_id;
         self
     }
 
@@ -86,7 +86,7 @@ impl Builder {
     /// let builder = Builder::new().global_encoding(GlobalEncoding::from(1));
     /// ```
     pub fn global_encoding(mut self, global_encoding: GlobalEncoding) -> Builder {
-        self.header.global_encoding = Some(global_encoding);
+        self.header.global_encoding = global_encoding;
         self
     }
 
@@ -288,40 +288,24 @@ impl<W: Seek + Write> Writer<W> {
         let header = &self.header;
         try!(self.write.seek(SeekFrom::Start(0)));
         try!(self.write.write(b"LASF"));
-        let file_source_id = if header.version.has_file_source_id() {
-            if let Some(file_source_id) = header.file_source_id {
-                file_source_id
-            } else {
-                info!("Writer doesn't have a file source id, writing zero");
-                0
-            }
-        } else {
-            if header.file_source_id.is_some() {
-                warn!("Version {} does not support file source id, writing zero instead",
-                      header.version);
-            }
+        let file_source_id = if !header.version.has_file_source_id() &&
+                                header.file_source_id != 0 {
+            warn!("Version {} does not support file source id, writing zero instead",
+                  header.version);
             0
+        } else {
+            header.file_source_id
         };
         try!(self.write.write_u16::<LittleEndian>(file_source_id));
-        let global_encoding = if header.version.has_global_encoding() {
-            if let Some(global_encoding) = header.global_encoding {
-                global_encoding.into()
-            } else {
-                info!("Writer doesn't have a global encoding, writing zero");
-                0
-            }
-        } else {
-            if let Some(global_encoding) = header.global_encoding {
-                match global_encoding.gps_time {
-                    GpsTime::Standard => {
-                        return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
-                    }
-                    _ => {}
-                };
-            }
-            0
+        if !header.version.has_global_encoding() {
+            match header.global_encoding.gps_time {
+                GpsTime::Standard => {
+                    return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
+                }
+                _ => {}
+            };
         };
-        try!(self.write.write_u16::<LittleEndian>(global_encoding));
+        try!(self.write.write_u16::<LittleEndian>(header.global_encoding.into()));
         try!(self.write.write(&header.project_id));
         try!(self.write.write_u8(header.version.major));
         try!(self.write.write_u8(header.version.minor));

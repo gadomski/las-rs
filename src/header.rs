@@ -18,12 +18,12 @@ const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 
 pub struct Header {
     /// The file source ID.
     ///
-    /// This does not exist for LAS 1.0 files.
-    pub file_source_id: Option<u16>,
+    /// This did not exist for LAS 1.0 files, but defaults to zero.
+    pub file_source_id: u16,
     /// The global encoding.
     ///
-    /// This does not exist for LAS 1.1 and 1.0 files.
-    pub global_encoding: Option<GlobalEncoding>,
+    /// This did not exist for LAS 1.1 and 1.0 files.
+    pub global_encoding: GlobalEncoding,
     /// The project id number.
     pub project_id: [u8; 16],
     /// The LAS version.
@@ -66,8 +66,8 @@ impl Default for Header {
             *target = source;
         }
         Header {
-            file_source_id: Some(0),
-            global_encoding: Some(Default::default()),
+            file_source_id: 0,
+            global_encoding: Default::default(),
             project_id: Default::default(),
             version: Version::new(1, 2),
             system_id: DEFAULT_SYSTEM_ID,
@@ -102,27 +102,6 @@ impl<R: Read> ReadHeader for R {
         let mut project_id = [0; 16];
         try!(self.read_exact(&mut project_id));
         let version = Version::new(try!(self.read_u8()), try!(self.read_u8()));
-
-        if !version.has_file_source_id() && file_source_id != 0 {
-            return Err(Error::ReservedIsNotZero);
-        }
-        // TODO make reading a header less error-ful
-        let file_source_id = if version.has_file_source_id() {
-            Some(file_source_id)
-        } else if file_source_id == 0 {
-            None
-        } else {
-            return Err(Error::ReservedIsNotZero);
-        };
-        // TODO make reading a header less error-ful
-        let global_encoding = if version.has_global_encoding() {
-            Some(GlobalEncoding::from(global_encoding))
-        } else if global_encoding == 0 {
-            None
-        } else {
-            return Err(Error::ReservedIsNotZero);
-        };
-
         let mut system_id = [0; 32];
         try!(self.read_exact(&mut system_id));
         let mut generating_software = [0; 32];
@@ -167,7 +146,7 @@ impl<R: Read> ReadHeader for R {
         let bounds = Bounds::new(minx, miny, minz, maxx, maxy, maxz);
         Ok(Header {
             file_source_id: file_source_id,
-            global_encoding: global_encoding,
+            global_encoding: GlobalEncoding::from(global_encoding),
             project_id: project_id,
             version: version,
             system_id: system_id,

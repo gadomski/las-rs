@@ -206,29 +206,6 @@ mod tests {
     }
 
     #[test]
-    fn reader_1_0_bad_reserved() {
-        for i in 4..8 {
-            let mut buf = las_vec("data/1.0_0.las");
-            buf[i] += 1;
-            assert!(Reader::new(Cursor::new(buf)).is_err());
-        }
-    }
-
-    #[test]
-    fn reader_1_1_bad_reserved() {
-        for i in 4..6 {
-            let mut buf = las_vec("data/1.1_0.las");
-            buf[i] += 1;
-            assert!(Reader::new(Cursor::new(buf)).is_ok());
-        }
-        for i in 6..8 {
-            let mut buf = las_vec("data/1.1_0.las");
-            buf[i] += 1;
-            assert!(Reader::new(Cursor::new(buf)).is_err());
-        }
-    }
-
-    #[test]
     fn reader_from_cursor() {
         check_0(&mut Reader::new(Cursor::new(las_vec("data/1.0_0.las"))).unwrap());
     }
