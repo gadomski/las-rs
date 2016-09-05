@@ -8,19 +8,19 @@ use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use {Error, Result};
-use global_encoding::GlobalEncoding;
 use header::{Header, WriteHeader};
-use point::{Format, Point, WritePoint};
+use point::{Point, WritePoint};
 use reader::Reader;
 use utils::{Bounds, Triple};
-use version::Version;
 use vlr::{Vlr, WriteVlr};
 
 /// Configure a `Writer`.
 #[derive(Debug)]
 pub struct Builder {
-    header: Header,
-    vlrs: Vec<Vlr>,
+    /// The header that will be used for the new file.
+    pub header: Header,
+    /// The VLRs that will be included in the new file.
+    pub vlrs: Vec<Vlr>,
 }
 
 impl Builder {
@@ -54,78 +54,6 @@ impl Builder {
             header: reader.header,
             vlrs: reader.vlrs.clone(),
         }
-    }
-
-    /// Sets the file source id.
-    ///
-    /// This field was added in LAS 1.1.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Builder;
-    /// let builder = Builder::new().file_source_id(1);
-    /// ```
-    pub fn file_source_id(mut self, file_source_id: u16) -> Builder {
-        self.header.file_source_id = file_source_id;
-        self
-    }
-
-    /// Sets the global encoding.
-    ///
-    /// This field was added in LAS 1.1.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Builder;
-    /// use las::global_encoding::GlobalEncoding;
-    /// let builder = Builder::new().global_encoding(GlobalEncoding::from(1));
-    /// ```
-    pub fn global_encoding(mut self, global_encoding: GlobalEncoding) -> Builder {
-        self.header.global_encoding = global_encoding;
-        self
-    }
-
-    /// Sets the LAS version.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Builder;
-    /// use las::Version;
-    /// let builder = Builder::new().version(Version::from((1, 2)));
-    /// ```
-    pub fn version(mut self, version: Version) -> Builder {
-        self.header.version = version;
-        self
-    }
-
-    /// Sets the point format.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Builder;
-    /// use las::point;
-    /// let builder = Builder::new().point_format(point::Format::from(1));
-    /// ```
-    pub fn point_format(mut self, format: Format) -> Builder {
-        self.header.point_format = format;
-        self
-    }
-
-    /// Sets the extra bytes on the output file.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Builder;
-    /// let builder = Builder::new().extra_bytes(2);
-    /// ```
-    pub fn extra_bytes(mut self, extra_bytes: u16) -> Builder {
-        self.header.extra_bytes = extra_bytes;
-        self
     }
 
     /// Creates a `Writer`.
@@ -307,8 +235,7 @@ mod tests {
 
     use std::io::Cursor;
 
-    use global_encoding::GlobalEncoding;
-    use point::{Classification, Color, Format, NumberOfReturns, Point, ReturnNumber, ScanDirection};
+    use point::{Classification, Color, NumberOfReturns, Point, ReturnNumber, ScanDirection};
     use reader::Reader;
     use utils::Bounds;
     use version::Version;
@@ -408,8 +335,9 @@ mod tests {
     fn write_one_point_format_1() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let mut writer =
-                Builder::new().point_format(Format::from(1)).writer(&mut cursor).unwrap();
+            let mut builder = Builder::new();
+            builder.header.point_format = 1.into();
+            let mut writer = builder.writer(&mut cursor).unwrap();
             writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
@@ -422,8 +350,9 @@ mod tests {
     fn write_one_point_format_2() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let mut writer =
-                Builder::new().point_format(Format::from(2)).writer(&mut cursor).unwrap();
+            let mut builder = Builder::new();
+            builder.header.point_format = 2.into();
+            let mut writer = builder.writer(&mut cursor).unwrap();
             writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
@@ -436,8 +365,9 @@ mod tests {
     fn write_one_point_format_3() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let mut writer =
-                Builder::new().point_format(Format::from(3)).writer(&mut cursor).unwrap();
+            let mut builder = Builder::new();
+            builder.header.point_format = 3.into();
+            let mut writer = builder.writer(&mut cursor).unwrap();
             writer.write(&point()).unwrap();
         }
         cursor.set_position(0);
@@ -448,8 +378,9 @@ mod tests {
 
     #[test]
     fn try_write_point_format_1_no_time() {
-        let mut writer =
-            Builder::new().point_format(Format::from(1)).writer(Cursor::new(Vec::new())).unwrap();
+        let mut builder = Builder::new();
+        builder.header.point_format = 1.into();
+        let mut writer = builder.writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.gps_time = None;
         assert!(writer.write(&point).is_err());
@@ -457,8 +388,9 @@ mod tests {
 
     #[test]
     fn try_write_point_format_2_no_color() {
-        let mut writer =
-            Builder::new().point_format(Format::from(2)).writer(Cursor::new(Vec::new())).unwrap();
+        let mut builder = Builder::new();
+        builder.header.point_format = 2.into();
+        let mut writer = builder.writer(Cursor::new(Vec::new())).unwrap();
         let mut point = point();
         point.color = None;
         assert!(writer.write(&point).is_err());
@@ -513,7 +445,9 @@ mod tests {
     #[test]
     fn write_version() {
         let mut cursor = Cursor::new(Vec::new());
-        Builder::new().version((1, 0).into()).writer(&mut cursor).unwrap();
+        let mut builder = Builder::new();
+        builder.header.version = (1, 0).into();
+        builder.writer(&mut cursor).unwrap();
         cursor.set_position(0);
         assert_eq!(Version::from((1, 0)),
                    Reader::new(&mut cursor).unwrap().header.version);
@@ -529,7 +463,9 @@ mod tests {
     fn write_extra_bytes() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let mut writer = Builder::new().extra_bytes(5).writer(&mut cursor).unwrap();
+            let mut builder = Builder::new();
+            builder.header.extra_bytes = 5;
+            let mut writer = builder.writer(&mut cursor).unwrap();
             let mut point = point();
             point.extra_bytes = b"Hello".to_vec();
             writer.write(&point).unwrap();
@@ -551,19 +487,17 @@ mod tests {
 
     #[test]
     fn disallow_file_source_id_wipe() {
-        assert!(Builder::new()
-            .file_source_id(1)
-            .version(Version::from((1, 0)))
-            .writer(Cursor::new(Vec::new()))
-            .is_err());
+        let mut builder = Builder::new();
+        builder.header.file_source_id = 1;
+        builder.header.version = (1, 0).into();
+        assert!(builder.writer(Cursor::new(Vec::new())).is_err());
     }
 
     #[test]
     fn disallow_global_encoding_downcast() {
-        assert!(Builder::new()
-            .global_encoding(GlobalEncoding::from(1))
-            .version(Version::from((1, 0)))
-            .writer(Cursor::new(Vec::new()))
-            .is_err());
+        let mut builder = Builder::new();
+        builder.header.global_encoding = 1.into();
+        builder.header.version = (1, 0).into();
+        assert!(builder.writer(Cursor::new(Vec::new())).is_err());
     }
 }

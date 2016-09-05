@@ -42,11 +42,11 @@
 //!
 //! ```
 //! # use std::io::Cursor;
-//! use las::{Builder, point, Version};
-//! let writer = Builder::new()
-//!     .point_format(point::Format::from(1))
-//!     .version(Version::from((1, 2)))
-//!     .writer(Cursor::new(Vec::new())).unwrap();
+//! use las::Builder;
+//! let mut builder = Builder::new();
+//! builder.header.point_format = 1.into();
+//! builder.header.version = (1, 2).into();
+//! let writer = builder.writer(Cursor::new(Vec::new())).unwrap();
 //! ```
 //!
 //! Convenience methods are provided for writing LAS data to a file:
