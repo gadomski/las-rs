@@ -6,7 +6,6 @@ use {Error, Result};
 use point::{Classification, Color, Format, NumberOfReturns, Point, ReturnNumber, ScanDirection,
             utils};
 use utils::{LinearTransform, Triple};
-use version::Version;
 
 /// Reads a point.
 pub trait ReadPoint {
@@ -16,7 +15,6 @@ pub trait ReadPoint {
     fn read_point(&mut self,
                   transforms: Triple<LinearTransform>,
                   format: Format,
-                  version: Version,
                   extra_bytes: u16)
                   -> Result<Option<Point>>;
 }
@@ -25,7 +23,6 @@ impl<R: Read> ReadPoint for R {
     fn read_point(&mut self,
                   transforms: Triple<LinearTransform>,
                   format: Format,
-                  version: Version,
                   extra_bytes: u16)
                   -> Result<Option<Point>> {
         let x = match self.read_i32::<LittleEndian>() {
@@ -46,8 +43,7 @@ impl<R: Read> ReadPoint for R {
         let number_of_returns = NumberOfReturns::from(byte);
         let scan_direction = ScanDirection::from(byte);
         let edge_of_flight_line = utils::edge_of_flight_line(byte);
-        // TODO classiciations shouldn't care about version, really?
-        let classification = Classification::from(try!(self.read_u8()), version);
+        let classification = Classification::from(try!(self.read_u8()));
         let scan_angle_rank = try!(self.read_i8());
         let user_data = try!(self.read_u8());
         let point_source_id = try!(self.read_u16::<LittleEndian>());

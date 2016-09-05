@@ -73,7 +73,6 @@ impl<R: Read + Seek> Reader<R> {
     pub fn read(&mut self) -> Result<Option<Point>> {
         self.read.read_point(self.header.transforms,
                              self.header.point_format,
-                             self.header.version,
                              self.header.extra_bytes)
     }
 

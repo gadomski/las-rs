@@ -412,7 +412,7 @@ mod tests {
             number_of_returns: NumberOfReturns::from(0b00010000),
             scan_direction: ScanDirection::Positive,
             edge_of_flight_line: false,
-            classification: Classification::from(2, (1, 2).into()),
+            classification: Classification::from(2),
             scan_angle_rank: 2,
             user_data: 3,
             point_source_id: 4,
