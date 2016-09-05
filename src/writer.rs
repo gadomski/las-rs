@@ -54,7 +54,7 @@ impl Builder {
     /// ```
     pub fn from_reader<R>(reader: &Reader<R>) -> Builder {
         Builder {
-            header: reader.header.clone(),
+            header: reader.header,
             vlrs: reader.vlrs.clone(),
         }
     }
@@ -200,7 +200,7 @@ impl<W: Seek + Write> Writer<W> {
         Writer {
             bounds: Default::default(),
             closed: false,
-            header: builder.header.clone(),
+            header: builder.header,
             point_count: 0,
             point_count_by_return: [0; 5],
             vlrs: builder.vlrs.clone(),
