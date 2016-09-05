@@ -1,10 +1,10 @@
-use std::io::Read;
+use std::io::{Read, Write};
 
-use byteorder::{LittleEndian, ReadBytesExt};
-use chrono::{Date, TimeZone, UTC};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use chrono::{Date, Datelike, TimeZone, UTC};
 
 use {Error, Result};
-use global_encoding::GlobalEncoding;
+use global_encoding::{GlobalEncoding, GpsTime};
 use point::Format;
 use utils::{Bounds, LinearTransform, Triple};
 use version::Version;
@@ -158,5 +158,63 @@ impl<R: Read> ReadHeader for R {
             transforms: transforms,
             bounds: bounds,
         })
+    }
+}
+
+pub trait WriteHeader {
+    fn write_header(&mut self, header: Header) -> Result<()>;
+}
+
+impl<W: Write> WriteHeader for W {
+    fn write_header(&mut self, header: Header) -> Result<()> {
+        // TODO constant
+        try!(self.write(b"LASF"));
+        let file_source_id = if !header.version.has_file_source_id() &&
+                                header.file_source_id != 0 {
+            warn!("Version {} does not support file source id, writing zero instead",
+                  header.version);
+            0
+        } else {
+            header.file_source_id
+        };
+        try!(self.write_u16::<LittleEndian>(file_source_id));
+        if !header.version.has_global_encoding() {
+            match header.global_encoding.gps_time {
+                GpsTime::Standard => {
+                    return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
+                }
+                _ => {}
+            };
+        };
+        try!(self.write_u16::<LittleEndian>(header.global_encoding.into()));
+        try!(self.write(&header.project_id));
+        try!(self.write_u8(header.version.major));
+        try!(self.write_u8(header.version.minor));
+        try!(self.write(&header.system_id));
+        try!(self.write(&header.generating_software));
+        try!(self.write_u16::<LittleEndian>(header.file_creation_date.ordinal() as u16));
+        try!(self.write_u16::<LittleEndian>(header.file_creation_date.year() as u16));
+        try!(self.write_u16::<LittleEndian>(header.header_size));
+        try!(self.write_u32::<LittleEndian>(header.offset_to_point_data));
+        try!(self.write_u32::<LittleEndian>(header.num_vlrs));
+        try!(self.write_u8(header.point_format.into()));
+        try!(self.write_u16::<LittleEndian>(header.point_format.record_length() + header.extra_bytes));
+        try!(self.write_u32::<LittleEndian>(header.point_count));
+        for &count in &header.point_count_by_return {
+            try!(self.write_u32::<LittleEndian>(count));
+        }
+        try!(self.write_f64::<LittleEndian>(header.transforms.x.scale));
+        try!(self.write_f64::<LittleEndian>(header.transforms.y.scale));
+        try!(self.write_f64::<LittleEndian>(header.transforms.z.scale));
+        try!(self.write_f64::<LittleEndian>(header.transforms.x.offset));
+        try!(self.write_f64::<LittleEndian>(header.transforms.y.offset));
+        try!(self.write_f64::<LittleEndian>(header.transforms.z.offset));
+        try!(self.write_f64::<LittleEndian>(header.bounds.max.x));
+        try!(self.write_f64::<LittleEndian>(header.bounds.min.x));
+        try!(self.write_f64::<LittleEndian>(header.bounds.max.y));
+        try!(self.write_f64::<LittleEndian>(header.bounds.min.y));
+        try!(self.write_f64::<LittleEndian>(header.bounds.max.z));
+        try!(self.write_f64::<LittleEndian>(header.bounds.min.z));
+        Ok(())
     }
 }

@@ -8,11 +8,10 @@ use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use chrono::Datelike;
 
 use {Error, Result};
-use global_encoding::{GlobalEncoding, GpsTime};
-use header::Header;
+use global_encoding::GlobalEncoding;
+use header::{Header, WriteHeader};
 use point::{Color, Format, Point, utils};
 use reader::Reader;
 use utils::{Bounds, Triple};
@@ -285,57 +284,11 @@ impl<W: Seek + Write> Writer<W> {
     }
 
     fn write_header(&mut self) -> Result<()> {
-        let header = &self.header;
+        // TODO test point count by return, offsets, etc
+        self.header.point_count = self.point_count;
+        self.header.bounds = self.bounds;
         try!(self.write.seek(SeekFrom::Start(0)));
-        try!(self.write.write(b"LASF"));
-        let file_source_id = if !header.version.has_file_source_id() &&
-                                header.file_source_id != 0 {
-            warn!("Version {} does not support file source id, writing zero instead",
-                  header.version);
-            0
-        } else {
-            header.file_source_id
-        };
-        try!(self.write.write_u16::<LittleEndian>(file_source_id));
-        if !header.version.has_global_encoding() {
-            match header.global_encoding.gps_time {
-                GpsTime::Standard => {
-                    return Err(Error::GpsTimeMismatch(header.version, GpsTime::Standard))
-                }
-                _ => {}
-            };
-        };
-        try!(self.write.write_u16::<LittleEndian>(header.global_encoding.into()));
-        try!(self.write.write(&header.project_id));
-        try!(self.write.write_u8(header.version.major));
-        try!(self.write.write_u8(header.version.minor));
-        try!(self.write.write(&header.system_id));
-        try!(self.write.write(&header.generating_software));
-        try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.ordinal() as u16));
-        try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.year() as u16));
-        try!(self.write.write_u16::<LittleEndian>(header.header_size));
-        // TODO compute offset to point data before writing
-        try!(self.write.write_u32::<LittleEndian>(header.offset_to_point_data));
-        try!(self.write.write_u32::<LittleEndian>(self.vlrs.len() as u32));
-        try!(self.write.write_u8(header.point_format.into()));
-        try!(self.write
-            .write_u16::<LittleEndian>(header.point_format.record_length() + header.extra_bytes));
-        try!(self.write.write_u32::<LittleEndian>(self.point_count));
-        for &count in &self.point_count_by_return {
-            try!(self.write.write_u32::<LittleEndian>(count));
-        }
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.scale));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.scale));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.scale));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.offset));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.offset));
-        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.offset));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.max.x));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.min.x));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.max.y));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.min.y));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.max.z));
-        try!(self.write.write_f64::<LittleEndian>(self.bounds.min.z));
+        try!(self.write.write_header(self.header));
         for vlr in &self.vlrs {
             try!(self.write.write_u16::<LittleEndian>(0)); // reserved
             try!(self.write.write(&vlr.user_id));
@@ -345,9 +298,11 @@ impl<W: Seek + Write> Writer<W> {
             try!(self.write.write(&vlr.data));
         }
         // TODO refactor
-        let location =
-            self.vlrs.iter().fold(header.header_size as u32, |acc, vlr| acc + vlr.len()) as i64;
-        let padding = header.offset_to_point_data as i64 - location;
+        let location = self.vlrs
+            .iter()
+            .fold(self.header.header_size as u32,
+                  |acc, vlr| acc + vlr.len()) as i64;
+        let padding = self.header.offset_to_point_data as i64 - location;
         if padding > 0 {
             let padding = vec![0; padding as usize];
             try!(self.write.write(&padding));
