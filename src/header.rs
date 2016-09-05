@@ -37,8 +37,6 @@ pub struct Header {
     ///
     /// This library *always* writes standard-sized headers, but some files in the wild might have
     /// extra bytes on the end of a header.
-    ///
-    /// TODO test a file that has a big header.
     pub header_size: u16,
     /// The byte offset to the beginning of point data.
     ///

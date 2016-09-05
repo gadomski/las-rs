@@ -50,6 +50,7 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let header = try!(read.read_header());
+        try!(read.seek(SeekFrom::Start(header.header_size as u64)));
         let vlrs = try!((0..header.num_vlrs).map(|_| read.read_vlr()).collect());
         try!(read.seek(SeekFrom::Start(header.offset_to_point_data as u64)));
         Ok(Reader {
@@ -324,5 +325,12 @@ mod tests {
         let mut reader = Reader::from_path("data/1.2_1_extra_bytes.las").unwrap();
         let points = reader.read_to_end().unwrap();
         assert_eq!(43, points.len());
+    }
+
+    #[test]
+    fn long_header() {
+        let mut reader = Reader::from_path("data/long-header.las").unwrap();
+        let points = reader.read_to_end().unwrap();
+        assert_eq!(1, points.len());
     }
 }
