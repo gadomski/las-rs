@@ -50,8 +50,8 @@ impl<W: Seek + Write> Writer<W> {
             bounds: Default::default(),
             closed: false,
             header: builder.header,
-            point_count: 0,
-            point_count_by_return: [0; 5],
+            point_count: Default::default(),
+            point_count_by_return: Default::default(),
             vlrs: builder.vlrs.clone(),
             write: write,
         }
