@@ -17,11 +17,13 @@ use point::{Color, Format, Point, utils};
 use reader::Reader;
 use utils::{Bounds, Triple};
 use version::Version;
+use vlr::Vlr;
 
 /// Configure a `Writer`.
 #[derive(Debug)]
 pub struct Builder {
     header: Header,
+    vlrs: Vec<Vlr>,
 }
 
 impl Builder {
@@ -34,7 +36,10 @@ impl Builder {
     /// let builder = Builder::new();
     /// ```
     pub fn new() -> Builder {
-        Builder { header: Header::default() }
+        Builder {
+            header: Header::default(),
+            vlrs: Vec::new(),
+        }
     }
 
     /// Creates a new `Builder` and configures it to match the provided `Reader`.
@@ -48,7 +53,10 @@ impl Builder {
     /// let builder = Builder::from_reader(&reader);
     /// ```
     pub fn from_reader<R>(reader: &Reader<R>) -> Builder {
-        Builder { header: reader.header.clone() }
+        Builder {
+            header: reader.header,
+            vlrs: reader.vlrs.clone(),
+        }
     }
 
     /// Sets the file source id.
@@ -169,6 +177,7 @@ pub struct Writer<W: Seek + Write> {
     header: Header,
     point_count: u32,
     point_count_by_return: [u32; 5],
+    vlrs: Vec<Vlr>,
     write: W,
 }
 
@@ -191,9 +200,10 @@ impl<W: Seek + Write> Writer<W> {
         Writer {
             bounds: Default::default(),
             closed: false,
-            header: builder.header.clone(),
+            header: builder.header,
             point_count: 0,
             point_count_by_return: [0; 5],
+            vlrs: builder.vlrs.clone(),
             write: write,
         }
     }
@@ -231,24 +241,9 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        try!(self.write
-            .write_i32::<LittleEndian>(((point.x - self.header.offset.x) /
-                                        self.header
-                    .scale
-                    .x)
-                .round() as i32));
-        try!(self.write
-            .write_i32::<LittleEndian>(((point.y - self.header.offset.y) /
-                                        self.header
-                    .scale
-                    .y)
-                .round() as i32));
-        try!(self.write
-            .write_i32::<LittleEndian>(((point.z - self.header.offset.z) /
-                                        self.header
-                    .scale
-                    .z)
-                .round() as i32));
+        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.x.inverse(point.x)));
+        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.y.inverse(point.y)));
+        try!(self.write.write_i32::<LittleEndian>(self.header.transforms.z.inverse(point.z)));
         try!(self.write.write_u16::<LittleEndian>(point.intensity));
         try!(self.write
             .write_u8(u8::from(point.return_number) | u8::from(point.number_of_returns) |
@@ -335,12 +330,9 @@ impl<W: Seek + Write> Writer<W> {
         try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.ordinal() as u16));
         try!(self.write.write_u16::<LittleEndian>(header.file_creation_date.year() as u16));
         try!(self.write.write_u16::<LittleEndian>(header.header_size));
-        try!(self.write
-            .write_u32::<LittleEndian>(header.vlrs
-                .iter()
-                .fold(header.padding + header.header_size as u32,
-                      |acc, vlr| acc + vlr.len())));
-        try!(self.write.write_u32::<LittleEndian>(header.vlrs.len() as u32));
+        // TODO compute offset to point data before writing
+        try!(self.write.write_u32::<LittleEndian>(header.offset_to_point_data));
+        try!(self.write.write_u32::<LittleEndian>(self.vlrs.len() as u32));
         try!(self.write.write_u8(header.point_format.into()));
         try!(self.write
             .write_u16::<LittleEndian>(header.point_format.record_length() + header.extra_bytes));
@@ -348,28 +340,32 @@ impl<W: Seek + Write> Writer<W> {
         for &count in &self.point_count_by_return {
             try!(self.write.write_u32::<LittleEndian>(count));
         }
-        try!(self.write.write_f64::<LittleEndian>(header.scale.x));
-        try!(self.write.write_f64::<LittleEndian>(header.scale.y));
-        try!(self.write.write_f64::<LittleEndian>(header.scale.z));
-        try!(self.write.write_f64::<LittleEndian>(header.offset.x));
-        try!(self.write.write_f64::<LittleEndian>(header.offset.y));
-        try!(self.write.write_f64::<LittleEndian>(header.offset.z));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.scale));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.scale));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.scale));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.x.offset));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.y.offset));
+        try!(self.write.write_f64::<LittleEndian>(header.transforms.z.offset));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.max.x));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.min.x));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.max.y));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.min.y));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.max.z));
         try!(self.write.write_f64::<LittleEndian>(self.bounds.min.z));
-        for vlr in &header.vlrs {
+        for vlr in &self.vlrs {
             try!(self.write.write_u16::<LittleEndian>(0)); // reserved
             try!(self.write.write(&vlr.user_id));
             try!(self.write.write_u16::<LittleEndian>(vlr.record_id));
-            try!(self.write.write_u16::<LittleEndian>(vlr.record_length));
+            try!(self.write.write_u16::<LittleEndian>(vlr.data.len() as u16));
             try!(self.write.write(&vlr.description));
             try!(self.write.write(&vlr.data));
         }
-        if header.padding > 0 {
-            let padding = vec![0; header.padding as usize];
+        // TODO refactor
+        let location =
+            self.vlrs.iter().fold(header.header_size as u32, |acc, vlr| acc + vlr.len()) as i64;
+        let padding = header.offset_to_point_data as i64 - location;
+        if padding > 0 {
+            let padding = vec![0; padding as usize];
             try!(self.write.write(&padding));
         }
         Ok(())

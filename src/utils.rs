@@ -7,7 +7,7 @@ use std::str;
 use {Error, Result};
 
 /// x, y, and z values in one struct.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Triple<T: Copy> {
     /// The x value of the triple.
     pub x: T,
@@ -164,6 +164,90 @@ impl ToLasStr for [u8] {
     }
 }
 
+/// A linear transformation.
+///
+/// If `y = ax + b`, `a` is the scale and `b` is the offset.
+///
+/// # Examples
+///
+/// Linear transforms can be created from `(f64, f64)`:
+///
+/// ```
+/// # use las::utils::LinearTransform;
+/// let transform = LinearTransform::from((1., 0.));
+/// ```
+///
+/// The `scale * x + offset` version of the transformation can be computed with `direct`:
+///
+/// ```
+/// # use las::utils::LinearTransform;
+/// let transform = LinearTransform::from((2., 1.));
+/// assert_eq!(7., transform.direct(3));
+/// ```
+///
+/// The `inverse` computes `(x - offset) / scale`:
+///
+/// ```
+/// # use las::utils::LinearTransform;
+/// # let transform = LinearTransform::from((2., 1.));
+/// assert_eq!(3, transform.inverse(7.));
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct LinearTransform {
+    /// The mutiplicative constant.
+    pub scale: f64,
+    /// The additive constant.
+    pub offset: f64,
+}
+
+impl LinearTransform {
+    /// Computes the forward (direct) transformation, `scale * x + offset`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::utils::LinearTransform;
+    /// let transform = LinearTransform::from((2., 1.));
+    /// assert_eq!(7., transform.direct(3));
+    /// ```
+    pub fn direct(&self, n: i32) -> f64 {
+        self.scale * n as f64 + self.offset
+    }
+
+    /// Computes the backwards (inverse) transformation, `(x - offset) / scale`.
+    ///
+    /// TODO formalize truncating/rounding.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::utils::LinearTransform;
+    /// let transform = LinearTransform::from((2., 1.));
+    /// assert_eq!(3, transform.inverse(7.));
+    /// ```
+    pub fn inverse(&self, n: f64) -> i32 {
+        ((n - self.offset) / self.scale) as i32
+    }
+}
+
+impl Default for LinearTransform {
+    fn default() -> LinearTransform {
+        LinearTransform {
+            scale: 1.,
+            offset: 0.,
+        }
+    }
+}
+
+impl From<(f64, f64)> for LinearTransform {
+    fn from((scale, offset): (f64, f64)) -> LinearTransform {
+        LinearTransform {
+            scale: scale,
+            offset: offset,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,5 +297,19 @@ mod tests {
         let buf = [240, 159, 146, 150];
         assert_eq!("\u{1f496}", buf.to_las_str().unwrap());
         assert!(buf.to_las_str_strict().is_err());
+    }
+
+    #[test]
+    fn linear_transformation_identity() {
+        let transform = LinearTransform::from((1.0, 0.));
+        assert_eq!(2., transform.direct(2));
+        assert_eq!(2, transform.inverse(2.));
+    }
+
+    #[test]
+    fn linear_transformation_changes() {
+        let transform = LinearTransform::from((2.0, 1.));
+        assert_eq!(7., transform.direct(3));
+        assert_eq!(3, transform.inverse(7.));
     }
 }
