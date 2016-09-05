@@ -216,7 +216,7 @@ impl LinearTransform {
 
     /// Computes the backwards (inverse) transformation, `(x - offset) / scale`.
     ///
-    /// TODO formalize truncating/rounding.
+    /// The resulting float is rounded to the nearest integer.
     ///
     /// # Examples
     ///
@@ -226,7 +226,7 @@ impl LinearTransform {
     /// assert_eq!(3, transform.inverse(7.));
     /// ```
     pub fn inverse(&self, n: f64) -> i32 {
-        ((n - self.offset) / self.scale) as i32
+        ((n - self.offset) / self.scale).round() as i32
     }
 }
 
@@ -311,5 +311,11 @@ mod tests {
         let transform = LinearTransform::from((2.0, 1.));
         assert_eq!(7., transform.direct(3));
         assert_eq!(3, transform.inverse(7.));
+    }
+
+    #[test]
+    fn linear_transformation_rounding() {
+        let transform = LinearTransform::from((4., 0.));
+        assert_eq!(1, transform.inverse(3.));
     }
 }
