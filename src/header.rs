@@ -6,9 +6,10 @@ use chrono::{Date, Datelike, TimeZone, UTC};
 use {Error, Result};
 use global_encoding::{GlobalEncoding, GpsTime};
 use point::Format;
-use utils::{Bounds, LinearTransform, Triple};
+use utils::{Bounds, LinearTransform, ToLasStr, Triple};
 use version::Version;
 
+const FILE_SIGNATURE: &'static [u8] = b"LASF";
 const HEADER_SIZE: u16 = 227;
 const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -112,10 +113,10 @@ pub trait ReadHeader {
 
 impl<R: Read> ReadHeader for R {
     fn read_header(&mut self) -> Result<Header> {
-        let mut file_signature = String::new();
-        try!(self.take(4).read_to_string(&mut file_signature));
-        if file_signature != "LASF" {
-            return Err(Error::InvalidFileSignature(file_signature));
+        let mut file_signature = [0; 4];
+        try!(self.read_exact(&mut file_signature));
+        if file_signature != FILE_SIGNATURE {
+            return Err(Error::InvalidFileSignature(try!(file_signature.to_las_str()).to_string()));
         }
         let file_source_id = try!(self.read_u16::<LittleEndian>());
         let global_encoding = try!(self.read_u16::<LittleEndian>());
@@ -188,8 +189,7 @@ pub trait WriteHeader {
 impl<W: Write> WriteHeader for W {
     fn write_header(&mut self, header: Header) -> Result<()> {
         try!(header.validate());
-        // TODO constant
-        try!(self.write(b"LASF"));
+        try!(self.write(FILE_SIGNATURE));
         try!(self.write_u16::<LittleEndian>(header.file_source_id));
         try!(self.write_u16::<LittleEndian>(header.global_encoding.into()));
         try!(self.write(&header.project_id));
