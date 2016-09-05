@@ -34,10 +34,22 @@ pub struct Header {
     /// The generating software.
     pub generating_software: [u8; 32],
     /// The size of the header.
+    ///
+    /// This library *always* writes standard-sized headers, but some files in the wild might have
+    /// extra bytes on the end of a header.
+    ///
+    /// TODO test a file that has a big header.
     pub header_size: u16,
     /// The byte offset to the beginning of point data.
+    ///
+    /// This library *always* writes points immediately after the last VLR, but that is not always
+    /// true for files in the wild.
+    ///
+    /// TODO test writing offset_to_point_data
     pub offset_to_point_data: u32,
     /// The number of VLRs.
+    ///
+    /// TODO test writing the number of VLRs
     pub num_vlrs: u32,
     /// The day of file creation.
     pub file_creation_date: Date<UTC>,
@@ -45,9 +57,7 @@ pub struct Header {
     pub point_format: Format,
     /// The number of extra bytes in the point beyond the standard.
     pub extra_bytes: u16,
-    /// The number of points.
-    ///
-    /// This value is taken from the header and is notoriously inaccurate.
+    /// The number of points in the file.
     pub point_count: u32,
     /// The number of points by return count.
     pub point_count_by_return: [u32; 5],

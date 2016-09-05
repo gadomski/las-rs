@@ -89,6 +89,7 @@ pub mod global_encoding;
 pub mod point;
 pub mod utils;
 
+mod builder;
 mod error;
 mod header;
 mod reader;
@@ -96,11 +97,12 @@ mod version;
 mod vlr;
 mod writer;
 
+pub use builder::Builder;
 pub use error::Error;
 pub use header::Header;
 pub use point::Point;
 pub use reader::Reader;
-pub use writer::{Builder, Writer};
+pub use writer::Writer;
 pub use version::Version;
 pub use vlr::Vlr;
 
