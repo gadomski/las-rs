@@ -12,8 +12,10 @@
 //! ```
 //! use las::Reader;
 //! let mut reader = Reader::from_path("data/1.0_0.las").unwrap();
+//!
 //! // Points from `Reader::read` are provided as a `Result<Option<Point>>`
 //! let point = reader.read().unwrap().unwrap();
+//!
 //! // Use `.iter_mut` to iterate over points, provided as `Result<Point>`.
 //! for point in reader.iter_mut() {
 //!     let point = point.unwrap();
@@ -33,11 +35,10 @@
 //! let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
 //! let mut point: Point = Default::default();
 //! point.x = 1.;
-//! // etc.
 //! writer.write(&point).unwrap();
 //! ```
 //!
-//! In order to configure the `Writer`, i.e. by setting the LAS version or point format, use a
+//! In order to configure the `Writer`, e.g. to set the LAS version or point format, use a
 //! `Builder`:
 //!
 //! ```
@@ -53,8 +54,9 @@
 //!
 //! ```
 //! # use las::{Writer, Builder};
-//! // Use the default writer:
+//! // Uses the default writer:
 //! let writer = Writer::from_path("/dev/null").unwrap();
+//!
 //! // Allows configuration before open:
 //! let writer = Builder::new().writer_from_path("/dev/null").unwrap();
 //! ```
