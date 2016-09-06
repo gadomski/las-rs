@@ -2,6 +2,7 @@
 
 use std::ascii::AsciiExt;
 use std::f64;
+use std::iter;
 use std::str;
 
 use {Error, Result};
@@ -164,6 +165,35 @@ impl ToLasStr for [u8] {
     }
 }
 
+/// Converts a string into bytes, ensuring zero-fill.
+pub trait FromLasStr {
+    /// Modifies `self` to match the provided str.
+    ///
+    /// # Examples
+    ///
+    /// `&[u8]` implements `FromLasStr`:
+    ///
+    /// ```
+    /// use las::utils::FromLasStr;
+    /// let mut bytes = [1; 5];
+    /// bytes.from_las_str("Beer").unwrap();
+    /// assert_eq!([66, 101, 101, 114, 0], bytes);
+    fn from_las_str(&mut self, s: &str) -> Result<()>;
+}
+
+impl<T: AsMut<[u8]>> FromLasStr for T {
+    fn from_las_str(&mut self, s: &str) -> Result<()> {
+        let count = self.as_mut().len();
+        if s.len() > count {
+            return Err(Error::TooLong(format!("{} is larger than {} bytes", s, count)));
+        }
+        for (a, b) in self.as_mut().iter_mut().zip(s.bytes().chain(iter::repeat(0))) {
+            *a = b;
+        }
+        Ok(())
+    }
+}
+
 /// A linear transformation.
 ///
 /// If `y = ax + b`, `a` is the scale and `b` is the offset.
@@ -317,5 +347,30 @@ mod tests {
     fn linear_transformation_rounding() {
         let transform = LinearTransform::from((4., 0.));
         assert_eq!(1, transform.inverse(3.));
+    }
+
+    #[test]
+    fn from_las_str_empty() {
+        assert!([].from_las_str("").is_ok());
+    }
+
+    #[test]
+    fn from_las_str_char() {
+        let mut data = [0];
+        data.from_las_str("B").unwrap();
+        assert_eq!([66], data);
+    }
+
+    #[test]
+    fn from_las_str_fill() {
+        let mut data = [0, 1];
+        data.from_las_str("B").unwrap();
+        assert_eq!([66, 0], data);
+    }
+
+    #[test]
+    fn from_las_str_too_many() {
+        let mut data = [0];
+        assert!(data.from_las_str("Be").is_err());
     }
 }

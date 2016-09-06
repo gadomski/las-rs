@@ -7,13 +7,24 @@ use global_encoding::GlobalEncoding;
 use header::Header;
 use point::Format;
 use reader::Reader;
-use utils::{LinearTransform, Triple};
+use utils::{FromLasStr, LinearTransform, ToLasStr, Triple};
 use version::Version;
 use vlr::Vlr;
 use writer::Writer;
 
 /// Configure a `Writer`.
-#[derive(Debug, Default)]
+///
+/// # Examples
+///
+/// ```
+/// use std::io::Cursor;
+/// # use las::Builder;
+/// let mut builder = Builder::new();
+/// builder.vlrs.push(Default::default());
+/// builder.set_generating_software("las-rs example");
+/// let writer = builder.writer(Cursor::new(Vec::new())).unwrap();
+/// ```
+#[derive(Debug)]
 pub struct Builder {
     /// The file source id.
     pub file_source_id: u16,
@@ -24,9 +35,9 @@ pub struct Builder {
     /// The LAS version.
     pub version: Version,
     /// The system ID.
-    pub system_id: [u8; 32],
+    system_id: [u8; 32],
     /// The generating software
-    pub generating_software: [u8; 32],
+    generating_software: [u8; 32],
     /// The point format.
     pub point_format: Format,
     /// The linear transformations for each dimension.
@@ -48,6 +59,44 @@ impl Builder {
     /// ```
     pub fn new() -> Builder {
         Builder { ..Default::default() }
+    }
+
+    /// Returns the system id as a string.
+    pub fn system_id(&self) -> Result<&str> {
+        self.system_id.to_las_str_strict()
+    }
+
+    /// Sets the system id from a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Builder;
+    /// let mut builder = Builder::new();
+    /// builder.set_system_id("las-rs example").unwrap();
+    /// assert_eq!("las-rs example", builder.system_id().unwrap());
+    /// ```
+    pub fn set_system_id(&mut self, system_id: &str) -> Result<()> {
+        self.system_id.from_las_str(system_id)
+    }
+
+    /// Returns the generating software as a string.
+    pub fn generating_software(&self) -> Result<&str> {
+        self.generating_software.to_las_str_strict()
+    }
+
+    /// Sets the generating software from a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Builder;
+    /// let mut builder = Builder::new();
+    /// builder.set_generating_software("las-rs example").unwrap();
+    /// assert_eq!("las-rs example", builder.generating_software().unwrap());
+    /// ```
+    pub fn set_generating_software(&mut self, generating_software: &str) -> Result<()> {
+        self.generating_software.from_las_str(generating_software)
     }
 
     /// Creates a `Writer`.
@@ -112,6 +161,27 @@ impl<'a> From<&'a Builder> for Header {
         header.transforms = builder.transforms;
         header.extra_bytes = builder.extra_bytes;
         header
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Builder {
+        let mut system_id = [0; 32];
+        system_id.from_las_str("las-rs").unwrap();
+        let mut generating_software = [0; 32];
+        generating_software.from_las_str(&format!("las-rs {}", env!("CARGO_PKG_VERSION"))).unwrap();
+        Builder {
+            file_source_id: Default::default(),
+            global_encoding: Default::default(),
+            project_id: Default::default(),
+            version: Default::default(),
+            system_id: system_id,
+            generating_software: generating_software,
+            point_format: Default::default(),
+            transforms: Default::default(),
+            extra_bytes: Default::default(),
+            vlrs: Default::default(),
+        }
     }
 }
 

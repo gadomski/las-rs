@@ -11,8 +11,6 @@ use version::Version;
 
 const FILE_SIGNATURE: &'static [u8] = b"LASF";
 const HEADER_SIZE: u16 = 227;
-const DEFAULT_SYSTEM_ID: [u8; 32] = [108, 97, 115, 45, 114, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /// The LAS header.
 #[derive(Clone, Copy, Debug)]
@@ -91,19 +89,19 @@ impl Default for Header {
             *target = source;
         }
         Header {
-            file_source_id: 0,
+            file_source_id: Default::default(),
             global_encoding: Default::default(),
             project_id: Default::default(),
             version: Default::default(),
-            system_id: DEFAULT_SYSTEM_ID,
-            generating_software: generating_software,
+            system_id: Default::default(),
+            generating_software: Default::default(),
             header_size: HEADER_SIZE,
             offset_to_point_data: HEADER_SIZE as u32,
-            num_vlrs: 0,
+            num_vlrs: Default::default(),
             file_creation_date: UTC::today(),
             point_format: format,
-            extra_bytes: 0,
-            point_count: 0,
+            extra_bytes: Default::default(),
+            point_count: Default::default(),
             point_count_by_return: Default::default(),
             transforms: Default::default(),
             bounds: Default::default(),
