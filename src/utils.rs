@@ -1,7 +1,6 @@
+use {Error, Result};
 use std::ascii::AsciiExt;
 use std::str;
-
-use {Error, Result};
 
 pub trait ToLasStr {
     fn to_las_str(&self) -> Result<&str>;
@@ -13,10 +12,10 @@ impl<'a> ToLasStr for &'a [u8] {
             if self[position..].iter().any(|c| *c != 0) {
                 return Err(Error::NotZeroFilled(self.to_vec()));
             } else {
-                try!(str::from_utf8(&self[0..position]))
+                str::from_utf8(&self[0..position])?
             }
         } else {
-            try!(str::from_utf8(self))
+            str::from_utf8(self)?
         };
         if !s.is_ascii() {
             Err(Error::NotAscii(s.to_string()))

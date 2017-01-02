@@ -1,10 +1,8 @@
-use std::io::{Read, Write};
-
+use {Bounds, Error, Header, Result, Transform, Vector, Vlr};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{Datelike, TimeZone, UTC};
-
-use {Bounds, Error, Header, Result, Transform, Vector, Vlr};
 use header::{GpsTimeType, HEADER_SIZE};
+use std::io::{Read, Write};
 use utils::{FromLasStr, ToLasStr};
 
 /// A raw header that maps directly onto the file structure.
@@ -72,7 +70,7 @@ impl RawHeader {
             date: UTC.yo_opt(self.file_creation_year as i32,
                         self.file_creation_day_of_year as u32)
                 .single(),
-            generating_software: try!(self.generating_software.as_ref().to_las_str()).to_string(),
+            generating_software: self.generating_software.as_ref().to_las_str()?.to_string(),
             guid: self.guid,
             // TODO las 1.4 header
             padding: self.padding,
@@ -80,7 +78,7 @@ impl RawHeader {
             point_format: self.point_data_format_id.into(),
             number_of_points: self.number_of_point_records,
             number_of_points_by_return: self.number_of_points_by_return,
-            system_identifier: try!(self.system_identifier.as_ref().to_las_str()).to_string(),
+            system_identifier: self.system_identifier.as_ref().to_las_str()?.to_string(),
             transforms: Vector {
                 x: Transform {
                     scale: self.x_scale_factor,
@@ -165,9 +163,9 @@ impl Header {
             GpsTimeType::Standard => 1,
         };
         let mut system_identifier = [0; 32];
-        try!(system_identifier.as_mut().from_las_str(&self.system_identifier));
+        system_identifier.as_mut().from_las_str(&self.system_identifier)?;
         let mut generating_software = [0; 32];
-        try!(generating_software.as_mut().from_las_str(&self.generating_software));
+        generating_software.as_mut().from_las_str(&self.generating_software)?;
         let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
         Ok(RawHeader {
             file_signature: *b"LASF",
@@ -226,45 +224,45 @@ pub trait ReadRawHeader {
 impl<R: Read> ReadRawHeader for R {
     fn read_raw_header(&mut self) -> Result<RawHeader> {
         let mut file_signature = [0; 4];
-        try!(self.read_exact(&mut file_signature));
-        let file_source_id = try!(self.read_u16::<LittleEndian>());
-        let global_encoding = try!(self.read_u16::<LittleEndian>());
+        self.read_exact(&mut file_signature)?;
+        let file_source_id = self.read_u16::<LittleEndian>()?;
+        let global_encoding = self.read_u16::<LittleEndian>()?;
         let mut guid = [0; 16];
-        try!(self.read_exact(&mut guid));
-        let version_major = try!(self.read_u8());
-        let version_minor = try!(self.read_u8());
+        self.read_exact(&mut guid)?;
+        let version_major = self.read_u8()?;
+        let version_minor = self.read_u8()?;
         let mut system_identifier = [0; 32];
-        try!(self.read_exact(&mut system_identifier));
+        self.read_exact(&mut system_identifier)?;
         let mut generating_software = [0; 32];
-        try!(self.read_exact(&mut generating_software));
-        let file_creation_day_of_year = try!(self.read_u16::<LittleEndian>());
-        let file_creation_year = try!(self.read_u16::<LittleEndian>());
-        let header_size = try!(self.read_u16::<LittleEndian>());
-        let offset_to_point_data = try!(self.read_u32::<LittleEndian>());
-        let number_of_variable_length_records = try!(self.read_u32::<LittleEndian>());
-        let point_data_format_id = try!(self.read_u8());
-        let point_data_record_length = try!(self.read_u16::<LittleEndian>());
-        let number_of_point_records = try!(self.read_u32::<LittleEndian>());
+        self.read_exact(&mut generating_software)?;
+        let file_creation_day_of_year = self.read_u16::<LittleEndian>()?;
+        let file_creation_year = self.read_u16::<LittleEndian>()?;
+        let header_size = self.read_u16::<LittleEndian>()?;
+        let offset_to_point_data = self.read_u32::<LittleEndian>()?;
+        let number_of_variable_length_records = self.read_u32::<LittleEndian>()?;
+        let point_data_format_id = self.read_u8()?;
+        let point_data_record_length = self.read_u16::<LittleEndian>()?;
+        let number_of_point_records = self.read_u32::<LittleEndian>()?;
         let mut number_of_points_by_return = [0; 5];
         for n in number_of_points_by_return.iter_mut() {
-            *n = try!(self.read_u32::<LittleEndian>());
+            *n = self.read_u32::<LittleEndian>()?;
         }
-        let x_scale_factor = try!(self.read_f64::<LittleEndian>());
-        let y_scale_factor = try!(self.read_f64::<LittleEndian>());
-        let z_scale_factor = try!(self.read_f64::<LittleEndian>());
-        let x_offset = try!(self.read_f64::<LittleEndian>());
-        let y_offset = try!(self.read_f64::<LittleEndian>());
-        let z_offset = try!(self.read_f64::<LittleEndian>());
-        let max_x = try!(self.read_f64::<LittleEndian>());
-        let min_x = try!(self.read_f64::<LittleEndian>());
-        let max_y = try!(self.read_f64::<LittleEndian>());
-        let min_y = try!(self.read_f64::<LittleEndian>());
-        let max_z = try!(self.read_f64::<LittleEndian>());
-        let min_z = try!(self.read_f64::<LittleEndian>());
+        let x_scale_factor = self.read_f64::<LittleEndian>()?;
+        let y_scale_factor = self.read_f64::<LittleEndian>()?;
+        let z_scale_factor = self.read_f64::<LittleEndian>()?;
+        let x_offset = self.read_f64::<LittleEndian>()?;
+        let y_offset = self.read_f64::<LittleEndian>()?;
+        let z_offset = self.read_f64::<LittleEndian>()?;
+        let max_x = self.read_f64::<LittleEndian>()?;
+        let min_x = self.read_f64::<LittleEndian>()?;
+        let max_y = self.read_f64::<LittleEndian>()?;
+        let min_y = self.read_f64::<LittleEndian>()?;
+        let max_z = self.read_f64::<LittleEndian>()?;
+        let min_z = self.read_f64::<LittleEndian>()?;
         // TODO las 1.4
         let padding = if header_size > HEADER_SIZE {
             let mut bytes = vec![0; (header_size - HEADER_SIZE) as usize];
-            try!(self.read_exact(&mut bytes));
+            self.read_exact(&mut bytes)?;
             bytes
         } else {
             Vec::new()
@@ -323,39 +321,39 @@ pub trait WriteRawHeader {
 
 impl<W: Write> WriteRawHeader for W {
     fn write_raw_header(&mut self, raw_header: &RawHeader) -> Result<()> {
-        try!(self.write_all(&raw_header.file_signature));
-        try!(self.write_u16::<LittleEndian>(raw_header.file_source_id));
-        try!(self.write_u16::<LittleEndian>(raw_header.global_encoding));
-        try!(self.write_all(&raw_header.guid));
-        try!(self.write_u8(raw_header.version_major));
-        try!(self.write_u8(raw_header.version_minor));
-        try!(self.write_all(&raw_header.system_identifier));
-        try!(self.write_all(&raw_header.generating_software));
-        try!(self.write_u16::<LittleEndian>(raw_header.file_creation_day_of_year));
-        try!(self.write_u16::<LittleEndian>(raw_header.file_creation_year));
-        try!(self.write_u16::<LittleEndian>(raw_header.header_size));
-        try!(self.write_u32::<LittleEndian>(raw_header.offset_to_point_data));
-        try!(self.write_u32::<LittleEndian>(raw_header.number_of_variable_length_records));
-        try!(self.write_u8(raw_header.point_data_format_id));
-        try!(self.write_u16::<LittleEndian>(raw_header.point_data_record_length));
-        try!(self.write_u32::<LittleEndian>(raw_header.number_of_point_records));
+        self.write_all(&raw_header.file_signature)?;
+        self.write_u16::<LittleEndian>(raw_header.file_source_id)?;
+        self.write_u16::<LittleEndian>(raw_header.global_encoding)?;
+        self.write_all(&raw_header.guid)?;
+        self.write_u8(raw_header.version_major)?;
+        self.write_u8(raw_header.version_minor)?;
+        self.write_all(&raw_header.system_identifier)?;
+        self.write_all(&raw_header.generating_software)?;
+        self.write_u16::<LittleEndian>(raw_header.file_creation_day_of_year)?;
+        self.write_u16::<LittleEndian>(raw_header.file_creation_year)?;
+        self.write_u16::<LittleEndian>(raw_header.header_size)?;
+        self.write_u32::<LittleEndian>(raw_header.offset_to_point_data)?;
+        self.write_u32::<LittleEndian>(raw_header.number_of_variable_length_records)?;
+        self.write_u8(raw_header.point_data_format_id)?;
+        self.write_u16::<LittleEndian>(raw_header.point_data_record_length)?;
+        self.write_u32::<LittleEndian>(raw_header.number_of_point_records)?;
         for n in raw_header.number_of_points_by_return.iter() {
-            try!(self.write_u32::<LittleEndian>(*n));
+            self.write_u32::<LittleEndian>(*n)?;
         }
-        try!(self.write_f64::<LittleEndian>(raw_header.x_scale_factor));
-        try!(self.write_f64::<LittleEndian>(raw_header.y_scale_factor));
-        try!(self.write_f64::<LittleEndian>(raw_header.z_scale_factor));
-        try!(self.write_f64::<LittleEndian>(raw_header.x_offset));
-        try!(self.write_f64::<LittleEndian>(raw_header.y_offset));
-        try!(self.write_f64::<LittleEndian>(raw_header.z_offset));
-        try!(self.write_f64::<LittleEndian>(raw_header.max_x));
-        try!(self.write_f64::<LittleEndian>(raw_header.min_x));
-        try!(self.write_f64::<LittleEndian>(raw_header.max_y));
-        try!(self.write_f64::<LittleEndian>(raw_header.min_y));
-        try!(self.write_f64::<LittleEndian>(raw_header.max_z));
-        try!(self.write_f64::<LittleEndian>(raw_header.min_z));
+        self.write_f64::<LittleEndian>(raw_header.x_scale_factor)?;
+        self.write_f64::<LittleEndian>(raw_header.y_scale_factor)?;
+        self.write_f64::<LittleEndian>(raw_header.z_scale_factor)?;
+        self.write_f64::<LittleEndian>(raw_header.x_offset)?;
+        self.write_f64::<LittleEndian>(raw_header.y_offset)?;
+        self.write_f64::<LittleEndian>(raw_header.z_offset)?;
+        self.write_f64::<LittleEndian>(raw_header.max_x)?;
+        self.write_f64::<LittleEndian>(raw_header.min_x)?;
+        self.write_f64::<LittleEndian>(raw_header.max_y)?;
+        self.write_f64::<LittleEndian>(raw_header.min_y)?;
+        self.write_f64::<LittleEndian>(raw_header.max_z)?;
+        self.write_f64::<LittleEndian>(raw_header.min_z)?;
         if !raw_header.padding.is_empty() {
-            try!(self.write_all(&raw_header.padding));
+            self.write_all(&raw_header.padding)?;
         }
         Ok(())
     }

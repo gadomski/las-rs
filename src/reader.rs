@@ -1,12 +1,11 @@
 //! Read las points.
 
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::Path;
-
 use {Error, Header, Point, Result, Vlr};
 use header::ReadRawHeader;
 use point::ReadRawPoint;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::Path;
 use vlr::ReadRawVlr;
 
 /// Reads LAS data.
@@ -33,19 +32,19 @@ impl<R: Read> Reader<R> {
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
-        let raw_header = try!(read.read_raw_header());
+        let raw_header = read.read_raw_header()?;
         let vlrs = try!((0..raw_header.number_of_variable_length_records)
             .map(|_| read.read_raw_vlr().and_then(|raw_vlr| raw_vlr.into_vlr()))
             .collect::<Result<Vec<Vlr>>>());
         let position = vlrs.iter().fold(raw_header.header_size as u32, |acc, vlr| acc + vlr.len());
         let vlr_padding = if position < raw_header.offset_to_point_data {
             let mut bytes = vec![0; (raw_header.offset_to_point_data - position) as usize];
-            try!(read.read_exact(&mut bytes));
+            read.read_exact(&mut bytes)?;
             bytes
         } else {
             Vec::new()
         };
-        let header = try!(raw_header.into_header(vlrs, vlr_padding));
+        let header = raw_header.into_header(vlrs, vlr_padding)?;
         Ok(Reader {
             header: header,
             read: read,

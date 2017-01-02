@@ -1,5 +1,5 @@
-//! Natively read and write [ASPRS
-//! LAS](https://www.asprs.org/committee-general/laser-las-file-format-exchange-activities.html) data.
+//! Natively read and write [ASPRS LAS]
+//! (https://www.asprs.org/committee-general/laser-las-file-format-exchange-activities.html) data.
 //!
 //! # Reading
 //!
@@ -94,8 +94,8 @@ mod writer;
 pub use bounds::Bounds;
 pub use error::Error;
 pub use header::Header;
-pub use reader::Reader;
 pub use point::Point;
+pub use reader::Reader;
 pub use transform::Transform;
 pub use vector::Vector;
 pub use vlr::Vlr;

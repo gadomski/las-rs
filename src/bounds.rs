@@ -1,6 +1,5 @@
-use std::f64;
-
 use {Point, Vector};
+use std::f64;
 
 /// Minimum and maximum bounds in three dimensions.
 #[derive(Clone, Copy, Debug)]
@@ -64,9 +63,9 @@ impl Default for Bounds {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     use Point;
+    use super::*;
 
     #[test]
     fn grow() {

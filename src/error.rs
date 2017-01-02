@@ -1,8 +1,7 @@
+use point::{Format, RawPoint};
 use std::fmt;
 use std::io;
 use std::str;
-
-use point::{Format, RawPoint};
 
 /// Crate-specific error enum.
 #[derive(Debug)]

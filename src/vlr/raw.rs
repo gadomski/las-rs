@@ -1,9 +1,7 @@
+use {Error, Result, Vlr};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
 use std::u16;
-
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-
-use {Error, Result, Vlr};
 use utils::{FromLasStr, ToLasStr};
 
 /// A raw VLR that maps directly onto the LAS specification.
@@ -32,9 +30,9 @@ impl Vlr {
             return Err(Error::VlrDataTooLong(self.data.len()));
         }
         let mut user_id = [0; 16];
-        try!(user_id.as_mut().from_las_str(&self.user_id));
+        user_id.as_mut().from_las_str(&self.user_id)?;
         let mut description = [0; 32];
-        try!(description.as_mut().from_las_str(&self.description));
+        description.as_mut().from_las_str(&self.description)?;
         Ok(RawVlr {
             reserved: 0,
             user_id: user_id,
@@ -57,9 +55,9 @@ impl RawVlr {
     /// ```
     pub fn into_vlr(self) -> Result<Vlr> {
         Ok(Vlr {
-            user_id: try!(self.user_id.as_ref().to_las_str()).to_string(),
+            user_id: self.user_id.as_ref().to_las_str()?.to_string(),
             record_id: self.record_id,
-            description: try!(self.description.as_ref().to_las_str()).to_string(),
+            description: self.description.as_ref().to_las_str()?.to_string(),
             data: self.data,
         })
     }
@@ -86,15 +84,15 @@ pub trait ReadRawVlr {
 
 impl<R: Read> ReadRawVlr for R {
     fn read_raw_vlr(&mut self) -> Result<RawVlr> {
-        let reserved = try!(self.read_u16::<LittleEndian>());
+        let reserved = self.read_u16::<LittleEndian>()?;
         let mut user_id = [0; 16];
-        try!(self.read_exact(&mut user_id));
-        let record_id = try!(self.read_u16::<LittleEndian>());
-        let record_length_after_header = try!(self.read_u16::<LittleEndian>());
+        self.read_exact(&mut user_id)?;
+        let record_id = self.read_u16::<LittleEndian>()?;
+        let record_length_after_header = self.read_u16::<LittleEndian>()?;
         let mut description = [0; 32];
-        try!(self.read_exact(&mut description));
+        self.read_exact(&mut description)?;
         let mut data = Vec::with_capacity(record_length_after_header as usize);
-        try!(self.take(record_length_after_header as u64).read_to_end(&mut data));
+        self.take(record_length_after_header as u64).read_to_end(&mut data)?;
         Ok(RawVlr {
             reserved: reserved,
             user_id: user_id,
@@ -125,21 +123,21 @@ pub trait WriteRawVlr {
 
 impl<W: Write> WriteRawVlr for W {
     fn write_raw_vlr(&mut self, raw_vlr: &RawVlr) -> Result<()> {
-        try!(self.write_u16::<LittleEndian>(raw_vlr.reserved));
-        try!(self.write_all(&raw_vlr.user_id));
-        try!(self.write_u16::<LittleEndian>(raw_vlr.record_id));
-        try!(self.write_u16::<LittleEndian>(raw_vlr.record_length_after_header));
-        try!(self.write_all(&raw_vlr.description));
-        try!(self.write_all(&raw_vlr.data));
+        self.write_u16::<LittleEndian>(raw_vlr.reserved)?;
+        self.write_all(&raw_vlr.user_id)?;
+        self.write_u16::<LittleEndian>(raw_vlr.record_id)?;
+        self.write_u16::<LittleEndian>(raw_vlr.record_length_after_header)?;
+        self.write_all(&raw_vlr.description)?;
+        self.write_all(&raw_vlr.data)?;
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::u16;
 
     use Vlr;
+    use std::u16;
 
     #[test]
     fn too_long_vlr_data() {

@@ -1,10 +1,9 @@
-use std::fs::File;
-use std::io::{BufWriter, Seek, SeekFrom, Write};
-use std::path::Path;
-
 use {Error, Header, Point, Result};
 use header::{GpsTimeType, WriteRawHeader};
 use point::WriteRawPoint;
+use std::fs::File;
+use std::io::{BufWriter, Seek, SeekFrom, Write};
+use std::path::Path;
 use vlr::WriteRawVlr;
 
 /// Writes LAS data.
@@ -61,12 +60,12 @@ impl<W: Seek + Write> Writer<W> {
         if header.version == (1, 0) {
             header.vlr_padding = vec![0xDD, 0xCC];
         }
-        try!(header.to_raw_header().and_then(|raw_header| write.write_raw_header(&raw_header)));
+        header.to_raw_header().and_then(|raw_header| write.write_raw_header(&raw_header))?;
         for vlr in header.vlrs.iter() {
-            try!(vlr.to_raw_vlr().and_then(|raw_vlr| write.write_raw_vlr(&raw_vlr)));
+            vlr.to_raw_vlr().and_then(|raw_vlr| write.write_raw_vlr(&raw_vlr))?;
         }
         if !header.vlr_padding.is_empty() {
-            try!(write.write_all(&header.vlr_padding));
+            write.write_all(&header.vlr_padding)?;
         }
         Ok(Writer {
             closed: false,
@@ -87,8 +86,9 @@ impl<W: Seek + Write> Writer<W> {
     /// writer.write(&Default::default()).unwrap();
     /// ```
     pub fn write(&mut self, point: &Point) -> Result<()> {
-        try!(self.write.write_raw_point(&try!(point.to_raw_point(&self.header.transforms)),
-                                        &self.header.point_format));
+        self.write
+            .write_raw_point(&point.to_raw_point(&self.header.transforms)?,
+                             &self.header.point_format)?;
         self.header.number_of_points += 1;
         if point.return_number > 0 {
             self.header.number_of_points_by_return[point.return_number as usize - 1] += 1;
@@ -112,10 +112,10 @@ impl<W: Seek + Write> Writer<W> {
     ///
     pub fn close(&mut self) -> Result<()> {
         if !self.closed {
-            try!(self.write.seek(SeekFrom::Start(0)));
-            try!(self.header
+            self.write.seek(SeekFrom::Start(0))?;
+            self.header
                 .to_raw_header()
-                .and_then(|raw_header| self.write.write_raw_header(&raw_header)));
+                .and_then(|raw_header| self.write.write_raw_header(&raw_header))?;
             self.closed = true;
         }
         Ok(())
@@ -148,13 +148,13 @@ impl<W: Seek + Write> Drop for Writer<W> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
-    use std::io::Cursor;
+    use Header;
 
     use byteorder::{LittleEndian, ReadBytesExt};
 
-    use Header;
+    use std::io::Cursor;
+    use super::*;
 
     #[test]
     fn las_1_0_point_data_start_signature() {

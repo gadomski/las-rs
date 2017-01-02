@@ -1,6 +1,5 @@
-use chrono::{Date, UTC};
-
 use {Bounds, Transform, Vector, Vlr};
+use chrono::{Date, UTC};
 use header::{GpsTimeType, HEADER_SIZE};
 use point::Format;
 

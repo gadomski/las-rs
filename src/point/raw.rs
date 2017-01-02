@@ -1,9 +1,7 @@
-use std::io::{Cursor, ErrorKind, Read, Write};
-
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-
 use {Error, Point, Result, Transform, Vector};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use point::{Classification, Color, Format, ScanDirection};
+use std::io::{Cursor, ErrorKind, Read, Write};
 
 /// A raw, uninterpreted point.
 #[derive(Clone, Copy, Debug, Default)]
@@ -181,7 +179,7 @@ impl Point {
             y: transforms.y.inverse(self.y),
             z: transforms.z.inverse(self.z),
             intensity: self.intensity,
-            flags: try!(self.flags()),
+            flags: self.flags()?,
             classification: self.classification.into(),
             scan_angle_rank: self.scan_angle_rank,
             user_data: self.user_data,
@@ -257,26 +255,26 @@ impl<R: Read> ReadRawPoint for R {
             }
         };
         let mut next_three = [0; 3];
-        try!(self.read_exact(&mut next_three));
+        self.read_exact(&mut next_three)?;
         let mut cursor = Cursor::new([byte, next_three[0], next_three[1], next_three[2]]);
-        let x = try!(cursor.read_i32::<LittleEndian>());
-        let y = try!(self.read_i32::<LittleEndian>());
-        let z = try!(self.read_i32::<LittleEndian>());
-        let intensity = try!(self.read_u16::<LittleEndian>());
-        let flags = try!(self.read_u8());
-        let classification = try!(self.read_u8());
-        let scan_angle_rank = try!(self.read_i8());
-        let user_data = try!(self.read_u8());
-        let point_source_id = try!(self.read_u16::<LittleEndian>());
+        let x = cursor.read_i32::<LittleEndian>()?;
+        let y = self.read_i32::<LittleEndian>()?;
+        let z = self.read_i32::<LittleEndian>()?;
+        let intensity = self.read_u16::<LittleEndian>()?;
+        let flags = self.read_u8()?;
+        let classification = self.read_u8()?;
+        let scan_angle_rank = self.read_i8()?;
+        let user_data = self.read_u8()?;
+        let point_source_id = self.read_u16::<LittleEndian>()?;
         let gps_time = if format.has_gps_time() {
-            Some(try!(self.read_f64::<LittleEndian>()))
+            Some(self.read_f64::<LittleEndian>()?)
         } else {
             None
         };
         let color = if format.has_color() {
-            let red = try!(self.read_u16::<LittleEndian>());
-            let green = try!(self.read_u16::<LittleEndian>());
-            let blue = try!(self.read_u16::<LittleEndian>());
+            let red = self.read_u16::<LittleEndian>()?;
+            let green = self.read_u16::<LittleEndian>()?;
+            let blue = self.read_u16::<LittleEndian>()?;
             Some(Color {
                 red: red,
                 green: green,
@@ -320,27 +318,27 @@ pub trait WriteRawPoint {
 
 impl<W: Write> WriteRawPoint for W {
     fn write_raw_point(&mut self, raw_point: &RawPoint, format: &Format) -> Result<()> {
-        try!(self.write_i32::<LittleEndian>(raw_point.x));
-        try!(self.write_i32::<LittleEndian>(raw_point.y));
-        try!(self.write_i32::<LittleEndian>(raw_point.z));
-        try!(self.write_u16::<LittleEndian>(raw_point.intensity));
-        try!(self.write_u8(raw_point.flags));
-        try!(self.write_u8(raw_point.classification));
-        try!(self.write_i8(raw_point.scan_angle_rank));
-        try!(self.write_u8(raw_point.user_data));
-        try!(self.write_u16::<LittleEndian>(raw_point.point_source_id));
+        self.write_i32::<LittleEndian>(raw_point.x)?;
+        self.write_i32::<LittleEndian>(raw_point.y)?;
+        self.write_i32::<LittleEndian>(raw_point.z)?;
+        self.write_u16::<LittleEndian>(raw_point.intensity)?;
+        self.write_u8(raw_point.flags)?;
+        self.write_u8(raw_point.classification)?;
+        self.write_i8(raw_point.scan_angle_rank)?;
+        self.write_u8(raw_point.user_data)?;
+        self.write_u16::<LittleEndian>(raw_point.point_source_id)?;
         if format.has_gps_time() {
             if let Some(gps_time) = raw_point.gps_time {
-                try!(self.write_f64::<LittleEndian>(gps_time));
+                self.write_f64::<LittleEndian>(gps_time)?;
             } else {
                 return Err(Error::MissingGpsTime(*format, *raw_point));
             }
         }
         if format.has_color() {
             if let Some(color) = raw_point.color {
-                try!(self.write_u16::<LittleEndian>(color.red));
-                try!(self.write_u16::<LittleEndian>(color.green));
-                try!(self.write_u16::<LittleEndian>(color.blue));
+                self.write_u16::<LittleEndian>(color.red)?;
+                self.write_u16::<LittleEndian>(color.green)?;
+                self.write_u16::<LittleEndian>(color.blue)?;
             } else {
                 return Err(Error::MissingColor(*format, *raw_point));
             }
@@ -351,12 +349,12 @@ impl<W: Write> WriteRawPoint for W {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use std::io::Cursor;
 
     use {Point, Transform, Vector};
     use point::{Format, ScanDirection};
+
+    use std::io::Cursor;
+    use super::*;
 
     #[test]
     fn return_number() {
