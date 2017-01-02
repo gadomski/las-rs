@@ -1,11 +1,11 @@
 use std::fmt;
 
-/// Point record format type.
-#[derive(Clone, Copy, Debug, Default)]
+/// A point format describes the attributes associated with the point.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Format(u8);
 
 impl Format {
-    /// Does this point format have a gps_time field?
+    /// Returns true if this format has GPS time attached to each point.
     ///
     /// # Examples
     ///
@@ -15,63 +15,41 @@ impl Format {
     /// assert!(Format::from(1).has_gps_time());
     /// ```
     pub fn has_gps_time(&self) -> bool {
-        match self.0 {
-            0 | 2 => false,
-            1 | 3 => true,
-            _ => {
-                panic!("Don't know whether this point format has gps time: {:?}",
-                       self)
-            }
-        }
+        self.0 % 2 == 1
     }
 
-    /// Does this point format have color fields?
+    /// Returns true if this point format has color.
     ///
     /// # Examples
     ///
     /// ```
     /// # use las::point::Format;
-    /// assert!(!Format::from(0).has_gps_time());
+    /// assert!(!Format::from(0).has_color());
     /// assert!(Format::from(2).has_color());
     /// ```
     pub fn has_color(&self) -> bool {
-        match self.0 {
-            0 | 1 => false,
-            2 | 3 => true,
-            _ => panic!("Don't know whether this point format has color: {:?}", self),
-        }
+        self.0 / 2 == 1
     }
 
-    /// Returns true if this point format is supported.
+    /// Returns the length of this point format.
+    ///
+    /// Does not include any extra bytes.
     ///
     /// # Examples
     ///
     /// ```
     /// # use las::point::Format;
-    /// assert!(Format::from(0).is_supported());
-    /// assert!(!Format::from(99).is_supported());
+    /// assert_eq!(20, Format::from(0).len());
     /// ```
-    pub fn is_supported(&self) -> bool {
-        self.0 <= 3
-    }
-
-    /// The length of a standard point in this format.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::point::Format;
-    /// assert_eq!(20, Format::from(0).record_length());
-    /// ```
-    pub fn record_length(&self) -> u16 {
-        let mut length = 20;
+    pub fn len(&self) -> u16 {
+        let mut len = 20;
         if self.has_gps_time() {
-            length += 8;
+            len += 8;
         }
         if self.has_color() {
-            length += 6;
+            len += 6;
         }
-        length
+        len
     }
 }
 
@@ -89,7 +67,7 @@ impl From<Format> for u8 {
 
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Point format {}", self.0)
+        write!(f, "point format {}", self.0)
     }
 }
 
@@ -98,7 +76,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn point_format_has_gps_time() {
+    fn has_gps_time() {
         assert!(!Format::from(0).has_gps_time());
         assert!(Format::from(1).has_gps_time());
         assert!(!Format::from(2).has_gps_time());
@@ -106,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn point_format_has_color() {
+    fn has_color() {
         assert!(!Format::from(0).has_color());
         assert!(!Format::from(1).has_color());
         assert!(Format::from(2).has_color());
@@ -114,19 +92,10 @@ mod tests {
     }
 
     #[test]
-    fn point_format_is_supported() {
-        assert!(Format::from(0).is_supported());
-        assert!(Format::from(1).is_supported());
-        assert!(Format::from(2).is_supported());
-        assert!(Format::from(3).is_supported());
-        assert!(!Format::from(4).is_supported());
-    }
-
-    #[test]
-    fn point_format_record_length() {
-        assert_eq!(20, Format::from(0).record_length());
-        assert_eq!(28, Format::from(1).record_length());
-        assert_eq!(26, Format::from(2).record_length());
-        assert_eq!(34, Format::from(3).record_length());
+    fn len() {
+        assert_eq!(20, Format::from(0).len());
+        assert_eq!(28, Format::from(1).len());
+        assert_eq!(26, Format::from(2).len());
+        assert_eq!(34, Format::from(3).len());
     }
 }

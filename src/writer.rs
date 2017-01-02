@@ -1,166 +1,147 @@
-//! Write points to a `Write`.
-//!
-//! Simple writes can be done with a `Writer`, but if you need to configure your output file, use a
-//! `Builder`.
-
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use {Error, Result};
-use builder::Builder;
-use header::{Header, WriteHeader};
-use point::{Point, WritePoint};
-use utils::{Bounds, Triple};
-use vlr::{Vlr, WriteVlr};
+use {Error, Header, Point, Result};
+use header::{GpsTimeType, WriteRawHeader};
+use point::WriteRawPoint;
+use vlr::WriteRawVlr;
 
-/// Write LAS points to a `Write`.
+/// Writes LAS data.
 ///
-/// This struct implements `Drop`, so the LAS data are finalized (the header is re-written) when
-/// the `Writer` goes out of scope. This will panic if there is an error while closing the file, so
-/// if you're worried about panics you will need to use `Writer::close` instead.
+/// The LAS header needs to be re-written when the writer closes. For convenience, this is done via
+/// the `Drop` implementation of the writer. One consequence is that if the header re-write fails
+/// during the drop, a panic will result. If you want to check for errors instead of panicing, use
+/// `close` explicitly.
+///
+/// ```
+/// use std::io::Cursor;
+/// # use las::Writer;
+/// {
+///     let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
+///     writer.close().unwrap();
+/// } // <- `close` is not called
+/// ```
 #[derive(Debug)]
 pub struct Writer<W: Seek + Write> {
-    bounds: Bounds<f64>,
     closed: bool,
     header: Header,
-    point_count: u32,
-    point_count_by_return: [u32; 5],
-    vlrs: Vec<Vlr>,
     write: W,
 }
 
-impl Writer<BufWriter<File>> {
-    /// Creates a default `Writer` that will write points out to a file at the path.
+impl<W: Seek + Write> Writer<W> {
+    /// Creates a new writer.
     ///
     /// # Examples
     ///
     /// ```
+    /// use std::io::Cursor;
     /// # use las::Writer;
-    /// let writer = Writer::from_path("/dev/null").unwrap();
+    /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Writer<BufWriter<File>>> {
-        File::create(path).map_err(Error::from).and_then(|f| Writer::default(BufWriter::new(f)))
-    }
-}
-
-impl<W: Seek + Write> Writer<W> {
-    fn from(builder: &Builder, write: W) -> Writer<W> {
-        let vlrs = builder.vlrs.clone();
-        let header: Header = builder.into();
-        Writer {
-            bounds: Default::default(),
+    pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
+        if header.version == (1, 0) && header.file_source_id != 0 {
+            return Err(Error::VersionDoesNotSupport(header.version, "file source id".to_string()));
+        }
+        if header.version == (1, 0) || header.version == (1, 1) {
+            if header.point_format.has_color() {
+                return Err(Error::VersionDoesNotSupport(header.version, "color".to_string()));
+            }
+            match header.gps_time_type {
+                GpsTimeType::Standard => {
+                    return Err(Error::VersionDoesNotSupport(header.version,
+                                                            "GPS standard time".to_string()))
+                }
+                _ => {}
+            }
+        }
+        header.bounds = Default::default();
+        header.number_of_points = 0;
+        header.number_of_points_by_return = [0; 5];
+        if header.version == (1, 0) {
+            header.vlr_padding = vec![0xDD, 0xCC];
+        }
+        try!(header.to_raw_header().and_then(|raw_header| write.write_raw_header(&raw_header)));
+        for vlr in header.vlrs.iter() {
+            try!(vlr.to_raw_vlr().and_then(|raw_vlr| write.write_raw_vlr(&raw_vlr)));
+        }
+        if !header.vlr_padding.is_empty() {
+            try!(write.write_all(&header.vlr_padding));
+        }
+        Ok(Writer {
             closed: false,
             header: header,
-            point_count: Default::default(),
-            point_count_by_return: Default::default(),
-            vlrs: vlrs,
             write: write,
-        }
-    }
-
-    /// Creates a new writer from a `Builder` and a `Write`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Writer;
-    /// use std::io::Cursor;
-    /// use las::Builder;
-    /// let writer = Writer::new(&Builder::new(), Cursor::new(Vec::new())).unwrap();
-    /// ```
-    pub fn new(builder: &Builder, write: W) -> Result<Writer<W>> {
-        let mut writer = Writer::from(builder, write);
-        try!(writer.write_header());
-        Ok(writer)
-    }
-
-    /// Creates a new default writer.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// # use las::Writer;
-    /// let writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-    /// ```
-    pub fn default(write: W) -> Result<Writer<W>> {
-        Builder::new().writer(write)
+        })
     }
 
     /// Writes a point.
     ///
     /// # Examples
     ///
-    ///
     /// ```
     /// use std::io::Cursor;
     /// # use las::Writer;
-    /// let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
+    ///
+    /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
     /// writer.write(&Default::default()).unwrap();
     /// ```
     pub fn write(&mut self, point: &Point) -> Result<()> {
-        if self.closed {
-            return Err(Error::ClosedWriter);
+        try!(self.write.write_raw_point(&try!(point.to_raw_point(&self.header.transforms)),
+                                        &self.header.point_format));
+        self.header.number_of_points += 1;
+        if point.return_number > 0 {
+            self.header.number_of_points_by_return[point.return_number as usize - 1] += 1;
         }
-        try!(self.write.write_point(point,
-                                    self.header.transforms,
-                                    self.header.point_format,
-                                    self.header.extra_bytes));
-        self.point_count += 1;
-        if point.return_number.is_valid() {
-            self.point_count_by_return[u8::from(point.return_number) as usize - 1] += 1;
-        }
-        self.bounds.grow(Triple {
-            x: point.x,
-            y: point.y,
-            z: point.z,
-        });
+        self.header.bounds.grow(point);
         Ok(())
     }
 
-    fn write_header(&mut self) -> Result<()> {
-        self.header.point_count = self.point_count;
-        self.header.point_count_by_return = self.point_count_by_return;
-        self.header.bounds = self.bounds;
-        try!(self.write.seek(SeekFrom::Start(0)));
-        try!(self.write.write_header(self.header));
-        for vlr in &self.vlrs {
-            try!(self.write.write_vlr(vlr));
-        }
-        Ok(())
-    }
-
-    /// Closes this writer.
+    /// Close this writer.
     ///
-    /// After the writer is closed, and future calls to `write` will error.
+    /// A second call to close is a no-op.
     ///
     /// # Examples
     ///
     /// ```
     /// use std::io::Cursor;
     /// # use las::Writer;
-    /// let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-    /// assert!(writer.write(&Default::default()).is_ok());
+    /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
     /// writer.close().unwrap();
-    /// assert!(writer.write(&Default::default()).is_err());
-    /// ```
+    /// writer.close().unwrap(); // <- no-op
+    ///
     pub fn close(&mut self) -> Result<()> {
-        if self.closed {
-            return Err(Error::ClosedWriter);
+        if !self.closed {
+            try!(self.write.seek(SeekFrom::Start(0)));
+            try!(self.header
+                .to_raw_header()
+                .and_then(|raw_header| self.write.write_raw_header(&raw_header)));
+            self.closed = true;
         }
-        try!(self.write_header());
-        self.closed = true;
         Ok(())
+    }
+}
+
+impl Writer<BufWriter<File>> {
+    /// Creates a new writer for a path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::Writer;
+    /// let writer = Writer::from_path("/dev/null", Default::default());
+    /// ```
+    pub fn from_path<P: AsRef<Path>>(path: P, header: Header) -> Result<Writer<BufWriter<File>>> {
+        File::create(path)
+            .map_err(Error::from)
+            .and_then(|file| Writer::new(BufWriter::new(file), header))
     }
 }
 
 impl<W: Seek + Write> Drop for Writer<W> {
     fn drop(&mut self) {
         if !self.closed {
-            if let Err(err) = self.close() {
-                error!("Error while dropping writer: {}", err);
-            }
+            self.close().expect("Error when dropping the writer");
         }
     }
 }
@@ -171,297 +152,23 @@ mod tests {
 
     use std::io::Cursor;
 
-    use builder::Builder;
-    use point::{Classification, Color, NumberOfReturns, Point, ReturnNumber, ScanDirection};
-    use reader::Reader;
-    use utils::Bounds;
-    use version::Version;
+    use byteorder::{LittleEndian, ReadBytesExt};
 
-    fn point() -> Point {
-        Point {
-            x: 1.,
-            y: 2.,
-            z: 3.,
-            intensity: 4,
-            return_number: ReturnNumber::from(1),
-            number_of_returns: NumberOfReturns::from(0b00010000),
-            scan_direction: ScanDirection::Positive,
-            edge_of_flight_line: false,
-            classification: Classification::from(2),
-            scan_angle_rank: 2,
-            user_data: 3,
-            point_source_id: 4,
-            gps_time: Some(5.),
-            color: Some(Color {
-                red: 6,
-                green: 7,
-                blue: 8,
-            }),
-            extra_bytes: Vec::new(),
-        }
-    }
-
-    fn check_point(point: &Point) {
-        assert_eq!(1., point.x);
-        assert_eq!(2., point.y);
-        assert_eq!(3., point.z);
-        assert_eq!(4, point.intensity);
-        assert_eq!(1, point.return_number);
-        assert_eq!(2, point.number_of_returns);
-        assert_eq!(ScanDirection::Positive, point.scan_direction);
-        assert!(!point.edge_of_flight_line);
-        assert_eq!(2, point.classification);
-        assert_eq!(2, point.scan_angle_rank);
-        assert_eq!(3, point.user_data);
-        assert_eq!(4, point.point_source_id);
-    }
-
-    fn check_point_0(point: Point) {
-        check_point(&point);
-        assert!(point.gps_time.is_none());
-        assert!(point.color.is_none());
-    }
-
-    fn check_point_1(point: Point) {
-        check_point(&point);
-        assert_eq!(5., point.gps_time.unwrap());
-        assert!(point.color.is_none());
-    }
-
-    fn check_point_2(point: Point) {
-        check_point(&point);
-        assert!(point.gps_time.is_none());
-        let color = point.color.unwrap();
-        assert_eq!(6, color.red);
-        assert_eq!(7, color.green);
-        assert_eq!(8, color.blue);
-    }
-
-    fn check_point_3(point: Point) {
-        check_point(&point);
-        assert_eq!(5., point.gps_time.unwrap());
-        let color = point.color.unwrap();
-        assert_eq!(6, color.red);
-        assert_eq!(7, color.green);
-        assert_eq!(8, color.blue);
-    }
+    use Header;
 
     #[test]
-    fn write_zero_points() {
-        let mut cursor = Cursor::new(Vec::new());
-        Writer::default(&mut cursor).unwrap();
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        assert!(reader.read().unwrap().is_none());
-    }
-
-    #[test]
-    fn write_one_point_default() {
+    fn las_1_0_point_data_start_signature() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
+            let header = Header {
+                version: (1, 0),
+                vlrs: vec![Default::default()],
+                ..Default::default()
+            };
+            let mut writer = Writer::new(&mut cursor, header).unwrap();
+            writer.write(&Default::default()).unwrap();
         }
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        check_point_0(reader.read().unwrap().unwrap());
-        assert!(reader.read().unwrap().is_none());
-    }
-
-    #[test]
-    fn write_one_point_format_1() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut builder = Builder::new();
-            builder.point_format = 1.into();
-            let mut writer = builder.writer(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        check_point_1(reader.read().unwrap().unwrap());
-        assert!(reader.read().unwrap().is_none());
-    }
-
-    #[test]
-    fn write_one_point_format_2() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut builder = Builder::new();
-            builder.point_format = 2.into();
-            let mut writer = builder.writer(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        check_point_2(reader.read().unwrap().unwrap());
-        assert!(reader.read().unwrap().is_none());
-    }
-
-    #[test]
-    fn write_one_point_format_3() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut builder = Builder::new();
-            builder.point_format = 3.into();
-            let mut writer = builder.writer(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        check_point_3(reader.read().unwrap().unwrap());
-        assert!(reader.read().unwrap().is_none());
-    }
-
-    #[test]
-    fn try_write_point_format_1_no_time() {
-        let mut builder = Builder::new();
-        builder.point_format = 1.into();
-        let mut writer = builder.writer(Cursor::new(Vec::new())).unwrap();
-        let mut point = point();
-        point.gps_time = None;
-        assert!(writer.write(&point).is_err());
-    }
-
-    #[test]
-    fn try_write_point_format_2_no_color() {
-        let mut builder = Builder::new();
-        builder.point_format = 2.into();
-        let mut writer = builder.writer(Cursor::new(Vec::new())).unwrap();
-        let mut point = point();
-        point.color = None;
-        assert!(writer.write(&point).is_err());
-    }
-
-    #[test]
-    fn write_point_count() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        assert_eq!(1, Reader::new(cursor).unwrap().header.point_count);
-    }
-
-    #[test]
-    fn write_two_points() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        assert!(reader.read().unwrap().is_some());
-        assert!(reader.read().unwrap().is_some());
-        assert!(reader.read().unwrap().is_none());
-    }
-
-    #[test]
-    fn write_bounds() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let reader = Reader::new(cursor).unwrap();
-        assert_eq!(Bounds::new(1., 2., 3., 1., 2., 3.), reader.header.bounds);
-    }
-
-    #[test]
-    fn close_the_writer() {
-        let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-        writer.close().is_ok();
-        assert!(writer.write(&point()).is_err());
-        assert!(writer.close().is_err());
-    }
-
-    #[test]
-    fn write_version() {
-        let mut cursor = Cursor::new(Vec::new());
-        let mut builder = Builder::new();
-        builder.version = (1, 0).into();
-        builder.writer(&mut cursor).unwrap();
-        cursor.set_position(0);
-        assert_eq!(Version::from((1, 0)),
-                   Reader::new(&mut cursor).unwrap().header.version);
-    }
-
-    #[test]
-    fn write_zero_return_number() {
-        let mut writer = Writer::default(Cursor::new(Vec::new())).unwrap();
-        writer.write(&Default::default()).unwrap();
-    }
-
-    #[test]
-    fn write_extra_bytes() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut builder = Builder::new();
-            builder.extra_bytes = 5;
-            let mut writer = builder.writer(&mut cursor).unwrap();
-            let mut point = point();
-            point.extra_bytes = b"Hello".to_vec();
-            writer.write(&point).unwrap();
-        }
-        cursor.set_position(0);
-        let point = Reader::new(cursor).unwrap().read_to_end().unwrap().pop().unwrap();
-        assert_eq!(b"Hello", &point.extra_bytes[..]);
-    }
-
-    #[test]
-    fn writer_from_path() {
-        assert!(Writer::from_path("/dev/null").is_ok());
-    }
-
-    #[test]
-    fn builder_writer_for_path() {
-        assert!(Builder::new().writer_from_path("/dev/null").is_ok());
-    }
-
-    #[test]
-    fn disallow_file_source_id_wipe() {
-        let mut builder = Builder::new();
-        builder.file_source_id = 1;
-        builder.version = (1, 0).into();
-        assert!(builder.writer(Cursor::new(Vec::new())).is_err());
-    }
-
-    #[test]
-    fn disallow_global_encoding_downcast() {
-        let mut builder = Builder::new();
-        builder.global_encoding = 1.into();
-        builder.version = (1, 0).into();
-        assert!(builder.writer(Cursor::new(Vec::new())).is_err());
-    }
-
-    #[test]
-    fn point_count_by_return_type() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut writer = Writer::default(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let reader = Reader::new(cursor).unwrap();
-        assert_eq!([1, 0, 0, 0, 0], reader.header.point_count_by_return);
-    }
-
-    #[test]
-    fn add_vlr() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut builder = Builder::new();
-            builder.vlrs.push(Default::default());
-            let mut writer = builder.writer(&mut cursor).unwrap();
-            writer.write(&point()).unwrap();
-        }
-        cursor.set_position(0);
-        let mut reader = Reader::new(cursor).unwrap();
-        assert_eq!(1, reader.header.num_vlrs);
-        assert!(reader.read_to_end().is_ok());
+        cursor.set_position(281);
+        assert_eq!(0xCCDD, cursor.read_u16::<LittleEndian>().unwrap());
     }
 }
