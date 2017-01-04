@@ -7,6 +7,8 @@ use std::str;
 /// Crate-specific error enum.
 #[derive(Debug)]
 pub enum Error {
+    /// The writer is closed.
+    ClosedWriter,
     /// The header size is too small.
     HeaderSizeTooSmall(u16),
     /// The las data is laszip compressed.
@@ -52,6 +54,7 @@ impl From<str::Utf8Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Error::ClosedWriter => write!(f, "The writer is closed"),
             Error::HeaderSizeTooSmall(n) => {
                 write!(f, "The header was {} bytes, which is too small", n)
             }
@@ -93,6 +96,7 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
+            Error::ClosedWriter => "the writer is closed",
             Error::HeaderSizeTooSmall(_) => "header size is too small",
             Error::Laszip => "this library does not support laszip (yet)",
             Error::OffsetToDataTooSmall(_) => "offset to point data is too small",

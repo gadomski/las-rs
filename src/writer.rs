@@ -86,6 +86,9 @@ impl<W: Seek + Write> Writer<W> {
     /// writer.write(&Default::default()).unwrap();
     /// ```
     pub fn write(&mut self, point: &Point) -> Result<()> {
+        if self.closed {
+            return Err(Error::ClosedWriter);
+        }
         self.write
             .write_raw_point(&point.to_raw_point(&self.header.transforms)?,
                              &self.header.point_format)?;
@@ -170,5 +173,13 @@ mod tests {
         }
         cursor.set_position(281);
         assert_eq!(0xCCDD, cursor.read_u16::<LittleEndian>().unwrap());
+    }
+
+    #[test]
+    fn writer_cant_write_closed() {
+        let mut cursor = Cursor::new(Vec::new());
+        let mut writer = Writer::new(&mut cursor, Default::default()).unwrap();
+        writer.close().unwrap();
+        assert!(writer.write(&Default::default()).is_err());
     }
 }
