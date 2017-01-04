@@ -33,6 +33,9 @@ impl<R: Read> Reader<R> {
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let raw_header = read.read_raw_header()?;
+        if raw_header.is_compressed() {
+            return Err(Error::Laszip);
+        }
         let vlrs = try!((0..raw_header.number_of_variable_length_records)
             .map(|_| read.read_raw_vlr().and_then(|raw_vlr| raw_vlr.into_vlr()))
             .collect::<Result<Vec<Vlr>>>());
