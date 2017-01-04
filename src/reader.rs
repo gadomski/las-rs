@@ -75,9 +75,10 @@ impl<R: Read> Reader<R> {
     ///
     /// ```
     /// # use las::Reader;
-    /// let iter = Reader::from_path("tests/data/autzen.las").unwrap().points();
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
     /// ```
-    pub fn points(self) -> Points<R> {
+    pub fn points(&mut self) -> Points<R> {
         Points { reader: self }
     }
 }
@@ -102,11 +103,11 @@ impl Reader<BufReader<File>> {
 ///
 /// This struct is generally created by calling `points()` on `Reader`.
 #[derive(Debug)]
-pub struct Points<R: Read> {
-    reader: Reader<R>,
+pub struct Points<'a, R: 'a + Read> {
+    reader: &'a mut Reader<R>,
 }
 
-impl<R: Read> Iterator for Points<R> {
+impl<'a, R: Read> Iterator for Points<'a, R> {
     type Item = Result<Point>;
     fn next(&mut self) -> Option<Result<Point>> {
         match self.reader.read() {

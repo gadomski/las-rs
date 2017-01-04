@@ -13,7 +13,7 @@ macro_rules! autzen {
 
             #[test]
             fn read_write() {
-                let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+                let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
                 let mut writer = Writer::new(Cursor::new(Vec::new()), Header {
                     version: VERSION,
                     ..Default::default() 
