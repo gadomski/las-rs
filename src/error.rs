@@ -1,4 +1,5 @@
 use point::{Format, RawPoint};
+use std::error;
 use std::fmt;
 use std::io;
 use std::str;
@@ -85,6 +86,35 @@ impl fmt::Display for Error {
             }
             Error::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             Error::VlrDataTooLong(n) => write!(f, "VLR data too long: {} bytes", n),
+        }
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::HeaderSizeTooSmall(_) => "header size is too small",
+            Error::Laszip => "this library does not support laszip (yet)",
+            Error::OffsetToDataTooSmall(_) => "offset to point data is too small",
+            Error::MissingColor(_, _) => "color data is missing",
+            Error::MissingGpsTime(_, _) => "gps time data is missing",
+            Error::NotAscii(_) => "the string is not ascii",
+            Error::NotZeroFilled(_) => "the string is not zero filled",
+            Error::InvalidNumberOfReturns(_) => "invalid number of returns",
+            Error::InvalidReturnNumber(_) => "invalid return number",
+            Error::Io(ref err) => err.description(),
+            Error::StringTooLong(_, _) => "string is too long",
+            Error::Utf8(ref err) => err.description(),
+            Error::VersionDoesNotSupport(_, _) => "version does not support feature",
+            Error::VlrDataTooLong(_) => "vlr data is too long",
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::Io(ref err) => Some(err),
+            Error::Utf8(ref err) => Some(err),
+            _ => None,
         }
     }
 }
