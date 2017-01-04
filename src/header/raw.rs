@@ -109,6 +109,24 @@ impl RawHeader {
             vlrs: vlrs,
         })
     }
+
+    /// Returns true if this raw header is for compressed las data.
+    ///
+    /// Though this isn't part of the las spec, the two high bits of the point data format id have
+    /// been used to indicate compressed data, particularily by the laszip library.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::header::RawHeader;
+    /// let mut raw_header = RawHeader { ..Default::default() };
+    /// assert!(!raw_header.is_compressed());
+    /// raw_header.point_data_format_id = 131;
+    /// assert!(raw_header.is_compressed());
+    /// ```
+    pub fn is_compressed(&self) -> bool {
+        (self.point_data_format_id >> 7) == 1
+    }
 }
 
 impl Default for RawHeader {
@@ -375,5 +393,13 @@ mod tests {
         let raw_header = RawHeader { file_creation_year: 0, ..Default::default() };
         let header = raw_header.into_header(Vec::new(), Vec::new()).unwrap();
         assert!(header.date.is_none());
+    }
+
+    #[test]
+    fn raw_header_is_compressed() {
+        let mut raw_header = RawHeader { point_data_format_id: 0, ..Default::default() };
+        assert!(!raw_header.is_compressed());
+        raw_header.point_data_format_id = 131;
+        assert!(raw_header.is_compressed());
     }
 }

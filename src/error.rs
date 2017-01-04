@@ -8,6 +8,8 @@ use std::str;
 pub enum Error {
     /// The header size is too small.
     HeaderSizeTooSmall(u16),
+    /// The las data is laszip compressed.
+    Laszip,
     /// The offset to data is too small.
     OffsetToDataTooSmall(u32),
     /// This format requires color, but it is missing.
@@ -52,6 +54,7 @@ impl fmt::Display for Error {
             Error::HeaderSizeTooSmall(n) => {
                 write!(f, "The header was {} bytes, which is too small", n)
             }
+            Error::Laszip => write!(f, "The las data is laszip compressed"),
             Error::OffsetToDataTooSmall(n) => {
                 write!(f, "The offset to data was {} bytes, which is too small", n)
             }
