@@ -1,6 +1,6 @@
 use {Bounds, Error, Header, Result, Transform, Vector, Vlr};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use chrono::{Datelike, TimeZone, UTC};
+use chrono::{Datelike, TimeZone, Utc};
 use header::{GpsTimeType, HEADER_SIZE};
 use std::io::{Read, Write};
 use utils::{FromLasStr, ToLasStr};
@@ -67,7 +67,7 @@ impl RawHeader {
         Ok(Header {
             file_source_id: self.file_source_id,
             gps_time_type: gps_time_type,
-            date: UTC.yo_opt(
+            date: Utc.yo_opt(
                 self.file_creation_year as i32,
                 self.file_creation_day_of_year as u32,
             ).single(),

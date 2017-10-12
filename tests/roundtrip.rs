@@ -48,7 +48,7 @@ fn new_writer_fail(header: Header) {
 macro_rules! roundtrip {
     ($name:ident, $major:expr, $minor:expr) => {
         mod $name {
-            use chrono::{UTC, Duration};
+            use chrono::{Utc, Duration};
 
             use las::{Header, Point, Transform, Vector};
             use las::header::GpsTimeType;
@@ -205,7 +205,7 @@ macro_rules! roundtrip {
 
             #[test]
             fn date() {
-                let header = Header { version: VERSION, date: Some(UTC::today() - Duration::days(1)), ..Default::default() };
+                let header = Header { version: VERSION, date: Some(Utc::today() - Duration::days(1)), ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 

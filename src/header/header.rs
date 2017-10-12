@@ -1,5 +1,5 @@
 use {Bounds, Transform, Vector, Vlr};
-use chrono::{Date, UTC};
+use chrono::{Date, Utc};
 use header::{GpsTimeType, HEADER_SIZE};
 use point::Format;
 
@@ -27,7 +27,7 @@ pub struct Header {
     /// The date these data were collected.
     ///
     /// If the date in the header was crap, this is `None`.
-    pub date: Option<Date<UTC>>,
+    pub date: Option<Date<Utc>>,
     /// Optional and discouraged padding between the header and the `Vlr`s.
     pub padding: Vec<u8>,
     /// Optional and discouraged padding between the `Vlr`s and the points.
@@ -73,7 +73,7 @@ impl Default for Header {
             file_source_id: 0,
             gps_time_type: GpsTimeType::Week,
             bounds: Default::default(),
-            date: Some(UTC::today()),
+            date: Some(Utc::today()),
             generating_software: format!("las-rs {}", env!("CARGO_PKG_VERSION")),
             guid: Default::default(),
             number_of_points: 0,
