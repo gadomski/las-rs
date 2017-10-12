@@ -16,7 +16,7 @@ macro_rules! autzen {
                 let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
                 let mut writer = Writer::new(Cursor::new(Vec::new()), Header {
                     version: VERSION,
-                    ..Default::default() 
+                    ..Default::default()
                 }).unwrap();
                 for point in reader.points() {
                     writer.write(&point.unwrap()).unwrap();
