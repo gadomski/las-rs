@@ -38,7 +38,10 @@ mod tests {
     #[test]
     fn len() {
         let data = vec![0; 1];
-        let vlr = Vlr { data: data, ..Default::default() };
+        let vlr = Vlr {
+            data: data,
+            ..Default::default()
+        };
         assert_eq!(55, vlr.len());
     }
 }

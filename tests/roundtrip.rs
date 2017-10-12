@@ -3,9 +3,9 @@
 extern crate chrono;
 extern crate las;
 
-use std::io::Cursor;
 
 use las::{Header, Point, Reader, Writer};
+use std::io::Cursor;
 
 pub fn roundtrip(header: Header, point: Point) {
     let mut cursor = Cursor::new(Vec::new());
@@ -32,8 +32,10 @@ pub fn roundtrip(header: Header, point: Point) {
     assert_eq!(point.z, other.bounds.min.z);
     assert_eq!(point.z, other.bounds.max.z);
     if point.return_number > 0 {
-        assert_eq!(1,
-                   other.number_of_points_by_return[point.return_number as usize - 1]);
+        assert_eq!(
+            1,
+            other.number_of_points_by_return[point.return_number as usize - 1]
+        );
     }
 
     assert_eq!(header.vlrs, other.vlrs);

@@ -64,8 +64,8 @@ impl Default for Bounds {
 #[cfg(test)]
 mod tests {
 
-    use Point;
     use super::*;
+    use Point;
 
     #[test]
     fn grow() {

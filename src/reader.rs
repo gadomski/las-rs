@@ -36,10 +36,15 @@ impl<R: Read> Reader<R> {
         if raw_header.is_compressed() {
             return Err(Error::Laszip);
         }
-        let vlrs = try!((0..raw_header.number_of_variable_length_records)
-            .map(|_| read.read_raw_vlr().and_then(|raw_vlr| raw_vlr.into_vlr()))
-            .collect::<Result<Vec<Vlr>>>());
-        let position = vlrs.iter().fold(raw_header.header_size as u32, |acc, vlr| acc + vlr.len());
+        let vlrs = (0..raw_header.number_of_variable_length_records)
+            .map(|_| {
+                read.read_raw_vlr().and_then(|raw_vlr| raw_vlr.into_vlr())
+            })
+            .collect::<Result<Vec<Vlr>>>()?;
+        let position = vlrs.iter().fold(
+            raw_header.header_size as u32,
+            |acc, vlr| acc + vlr.len(),
+        );
         let vlr_padding = if position < raw_header.offset_to_point_data {
             let mut bytes = vec![0; (raw_header.offset_to_point_data - position) as usize];
             read.read_exact(&mut bytes)?;
@@ -64,9 +69,9 @@ impl<R: Read> Reader<R> {
     /// let point = reader.read().unwrap().unwrap();
     /// ```
     pub fn read(&mut self) -> Result<Option<Point>> {
-        self.read
-            .read_raw_point(&self.header.point_format)
-            .map(|option| option.map(|raw_point| raw_point.into_point(&self.header.transforms)))
+        self.read.read_raw_point(&self.header.point_format).map(
+            |option| option.map(|raw_point| raw_point.into_point(&self.header.transforms)),
+        )
     }
 
     /// Returns an iterator over this reader's points.
@@ -95,7 +100,9 @@ impl Reader<BufReader<File>> {
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
-        File::open(path).map_err(Error::from).and_then(|file| Reader::new(BufReader::new(file)))
+        File::open(path).map_err(Error::from).and_then(|file| {
+            Reader::new(BufReader::new(file))
+        })
     }
 }
 

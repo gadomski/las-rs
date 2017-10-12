@@ -350,65 +350,152 @@ impl<W: Write> WriteRawPoint for W {
 #[cfg(test)]
 mod tests {
 
+    use super::*;
     use {Point, Transform, Vector};
     use point::{Format, ScanDirection};
 
     use std::io::Cursor;
-    use super::*;
 
     #[test]
     fn return_number() {
-        assert_eq!(0,
-                   RawPoint { flags: 0, ..Default::default() }.return_number());
-        assert_eq!(7,
-                   RawPoint { flags: 7, ..Default::default() }.return_number());
-        assert_eq!(0,
-                   RawPoint { flags: 8, ..Default::default() }.return_number());
+        assert_eq!(
+            0,
+            RawPoint {
+                flags: 0,
+                ..Default::default()
+            }.return_number()
+        );
+        assert_eq!(
+            7,
+            RawPoint {
+                flags: 7,
+                ..Default::default()
+            }.return_number()
+        );
+        assert_eq!(
+            0,
+            RawPoint {
+                flags: 8,
+                ..Default::default()
+            }.return_number()
+        );
     }
 
     #[test]
     fn flags() {
         assert_eq!(0, Point { ..Default::default() }.flags().unwrap());
-        assert_eq!(1,
-                   Point { return_number: 1, ..Default::default() }.flags().unwrap());
-        assert_eq!(5,
-                   Point { return_number: 5, ..Default::default() }.flags().unwrap());
-        assert!(Point { return_number: 6, ..Default::default() }.flags().is_err());
-        assert_eq!(8,
-                   Point { number_of_returns: 1, ..Default::default() }.flags().unwrap());
-        assert!(Point { number_of_returns: 6, ..Default::default() }.flags().is_err());
-        assert_eq!(64,
-                   Point { scan_direction: ScanDirection::Positive, ..Default::default() }
-                       .flags()
-                       .unwrap());
-        assert_eq!(128,
-                   Point { edge_of_flight_line: true, ..Default::default() }.flags().unwrap());
+        assert_eq!(
+            1,
+            Point {
+                return_number: 1,
+                ..Default::default()
+            }.flags()
+                .unwrap()
+        );
+        assert_eq!(
+            5,
+            Point {
+                return_number: 5,
+                ..Default::default()
+            }.flags()
+                .unwrap()
+        );
+        assert!(
+            Point {
+                return_number: 6,
+                ..Default::default()
+            }.flags()
+                .is_err()
+        );
+        assert_eq!(
+            8,
+            Point {
+                number_of_returns: 1,
+                ..Default::default()
+            }.flags()
+                .unwrap()
+        );
+        assert!(
+            Point {
+                number_of_returns: 6,
+                ..Default::default()
+            }.flags()
+                .is_err()
+        );
+        assert_eq!(
+            64,
+            Point {
+                scan_direction: ScanDirection::Positive,
+                ..Default::default()
+            }.flags()
+                .unwrap()
+        );
+        assert_eq!(
+            128,
+            Point {
+                edge_of_flight_line: true,
+                ..Default::default()
+            }.flags()
+                .unwrap()
+        );
     }
 
     #[test]
     fn number_of_returns() {
-        assert_eq!(0,
-                   RawPoint { flags: 0, ..Default::default() }.number_of_returns());
-        assert_eq!(1,
-                   RawPoint { flags: 8, ..Default::default() }.number_of_returns());
-        assert_eq!(7,
-                   RawPoint { flags: 56, ..Default::default() }.number_of_returns());
-        assert_eq!(0,
-                   RawPoint { flags: 64, ..Default::default() }.number_of_returns());
+        assert_eq!(
+            0,
+            RawPoint {
+                flags: 0,
+                ..Default::default()
+            }.number_of_returns()
+        );
+        assert_eq!(
+            1,
+            RawPoint {
+                flags: 8,
+                ..Default::default()
+            }.number_of_returns()
+        );
+        assert_eq!(
+            7,
+            RawPoint {
+                flags: 56,
+                ..Default::default()
+            }.number_of_returns()
+        );
+        assert_eq!(
+            0,
+            RawPoint {
+                flags: 64,
+                ..Default::default()
+            }.number_of_returns()
+        );
     }
 
     #[test]
     fn scan_direction() {
-        assert_eq!(ScanDirection::Negative,
-                   RawPoint { ..Default::default() }.scan_direction());
-        assert_eq!(ScanDirection::Positive,
-                   RawPoint { flags: 64, ..Default::default() }.scan_direction());
+        assert_eq!(
+            ScanDirection::Negative,
+            RawPoint { ..Default::default() }.scan_direction()
+        );
+        assert_eq!(
+            ScanDirection::Positive,
+            RawPoint {
+                flags: 64,
+                ..Default::default()
+            }.scan_direction()
+        );
     }
 
     #[test]
     fn edge_of_flight_line() {
         assert!(!RawPoint { ..Default::default() }.edge_of_flight_line());
-        assert!(RawPoint { flags: 128, ..Default::default() }.edge_of_flight_line());
+        assert!(
+            RawPoint {
+                flags: 128,
+                ..Default::default()
+            }.edge_of_flight_line()
+        );
     }
 
     #[test]

@@ -92,7 +92,9 @@ impl<R: Read> ReadRawVlr for R {
         let mut description = [0; 32];
         self.read_exact(&mut description)?;
         let mut data = Vec::with_capacity(record_length_after_header as usize);
-        self.take(record_length_after_header as u64).read_to_end(&mut data)?;
+        self.take(record_length_after_header as u64).read_to_end(
+            &mut data,
+        )?;
         Ok(RawVlr {
             reserved: reserved,
             user_id: user_id,
@@ -126,7 +128,9 @@ impl<W: Write> WriteRawVlr for W {
         self.write_u16::<LittleEndian>(raw_vlr.reserved)?;
         self.write_all(&raw_vlr.user_id)?;
         self.write_u16::<LittleEndian>(raw_vlr.record_id)?;
-        self.write_u16::<LittleEndian>(raw_vlr.record_length_after_header)?;
+        self.write_u16::<LittleEndian>(
+            raw_vlr.record_length_after_header,
+        )?;
         self.write_all(&raw_vlr.description)?;
         self.write_all(&raw_vlr.data)?;
         Ok(())
@@ -142,7 +146,10 @@ mod tests {
     #[test]
     fn too_long_vlr_data() {
         let data = vec![0; u16::MAX as usize + 1];
-        let vlr = Vlr { data: data, ..Default::default() };
+        let vlr = Vlr {
+            data: data,
+            ..Default::default()
+        };
         assert!(vlr.to_raw_vlr().is_err());
     }
 }

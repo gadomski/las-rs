@@ -67,9 +67,10 @@ impl RawHeader {
         Ok(Header {
             file_source_id: self.file_source_id,
             gps_time_type: gps_time_type,
-            date: UTC.yo_opt(self.file_creation_year as i32,
-                        self.file_creation_day_of_year as u32)
-                .single(),
+            date: UTC.yo_opt(
+                self.file_creation_year as i32,
+                self.file_creation_day_of_year as u32,
+            ).single(),
             generating_software: self.generating_software.as_ref().to_las_str()?.to_string(),
             guid: self.guid,
             // TODO las 1.4 header
@@ -181,9 +182,13 @@ impl Header {
             GpsTimeType::Standard => 1,
         };
         let mut system_identifier = [0; 32];
-        system_identifier.as_mut().from_las_str(&self.system_identifier)?;
+        system_identifier.as_mut().from_las_str(
+            &self.system_identifier,
+        )?;
         let mut generating_software = [0; 32];
-        generating_software.as_mut().from_las_str(&self.generating_software)?;
+        generating_software.as_mut().from_las_str(
+            &self.generating_software,
+        )?;
         let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
         Ok(RawHeader {
             file_signature: *b"LASF",
@@ -198,7 +203,7 @@ impl Header {
             file_creation_year: self.date.map_or(0, |d| d.year() as u16),
             header_size: HEADER_SIZE + self.padding.len() as u16,
             offset_to_point_data: HEADER_SIZE as u32 + self.padding.len() as u32 + vlr_len +
-                                  self.vlr_padding.len() as u32,
+                self.vlr_padding.len() as u32,
             number_of_variable_length_records: self.vlrs.len() as u32,
             point_data_format_id: self.point_format.into(),
             // TODO extra bytes
@@ -347,14 +352,26 @@ impl<W: Write> WriteRawHeader for W {
         self.write_u8(raw_header.version_minor)?;
         self.write_all(&raw_header.system_identifier)?;
         self.write_all(&raw_header.generating_software)?;
-        self.write_u16::<LittleEndian>(raw_header.file_creation_day_of_year)?;
-        self.write_u16::<LittleEndian>(raw_header.file_creation_year)?;
+        self.write_u16::<LittleEndian>(
+            raw_header.file_creation_day_of_year,
+        )?;
+        self.write_u16::<LittleEndian>(
+            raw_header.file_creation_year,
+        )?;
         self.write_u16::<LittleEndian>(raw_header.header_size)?;
-        self.write_u32::<LittleEndian>(raw_header.offset_to_point_data)?;
-        self.write_u32::<LittleEndian>(raw_header.number_of_variable_length_records)?;
+        self.write_u32::<LittleEndian>(
+            raw_header.offset_to_point_data,
+        )?;
+        self.write_u32::<LittleEndian>(
+            raw_header.number_of_variable_length_records,
+        )?;
         self.write_u8(raw_header.point_data_format_id)?;
-        self.write_u16::<LittleEndian>(raw_header.point_data_record_length)?;
-        self.write_u32::<LittleEndian>(raw_header.number_of_point_records)?;
+        self.write_u16::<LittleEndian>(
+            raw_header.point_data_record_length,
+        )?;
+        self.write_u32::<LittleEndian>(
+            raw_header.number_of_point_records,
+        )?;
         for n in raw_header.number_of_points_by_return.iter() {
             self.write_u32::<LittleEndian>(*n)?;
         }
@@ -383,21 +400,30 @@ mod tests {
 
     #[test]
     fn no_day_no_date() {
-        let raw_header = RawHeader { file_creation_day_of_year: 0, ..Default::default() };
+        let raw_header = RawHeader {
+            file_creation_day_of_year: 0,
+            ..Default::default()
+        };
         let header = raw_header.into_header(Vec::new(), Vec::new()).unwrap();
         assert!(header.date.is_none());
     }
 
     #[test]
     fn no_year_no_date() {
-        let raw_header = RawHeader { file_creation_year: 0, ..Default::default() };
+        let raw_header = RawHeader {
+            file_creation_year: 0,
+            ..Default::default()
+        };
         let header = raw_header.into_header(Vec::new(), Vec::new()).unwrap();
         assert!(header.date.is_none());
     }
 
     #[test]
     fn raw_header_is_compressed() {
-        let mut raw_header = RawHeader { point_data_format_id: 0, ..Default::default() };
+        let mut raw_header = RawHeader {
+            point_data_format_id: 0,
+            ..Default::default()
+        };
         assert!(!raw_header.is_compressed());
         raw_header.point_data_format_id = 131;
         assert!(raw_header.is_compressed());
