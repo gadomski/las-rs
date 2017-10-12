@@ -38,7 +38,7 @@ impl Transform {
 impl Default for Transform {
     fn default() -> Transform {
         Transform {
-            scale: 0.01,
+            scale: 0.001,
             offset: 0.,
         }
     }
