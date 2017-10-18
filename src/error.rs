@@ -29,6 +29,8 @@ pub enum Error {
     InvalidReturnNumber(u8),
     /// Wrapper around `std::io::Error`.
     Io(io::Error),
+    /// The value can't be represnted as an i32.
+    Overflow(f64),
     /// This string is too long for the target slice.
     StringTooLong(String, usize),
     /// Wrapper around `std::str::Utf8Error`.
@@ -80,6 +82,7 @@ impl fmt::Display for Error {
             Error::NotZeroFilled(ref v) => write!(f, "The vector {:?} was not zero filled", v),
             Error::InvalidNumberOfReturns(n) => write!(f, "{} is not a valid number of returns", n),
             Error::InvalidReturnNumber(n) => write!(f, "{} is not a valid return number", n),
+            Error::Overflow(n) => write!(f, "{} cannot be represented as a i32", n),
             Error::VersionDoesNotSupport(version, ref s) => {
                 write!(
                     f,
@@ -113,6 +116,7 @@ impl error::Error for Error {
             Error::InvalidNumberOfReturns(_) => "invalid number of returns",
             Error::InvalidReturnNumber(_) => "invalid return number",
             Error::Io(ref err) => err.description(),
+            Error::Overflow(_) => "number cannot be represented as an i32",
             Error::StringTooLong(_, _) => "string is too long",
             Error::Utf8(ref err) => err.description(),
             Error::VersionDoesNotSupport(_, _) => "version does not support feature",

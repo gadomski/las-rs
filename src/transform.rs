@@ -1,3 +1,5 @@
+use Result;
+
 /// A scale and an offset that transforms xyz coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Transform {
@@ -23,15 +25,25 @@ impl Transform {
 
     /// Applies the inverse transform, and rounds the result.
     ///
+    /// Returns an error if the resultant value can't be representaed as an i32.
+    ///
     /// # Examples
     ///
     /// ```
     /// # use las::Transform;
     /// let transform = Transform { scale: 2., offset: 1. };
-    /// assert_eq!(1, transform.inverse(2.9));
+    /// assert_eq!(1, transform.inverse(2.9).unwrap());
     /// ```
-    pub fn inverse(&self, n: f64) -> i32 {
-        ((n - self.offset) / self.scale).round() as i32
+    pub fn inverse(&self, n: f64) -> Result<i32> {
+        use Error;
+        use std::i32;
+
+        let n = ((n - self.offset) / self.scale).round();
+        if n > i32::MAX as f64 {
+            Err(Error::Overflow(n))
+        } else {
+            Ok(n as i32)
+        }
     }
 }
 

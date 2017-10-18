@@ -175,9 +175,9 @@ impl Point {
     /// ```
     pub fn to_raw_point(&self, transforms: &Vector<Transform>) -> Result<RawPoint> {
         Ok(RawPoint {
-            x: transforms.x.inverse(self.x),
-            y: transforms.y.inverse(self.y),
-            z: transforms.z.inverse(self.z),
+            x: transforms.x.inverse(self.x)?,
+            y: transforms.y.inverse(self.y)?,
+            z: transforms.z.inverse(self.z)?,
             intensity: self.intensity,
             flags: self.flags()?,
             classification: self.classification.into(),
