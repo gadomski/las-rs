@@ -40,7 +40,7 @@ impl Transform {
 
         let n = ((n - self.offset) / self.scale).round();
         if n > i32::MAX as f64 {
-            Err(Error::Overflow(n))
+            Err(Error::CannotBeI32(n))
         } else {
             Ok(n as i32)
         }

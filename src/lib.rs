@@ -75,9 +75,12 @@
         unsafe_code,
         unstable_features,
         unused_import_braces, unused_qualifications)]
+#![recursion_limit="128"]
 
 extern crate byteorder;
 extern crate chrono;
+#[macro_use]
+extern crate quick_error;
 
 pub mod header;
 pub mod point;
