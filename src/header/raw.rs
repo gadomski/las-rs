@@ -42,6 +42,95 @@ pub struct RawHeader {
 }
 
 impl RawHeader {
+    /// Reads a raw header from a `Read`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fs::File;
+    /// use las::header::RawHeader;
+    /// let mut file = File::open("tests/data/autzen.las").unwrap();
+    /// let header = RawHeader::read_from(&mut file).unwrap();
+    /// ```
+    pub fn read_from<R: Read>(mut read: R) -> Result<RawHeader> {
+        let mut file_signature = [0; 4];
+        read.read_exact(&mut file_signature)?;
+        let file_source_id = read.read_u16::<LittleEndian>()?;
+        let global_encoding = read.read_u16::<LittleEndian>()?;
+        let mut guid = [0; 16];
+        read.read_exact(&mut guid)?;
+        let version_major = read.read_u8()?;
+        let version_minor = read.read_u8()?;
+        let mut system_identifier = [0; 32];
+        read.read_exact(&mut system_identifier)?;
+        let mut generating_software = [0; 32];
+        read.read_exact(&mut generating_software)?;
+        let file_creation_day_of_year = read.read_u16::<LittleEndian>()?;
+        let file_creation_year = read.read_u16::<LittleEndian>()?;
+        let header_size = read.read_u16::<LittleEndian>()?;
+        let offset_to_point_data = read.read_u32::<LittleEndian>()?;
+        let number_of_variable_length_records = read.read_u32::<LittleEndian>()?;
+        let point_data_format_id = read.read_u8()?;
+        let point_data_record_length = read.read_u16::<LittleEndian>()?;
+        let number_of_point_records = read.read_u32::<LittleEndian>()?;
+        let mut number_of_points_by_return = [0; 5];
+        for n in number_of_points_by_return.iter_mut() {
+            *n = read.read_u32::<LittleEndian>()?;
+        }
+        let x_scale_factor = read.read_f64::<LittleEndian>()?;
+        let y_scale_factor = read.read_f64::<LittleEndian>()?;
+        let z_scale_factor = read.read_f64::<LittleEndian>()?;
+        let x_offset = read.read_f64::<LittleEndian>()?;
+        let y_offset = read.read_f64::<LittleEndian>()?;
+        let z_offset = read.read_f64::<LittleEndian>()?;
+        let max_x = read.read_f64::<LittleEndian>()?;
+        let min_x = read.read_f64::<LittleEndian>()?;
+        let max_y = read.read_f64::<LittleEndian>()?;
+        let min_y = read.read_f64::<LittleEndian>()?;
+        let max_z = read.read_f64::<LittleEndian>()?;
+        let min_z = read.read_f64::<LittleEndian>()?;
+        // TODO las 1.4
+        let padding = if header_size > HEADER_SIZE {
+            let mut bytes = vec![0; (header_size - HEADER_SIZE) as usize];
+            read.read_exact(&mut bytes)?;
+            bytes
+        } else {
+            Vec::new()
+        };
+        Ok(RawHeader {
+            file_signature: file_signature,
+            file_source_id: file_source_id,
+            global_encoding: global_encoding,
+            guid: guid,
+            version_major: version_major,
+            version_minor: version_minor,
+            system_identifier: system_identifier,
+            generating_software: generating_software,
+            file_creation_day_of_year: file_creation_day_of_year,
+            file_creation_year: file_creation_year,
+            header_size: header_size,
+            offset_to_point_data: offset_to_point_data,
+            number_of_variable_length_records: number_of_variable_length_records,
+            point_data_format_id: point_data_format_id,
+            point_data_record_length: point_data_record_length,
+            number_of_point_records: number_of_point_records,
+            number_of_points_by_return: number_of_points_by_return,
+            x_scale_factor: x_scale_factor,
+            y_scale_factor: y_scale_factor,
+            z_scale_factor: z_scale_factor,
+            x_offset: x_offset,
+            y_offset: y_offset,
+            z_offset: z_offset,
+            max_x: max_x,
+            min_x: min_x,
+            max_y: max_y,
+            min_y: min_y,
+            max_z: max_z,
+            min_z: min_z,
+            padding: padding,
+        })
+    }
+
     /// Converts this raw header into a `Header`.
     ///
     /// # Examples
@@ -127,6 +216,63 @@ impl RawHeader {
     /// ```
     pub fn is_compressed(&self) -> bool {
         (self.point_data_format_id >> 7) == 1
+    }
+
+    /// Writes a raw header to a `Write`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    /// use las::header::RawHeader;
+    /// let mut cursor = Cursor::new(Vec::new());
+    /// let raw_header = RawHeader::default();
+    /// raw_header.write_to(&mut cursor).unwrap();
+    /// ```
+    pub fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
+        write.write_all(&self.file_signature)?;
+        write.write_u16::<LittleEndian>(self.file_source_id)?;
+        write.write_u16::<LittleEndian>(self.global_encoding)?;
+        write.write_all(&self.guid)?;
+        write.write_u8(self.version_major)?;
+        write.write_u8(self.version_minor)?;
+        write.write_all(&self.system_identifier)?;
+        write.write_all(&self.generating_software)?;
+        write.write_u16::<LittleEndian>(
+            self.file_creation_day_of_year,
+        )?;
+        write.write_u16::<LittleEndian>(self.file_creation_year)?;
+        write.write_u16::<LittleEndian>(self.header_size)?;
+        write.write_u32::<LittleEndian>(self.offset_to_point_data)?;
+        write.write_u32::<LittleEndian>(
+            self.number_of_variable_length_records,
+        )?;
+        write.write_u8(self.point_data_format_id)?;
+        write.write_u16::<LittleEndian>(
+            self.point_data_record_length,
+        )?;
+        write.write_u32::<LittleEndian>(
+            self.number_of_point_records,
+        )?;
+        for n in self.number_of_points_by_return.iter() {
+            write.write_u32::<LittleEndian>(*n)?;
+        }
+        write.write_f64::<LittleEndian>(self.x_scale_factor)?;
+        write.write_f64::<LittleEndian>(self.y_scale_factor)?;
+        write.write_f64::<LittleEndian>(self.z_scale_factor)?;
+        write.write_f64::<LittleEndian>(self.x_offset)?;
+        write.write_f64::<LittleEndian>(self.y_offset)?;
+        write.write_f64::<LittleEndian>(self.z_offset)?;
+        write.write_f64::<LittleEndian>(self.max_x)?;
+        write.write_f64::<LittleEndian>(self.min_x)?;
+        write.write_f64::<LittleEndian>(self.max_y)?;
+        write.write_f64::<LittleEndian>(self.min_y)?;
+        write.write_f64::<LittleEndian>(self.max_z)?;
+        write.write_f64::<LittleEndian>(self.min_z)?;
+        if !self.padding.is_empty() {
+            write.write_all(&self.padding)?;
+        }
+        Ok(())
     }
 }
 
@@ -224,173 +370,6 @@ impl Header {
             min_z: self.bounds.min.z,
             padding: self.padding.clone(),
         })
-    }
-}
-
-/// Reads a raw header.
-pub trait ReadRawHeader {
-    /// Reads a raw header.
-    ///
-    /// # Examples
-    ///
-    /// `Read` implements `ReadRawHeader`.
-    ///
-    /// ```
-    /// use std::fs::File;
-    /// use las::header::ReadRawHeader;
-    /// let mut file = File::open("tests/data/autzen.las").unwrap();
-    /// let header = file.read_raw_header().unwrap();
-    /// ```
-    fn read_raw_header(&mut self) -> Result<RawHeader>;
-}
-
-impl<R: Read> ReadRawHeader for R {
-    fn read_raw_header(&mut self) -> Result<RawHeader> {
-        let mut file_signature = [0; 4];
-        self.read_exact(&mut file_signature)?;
-        let file_source_id = self.read_u16::<LittleEndian>()?;
-        let global_encoding = self.read_u16::<LittleEndian>()?;
-        let mut guid = [0; 16];
-        self.read_exact(&mut guid)?;
-        let version_major = self.read_u8()?;
-        let version_minor = self.read_u8()?;
-        let mut system_identifier = [0; 32];
-        self.read_exact(&mut system_identifier)?;
-        let mut generating_software = [0; 32];
-        self.read_exact(&mut generating_software)?;
-        let file_creation_day_of_year = self.read_u16::<LittleEndian>()?;
-        let file_creation_year = self.read_u16::<LittleEndian>()?;
-        let header_size = self.read_u16::<LittleEndian>()?;
-        let offset_to_point_data = self.read_u32::<LittleEndian>()?;
-        let number_of_variable_length_records = self.read_u32::<LittleEndian>()?;
-        let point_data_format_id = self.read_u8()?;
-        let point_data_record_length = self.read_u16::<LittleEndian>()?;
-        let number_of_point_records = self.read_u32::<LittleEndian>()?;
-        let mut number_of_points_by_return = [0; 5];
-        for n in number_of_points_by_return.iter_mut() {
-            *n = self.read_u32::<LittleEndian>()?;
-        }
-        let x_scale_factor = self.read_f64::<LittleEndian>()?;
-        let y_scale_factor = self.read_f64::<LittleEndian>()?;
-        let z_scale_factor = self.read_f64::<LittleEndian>()?;
-        let x_offset = self.read_f64::<LittleEndian>()?;
-        let y_offset = self.read_f64::<LittleEndian>()?;
-        let z_offset = self.read_f64::<LittleEndian>()?;
-        let max_x = self.read_f64::<LittleEndian>()?;
-        let min_x = self.read_f64::<LittleEndian>()?;
-        let max_y = self.read_f64::<LittleEndian>()?;
-        let min_y = self.read_f64::<LittleEndian>()?;
-        let max_z = self.read_f64::<LittleEndian>()?;
-        let min_z = self.read_f64::<LittleEndian>()?;
-        // TODO las 1.4
-        let padding = if header_size > HEADER_SIZE {
-            let mut bytes = vec![0; (header_size - HEADER_SIZE) as usize];
-            self.read_exact(&mut bytes)?;
-            bytes
-        } else {
-            Vec::new()
-        };
-        Ok(RawHeader {
-            file_signature: file_signature,
-            file_source_id: file_source_id,
-            global_encoding: global_encoding,
-            guid: guid,
-            version_major: version_major,
-            version_minor: version_minor,
-            system_identifier: system_identifier,
-            generating_software: generating_software,
-            file_creation_day_of_year: file_creation_day_of_year,
-            file_creation_year: file_creation_year,
-            header_size: header_size,
-            offset_to_point_data: offset_to_point_data,
-            number_of_variable_length_records: number_of_variable_length_records,
-            point_data_format_id: point_data_format_id,
-            point_data_record_length: point_data_record_length,
-            number_of_point_records: number_of_point_records,
-            number_of_points_by_return: number_of_points_by_return,
-            x_scale_factor: x_scale_factor,
-            y_scale_factor: y_scale_factor,
-            z_scale_factor: z_scale_factor,
-            x_offset: x_offset,
-            y_offset: y_offset,
-            z_offset: z_offset,
-            max_x: max_x,
-            min_x: min_x,
-            max_y: max_y,
-            min_y: min_y,
-            max_z: max_z,
-            min_z: min_z,
-            padding: padding,
-        })
-    }
-}
-
-/// Writes a raw header.
-pub trait WriteRawHeader {
-    /// Writes a raw header.
-    ///
-    /// # Examples
-    ///
-    /// `Write` implements `WriteRawHeader`.
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use las::header::WriteRawHeader;
-    /// let mut cursor = Cursor::new(Vec::new());
-    /// cursor.write_raw_header(&Default::default()).unwrap();
-    /// ```
-    fn write_raw_header(&mut self, raw_header: &RawHeader) -> Result<()>;
-}
-
-impl<W: Write> WriteRawHeader for W {
-    fn write_raw_header(&mut self, raw_header: &RawHeader) -> Result<()> {
-        self.write_all(&raw_header.file_signature)?;
-        self.write_u16::<LittleEndian>(raw_header.file_source_id)?;
-        self.write_u16::<LittleEndian>(raw_header.global_encoding)?;
-        self.write_all(&raw_header.guid)?;
-        self.write_u8(raw_header.version_major)?;
-        self.write_u8(raw_header.version_minor)?;
-        self.write_all(&raw_header.system_identifier)?;
-        self.write_all(&raw_header.generating_software)?;
-        self.write_u16::<LittleEndian>(
-            raw_header.file_creation_day_of_year,
-        )?;
-        self.write_u16::<LittleEndian>(
-            raw_header.file_creation_year,
-        )?;
-        self.write_u16::<LittleEndian>(raw_header.header_size)?;
-        self.write_u32::<LittleEndian>(
-            raw_header.offset_to_point_data,
-        )?;
-        self.write_u32::<LittleEndian>(
-            raw_header.number_of_variable_length_records,
-        )?;
-        self.write_u8(raw_header.point_data_format_id)?;
-        self.write_u16::<LittleEndian>(
-            raw_header.point_data_record_length,
-        )?;
-        self.write_u32::<LittleEndian>(
-            raw_header.number_of_point_records,
-        )?;
-        for n in raw_header.number_of_points_by_return.iter() {
-            self.write_u32::<LittleEndian>(*n)?;
-        }
-        self.write_f64::<LittleEndian>(raw_header.x_scale_factor)?;
-        self.write_f64::<LittleEndian>(raw_header.y_scale_factor)?;
-        self.write_f64::<LittleEndian>(raw_header.z_scale_factor)?;
-        self.write_f64::<LittleEndian>(raw_header.x_offset)?;
-        self.write_f64::<LittleEndian>(raw_header.y_offset)?;
-        self.write_f64::<LittleEndian>(raw_header.z_offset)?;
-        self.write_f64::<LittleEndian>(raw_header.max_x)?;
-        self.write_f64::<LittleEndian>(raw_header.min_x)?;
-        self.write_f64::<LittleEndian>(raw_header.max_y)?;
-        self.write_f64::<LittleEndian>(raw_header.min_y)?;
-        self.write_f64::<LittleEndian>(raw_header.max_z)?;
-        self.write_f64::<LittleEndian>(raw_header.min_z)?;
-        if !raw_header.padding.is_empty() {
-            self.write_all(&raw_header.padding)?;
-        }
-        Ok(())
     }
 }
 

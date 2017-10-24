@@ -1,10 +1,8 @@
 use {Error, Header, Point, Result};
-use header::{GpsTimeType, WriteRawHeader};
-use point::WriteRawPoint;
+use header::GpsTimeType;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
-use vlr::WriteRawVlr;
 
 /// Writes LAS data.
 ///
@@ -69,11 +67,11 @@ impl<W: Seek + Write> Writer<W> {
             header.vlr_padding = vec![0xDD, 0xCC];
         }
         header.to_raw_header().and_then(|raw_header| {
-            write.write_raw_header(&raw_header)
+            raw_header.write_to(&mut write)
         })?;
         for vlr in header.vlrs.iter() {
             vlr.to_raw_vlr().and_then(
-                |raw_vlr| write.write_raw_vlr(&raw_vlr),
+                |raw_vlr| raw_vlr.write_to(&mut write),
             )?;
         }
         if !header.vlr_padding.is_empty() {
@@ -101,9 +99,10 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        self.write.write_raw_point(
-            &point.to_raw_point(&self.header.transforms)?,
-            &self.header.point_format,
+        point.to_raw_point(&self.header.transforms).and_then(
+            |raw_point| {
+                raw_point.write_to(&mut self.write, self.header.point_format)
+            },
         )?;
         self.header.number_of_points += 1;
         if point.return_number > 0 {
@@ -130,7 +129,7 @@ impl<W: Seek + Write> Writer<W> {
         if !self.closed {
             self.write.seek(SeekFrom::Start(0))?;
             self.header.to_raw_header().and_then(|raw_header| {
-                self.write.write_raw_header(&raw_header)
+                raw_header.write_to(&mut self.write)
             })?;
             self.closed = true;
         }

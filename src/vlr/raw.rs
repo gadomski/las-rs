@@ -45,6 +45,42 @@ impl Vlr {
 }
 
 impl RawVlr {
+    /// Reads a raw VLR.
+    ///
+    /// # Examples
+    ///
+    /// `Read` implements `ReadRawVlr`.
+    ///
+    /// ```
+    /// use std::io::{Seek, SeekFrom};
+    /// use std::fs::File;
+    /// use las::vlr::RawVlr;
+    /// let mut file = File::open("tests/data/autzen.las").unwrap();
+    /// file.seek(SeekFrom::Start(227));
+    /// let vlr = RawVlr::read_from(file).unwrap();
+    /// ```
+    pub fn read_from<R: Read>(mut read: R) -> Result<RawVlr> {
+        let reserved = read.read_u16::<LittleEndian>()?;
+        let mut user_id = [0; 16];
+        read.read_exact(&mut user_id)?;
+        let record_id = read.read_u16::<LittleEndian>()?;
+        let record_length_after_header = read.read_u16::<LittleEndian>()?;
+        let mut description = [0; 32];
+        read.read_exact(&mut description)?;
+        let mut data = Vec::with_capacity(record_length_after_header as usize);
+        read.take(record_length_after_header as u64).read_to_end(
+            &mut data,
+        )?;
+        Ok(RawVlr {
+            reserved: reserved,
+            user_id: user_id,
+            record_id: record_id,
+            record_length_after_header: record_length_after_header,
+            description: description,
+            data: data,
+        })
+    }
+
     /// Converts this raw vlr into a vlr.
     ///
     /// # Examples
@@ -61,78 +97,27 @@ impl RawVlr {
             data: self.data,
         })
     }
-}
 
-/// Reads a raw VLR.
-pub trait ReadRawVlr {
-    /// Reads a raw VLR.
-    ///
-    /// # Examples
-    ///
-    /// `Read` implements `ReadRawVlr`.
-    ///
-    /// ```
-    /// use std::io::{Seek, SeekFrom};
-    /// use std::fs::File;
-    /// use las::vlr::ReadRawVlr;
-    /// let mut file = File::open("tests/data/autzen.las").unwrap();
-    /// file.seek(SeekFrom::Start(227));
-    /// let vlr = file.read_raw_vlr().unwrap();
-    /// ```
-    fn read_raw_vlr(&mut self) -> Result<RawVlr>;
-}
-
-impl<R: Read> ReadRawVlr for R {
-    fn read_raw_vlr(&mut self) -> Result<RawVlr> {
-        let reserved = self.read_u16::<LittleEndian>()?;
-        let mut user_id = [0; 16];
-        self.read_exact(&mut user_id)?;
-        let record_id = self.read_u16::<LittleEndian>()?;
-        let record_length_after_header = self.read_u16::<LittleEndian>()?;
-        let mut description = [0; 32];
-        self.read_exact(&mut description)?;
-        let mut data = Vec::with_capacity(record_length_after_header as usize);
-        self.take(record_length_after_header as u64).read_to_end(
-            &mut data,
-        )?;
-        Ok(RawVlr {
-            reserved: reserved,
-            user_id: user_id,
-            record_id: record_id,
-            record_length_after_header: record_length_after_header,
-            description: description,
-            data: data,
-        })
-    }
-}
-
-/// Writes a raw VLR.
-pub trait WriteRawVlr {
     /// Writes a raw VLR.
     ///
     /// # Examples
     ///
-    /// `Write` implements `WriteRawVlr`.
-    ///
     /// ```
     /// use std::io::Cursor;
-    /// use las::vlr::WriteRawVlr;
+    /// use las::vlr::RawVlr;
     /// let mut cursor = Cursor::new(Vec::new());
-    /// cursor.write_raw_vlr(&Default::default()).unwrap();
+    /// let raw_vlr = RawVlr::default();
+    /// raw_vlr.write_to(cursor).unwrap();
     /// ```
-    fn write_raw_vlr(&mut self, raw_vlr: &RawVlr) -> Result<()>;
-}
-
-impl<W: Write> WriteRawVlr for W {
-    fn write_raw_vlr(&mut self, raw_vlr: &RawVlr) -> Result<()> {
-        self.write_u16::<LittleEndian>(raw_vlr.reserved)?;
-        self.write_all(&raw_vlr.user_id)?;
-        self.write_u16::<LittleEndian>(raw_vlr.record_id)?;
-        self.write_u16::<LittleEndian>(
-            raw_vlr.record_length_after_header,
+    pub fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
+        write.write_u16::<LittleEndian>(self.reserved)?;
+        write.write_all(&self.user_id)?;
+        write.write_u16::<LittleEndian>(self.record_id)?;
+        write.write_u16::<LittleEndian>(
+            self.record_length_after_header,
         )?;
-        self.write_all(&raw_vlr.description)?;
-        self.write_all(&raw_vlr.data)?;
+        write.write_all(&self.description)?;
+        write.write_all(&self.data)?;
         Ok(())
     }
 }

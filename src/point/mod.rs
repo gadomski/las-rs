@@ -11,5 +11,5 @@ pub use point::classification::Classification;
 pub use point::color::Color;
 pub use point::format::Format;
 pub use point::point::Point;
-pub use point::raw::{RawPoint, ReadRawPoint, WriteRawPoint};
+pub use point::raw::RawPoint;
 pub use point::scan_direction::ScanDirection;

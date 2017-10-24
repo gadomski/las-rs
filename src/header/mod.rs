@@ -4,7 +4,7 @@ mod header;
 mod raw;
 
 pub use header::header::Header;
-pub use header::raw::{RawHeader, ReadRawHeader, WriteRawHeader};
+pub use header::raw::RawHeader;
 
 const HEADER_SIZE: u16 = 227;
 

@@ -6,5 +6,5 @@
 mod raw;
 mod vlr;
 
-pub use vlr::raw::{RawVlr, ReadRawVlr, WriteRawVlr};
+pub use vlr::raw::RawVlr;
 pub use vlr::vlr::Vlr;
