@@ -15,7 +15,7 @@
 //! ```
 //! use std::io::BufReader;
 //! use std::fs::File;
-//! # use las::Reader;
+//! use las::Reader;
 //! let read = BufReader::new(File::open("tests/data/autzen.las").unwrap());
 //! let reader = Reader::new(read).unwrap();
 //! ```
@@ -26,8 +26,8 @@
 //! Read points one-by-one with `read`:
 //!
 //! ```
-//! # use las::Reader;
-//! # let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+//! use las::Reader;
+//! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let point = reader.read().unwrap().unwrap();
 //! ```
 //!
@@ -44,27 +44,25 @@
 //! Use the `Header` to customize the output data formats:
 //!
 //! ```
-//! # use std::io::Cursor;
-//! # use las::Writer;
-//! use las::Header;
-//! let header = Header { version: (1, 3), point_format: 2.into(), ..Default::default() };
+//! use std::io::Cursor;
+//! use las::{Writer, Header};
+//! let header = Header { version: (1, 3).into(), point_format: 2.into(), ..Default::default() };
 //! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
 //! ```
 //!
 //! You can also write out to a path (automatically buffered):
 //!
 //! ```
-//! # use las::Writer;
+//! use las::Writer;
 //! let writer = Writer::from_path("/dev/null", Default::default());
 //! ```
 //!
 //! Write points one at a time:
 //!
 //! ```
-//! # use std::io::Cursor;
-//! # use las::Writer;
-//! # let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
-//! use las::Point;
+//! use std::io::Cursor;
+//! use las::{Writer, Point};
+//! let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
 //! let point = Point { x: 1., y: 2., z: 3., ..Default::default() };
 //! writer.write(&point).unwrap();
 //! ```
@@ -94,6 +92,7 @@ mod header;
 mod transform;
 mod utils;
 mod vector;
+mod version;
 mod vlr;
 mod writer;
 
@@ -106,6 +105,7 @@ pub use point::Point;
 pub use reader::Reader;
 pub use transform::Transform;
 pub use vector::Vector;
+pub use version::Version;
 pub use vlr::Vlr;
 pub use writer::Writer;
 

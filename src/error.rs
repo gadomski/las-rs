@@ -1,5 +1,5 @@
+use {Version, raw};
 use point::Format;
-use raw;
 use std::io;
 use std::str;
 
@@ -80,9 +80,9 @@ quick_error! {
             display("utf8 error: {}", err)
         }
         /// This version does not support the feature.
-        VersionDoesNotSupport(version: (u8, u8), s: String) {
+        VersionDoesNotSupport(version: Version, s: String) {
             description("las version does not support the provided feature")
-            display("las version {}.{} does not support feature: {}", version.0, version.1, s)
+            display("las version {} does not support feature: {}", version, s)
         }
         /// The data in the VLR are too long for LAS.
         VlrDataTooLong(n: usize) {

@@ -55,12 +55,12 @@ macro_rules! roundtrip {
             const VERSION: (u8, u8) = ($major, $minor);
 
             fn roundtrip(point: Point) {
-                let header = Header { version: VERSION, ..Default::default() };
+                let header = Header { version: VERSION.into(), ..Default::default() };
                 super::roundtrip(header, point);
             }
 
             fn roundtrip_with_format(point: Point, point_format: u8) {
-                let header = Header { version: VERSION, point_format: point_format.into(), ..Default::default() };
+                let header = Header { version: VERSION.into(), point_format: point_format.into(), ..Default::default() };
                 super::roundtrip(header, point);
             }
 
@@ -179,50 +179,50 @@ macro_rules! roundtrip {
                     y: transform,
                     z: transform,
                 };
-                let header = Header { version: VERSION, transforms: transforms, ..Default::default() };
+                let header = Header { version: VERSION.into(), transforms: transforms, ..Default::default() };
                 super::roundtrip(header, point);
             }
 
             #[test]
             fn guid() {
-                let header = Header { version: VERSION, guid: [1; 16], ..Default::default() };
+                let header = Header { version: VERSION.into(), guid: [1; 16], ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
             #[test]
             fn system_identifier() {
-                let header = Header { version: VERSION, system_identifier: "Beer!".to_string(), ..Default::default() };
+                let header = Header { version: VERSION.into(), system_identifier: "Beer!".to_string(), ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
             #[test]
             fn generating_software() {
-                let header = Header { version: VERSION, generating_software: "Beer!".to_string(), ..Default::default() };
+                let header = Header { version: VERSION.into(), generating_software: "Beer!".to_string(), ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
             #[test]
             fn date() {
-                let header = Header { version: VERSION, date: Some(Utc::today() - Duration::days(1)), ..Default::default() };
+                let header = Header { version: VERSION.into(), date: Some(Utc::today() - Duration::days(1)), ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
             #[test]
             fn padding() {
-                let header = Header { version: VERSION, padding: vec![1], ..Default::default() };
+                let header = Header { version: VERSION.into(), padding: vec![1], ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
             #[test]
             fn vlr_padding() {
-                let header = Header { version: VERSION, vlr_padding: vec![0], ..Default::default() };
+                let header = Header { version: VERSION.into(), vlr_padding: vec![0], ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
             #[test]
             fn vlrs() {
                 let vlrs = vec![Default::default()];
-                let header = Header { version: VERSION, vlrs: vlrs, ..Default::default() };
+                let header = Header { version: VERSION.into(), vlrs: vlrs, ..Default::default() };
                 super::roundtrip(header, Default::default());
             }
 
@@ -233,7 +233,7 @@ macro_rules! roundtrip {
                     ..Default::default()
                 };
                 if VERSION == (1, 0) || VERSION == (1, 1) {
-                    super::new_writer_fail(Header { version: VERSION, point_format: 2.into(), ..Default::default() });
+                    super::new_writer_fail(Header { version: VERSION.into(), point_format: 2.into(), ..Default::default() });
                 } else {
                     roundtrip_with_format(point, 2.into());
                 }
@@ -241,7 +241,7 @@ macro_rules! roundtrip {
 
             #[test]
             fn file_source_id() {
-                let header = Header { version: VERSION, file_source_id: 1, ..Default::default() };
+                let header = Header { version: VERSION.into(), file_source_id: 1, ..Default::default() };
                 if VERSION == (1, 0) {
                     super::new_writer_fail(header);
                 } else {
@@ -251,7 +251,7 @@ macro_rules! roundtrip {
 
             #[test]
             fn gps_time_type() {
-                let header = Header { version: VERSION, gps_time_type: GpsTimeType::Standard, ..Default::default() };
+                let header = Header { version: VERSION.into(), gps_time_type: GpsTimeType::Standard, ..Default::default() };
                 if VERSION == (1, 0) || VERSION == (1, 1) {
                     super::new_writer_fail(header);
                 } else {

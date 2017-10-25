@@ -1,5 +1,4 @@
-use {Bounds, GpsTimeType, Transform, Vector, Vlr, raw};
-use Result;
+use {Bounds, GpsTimeType, Result, Transform, Vector, Version, Vlr, raw};
 use chrono::{Date, Utc};
 use point::Format;
 
@@ -16,9 +15,7 @@ pub struct Header {
     /// Optional globally-unique identifier.
     pub guid: [u8; 16],
     /// The LAS version of this file.
-    ///
-    /// TODO this should probably be a major-minor struct.
-    pub version: (u8, u8),
+    pub version: Version,
     /// The system that produced this file.
     ///
     /// If hardware, this should be the name of the hardware. Otherwise, maybe describe the
@@ -125,7 +122,7 @@ impl Header {
                     z: header.max_z,
                 },
             },
-            version: (header.version_major, header.version_minor),
+            version: Version::new(header.version_major, header.version_minor),
             vlrs: vlrs,
         })
     }
@@ -177,8 +174,8 @@ impl Header {
             file_source_id: self.file_source_id,
             global_encoding: global_encoding,
             guid: self.guid,
-            version_major: self.version.0,
-            version_minor: self.version.1,
+            version_major: self.version.major,
+            version_minor: self.version.minor,
             system_identifier: system_identifier,
             generating_software: generating_software,
             file_creation_day_of_year: self.date.map_or(0, |d| d.ordinal() as u16),
@@ -225,7 +222,7 @@ impl Default for Header {
             point_format: 0.into(),
             system_identifier: "las-rs".to_string(),
             transforms: Default::default(),
-            version: (1, 2),
+            version: Default::default(),
             vlrs: Vec::new(),
         }
     }

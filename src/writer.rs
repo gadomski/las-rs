@@ -1,4 +1,4 @@
-use {Error, GpsTimeType, Header, Point, Result};
+use {Error, Header, Point, Result};
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -36,34 +36,29 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        if header.version == (1, 0) && header.file_source_id != 0 {
+        if !header.version.supports_file_source_id() && header.file_source_id != 0 {
             return Err(Error::VersionDoesNotSupport(
                 header.version,
                 "file source id".to_string(),
             ));
         }
-        if header.version == (1, 0) || header.version == (1, 1) {
-            if header.point_format.has_color() {
-                return Err(Error::VersionDoesNotSupport(
-                    header.version,
-                    "color".to_string(),
-                ));
-            }
-            match header.gps_time_type {
-                GpsTimeType::Standard => {
-                    return Err(Error::VersionDoesNotSupport(
-                        header.version,
-                        "GPS standard time".to_string(),
-                    ))
-                }
-                _ => {}
-            }
+        if !header.version.supports_color() && header.point_format.has_color() {
+            return Err(Error::VersionDoesNotSupport(
+                header.version,
+                "color".to_string(),
+            ));
+        }
+        if !header.version.supports_gps_standard_time() && header.gps_time_type.is_standard() {
+            return Err(Error::VersionDoesNotSupport(
+                header.version,
+                "GPS standard time".to_string(),
+            ));
         }
         header.bounds = Default::default();
         header.number_of_points = 0;
         header.number_of_points_by_return = [0; 5];
-        if header.version == (1, 0) {
-            header.vlr_padding = vec![0xDD, 0xCC];
+        if header.version.requires_point_data_start_signature() {
+            header.vlr_padding = ::raw::POINT_DATA_START_SIGNATURE.to_vec();
         }
         header.to_raw().and_then(
             |raw_header| raw_header.write_to(&mut write),
@@ -175,7 +170,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         {
             let header = Header {
-                version: (1, 0),
+                version: (1, 0).into(),
                 vlrs: vec![Default::default()],
                 ..Default::default()
             };
