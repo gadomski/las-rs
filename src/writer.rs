@@ -1,5 +1,4 @@
-use {Error, Header, Point, Result};
-use header::GpsTimeType;
+use {Error, GpsTimeType, Header, Point, Result};
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -66,11 +65,11 @@ impl<W: Seek + Write> Writer<W> {
         if header.version == (1, 0) {
             header.vlr_padding = vec![0xDD, 0xCC];
         }
-        header.to_raw_header().and_then(|raw_header| {
-            raw_header.write_to(&mut write)
-        })?;
+        header.to_raw().and_then(
+            |raw_header| raw_header.write_to(&mut write),
+        )?;
         for vlr in header.vlrs.iter() {
-            vlr.to_raw_vlr().and_then(
+            vlr.to_raw().and_then(
                 |raw_vlr| raw_vlr.write_to(&mut write),
             )?;
         }
@@ -99,7 +98,7 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        point.to_raw_point(&self.header.transforms).and_then(
+        point.to_raw(&self.header.transforms).and_then(
             |raw_point| {
                 raw_point.write_to(&mut self.write, self.header.point_format)
             },
@@ -128,7 +127,7 @@ impl<W: Seek + Write> Writer<W> {
     pub fn close(&mut self) -> Result<()> {
         if !self.closed {
             self.write.seek(SeekFrom::Start(0))?;
-            self.header.to_raw_header().and_then(|raw_header| {
+            self.header.to_raw().and_then(|raw_header| {
                 raw_header.write_to(&mut self.write)
             })?;
             self.closed = true;

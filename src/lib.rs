@@ -82,20 +82,25 @@ extern crate chrono;
 #[macro_use]
 extern crate quick_error;
 
-pub mod header;
 pub mod point;
+pub mod raw;
 pub mod reader;
-pub mod vlr;
 
 mod bounds;
+mod color;
 mod error;
+mod gps_time_type;
+mod header;
 mod transform;
 mod utils;
 mod vector;
+mod vlr;
 mod writer;
 
 pub use bounds::Bounds;
+pub use color::Color;
 pub use error::Error;
+pub use gps_time_type::GpsTimeType;
 pub use header::Header;
 pub use point::Point;
 pub use reader::Reader;

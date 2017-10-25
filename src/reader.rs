@@ -1,12 +1,10 @@
 //! Read las points.
 
 use {Error, Header, Point, Result, Vlr};
-use header::RawHeader;
-use point::RawPoint;
+use raw;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
-use vlr::RawVlr;
 
 /// Reads LAS data.
 #[derive(Debug)]
@@ -32,13 +30,13 @@ impl<R: Read> Reader<R> {
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
-        let raw_header = RawHeader::read_from(&mut read)?;
+        let raw_header = raw::Header::read_from(&mut read)?;
         if raw_header.is_compressed() {
             return Err(Error::Laszip);
         }
         let vlrs = (0..raw_header.number_of_variable_length_records)
             .map(|_| {
-                RawVlr::read_from(&mut read).and_then(|raw_vlr| raw_vlr.into_vlr())
+                raw::Vlr::read_from(&mut read).and_then(|raw_vlr| Vlr::new(raw_vlr))
             })
             .collect::<Result<Vec<Vlr>>>()?;
         let position = vlrs.iter().fold(
@@ -52,7 +50,7 @@ impl<R: Read> Reader<R> {
         } else {
             Vec::new()
         };
-        let header = raw_header.into_header(vlrs, vlr_padding)?;
+        let header = Header::new(raw_header, vlrs, vlr_padding)?;
         Ok(Reader {
             header: header,
             read: read,
@@ -69,8 +67,8 @@ impl<R: Read> Reader<R> {
     /// let point = reader.read().unwrap().unwrap();
     /// ```
     pub fn read(&mut self) -> Result<Option<Point>> {
-        RawPoint::read_from(&mut self.read, self.header.point_format).map(|option| {
-            option.map(|raw_point| raw_point.into_point(&self.header.transforms))
+        raw::Point::read_from(&mut self.read, self.header.point_format).map(|option| {
+            option.map(|raw_point| Point::new(raw_point, self.header.transforms))
         })
     }
 

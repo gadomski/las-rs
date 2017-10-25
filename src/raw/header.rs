@@ -1,14 +1,14 @@
-use {Bounds, Error, Header, Result, Transform, Vector, Vlr};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use chrono::{Datelike, TimeZone, Utc};
-use header::{GpsTimeType, HEADER_SIZE};
+use Result;
 use std::io::{Read, Write};
-use utils::{FromLasStr, ToLasStr};
+
+/// The default size of a las header.
+pub const HEADER_SIZE: u16 = 227;
+const IS_COMPRESSED_MASK: u8 = 0x80;
 
 /// A raw header that maps directly onto the file structure.
 #[derive(Debug)]
 #[allow(missing_docs)]
-pub struct RawHeader {
+pub struct Header {
     pub file_signature: [u8; 4],
     pub file_source_id: u16,
     pub global_encoding: u16,
@@ -41,18 +41,19 @@ pub struct RawHeader {
     pub padding: Vec<u8>,
 }
 
-impl RawHeader {
+impl Header {
     /// Reads a raw header from a `Read`.
     ///
     /// # Examples
     ///
     /// ```
     /// use std::fs::File;
-    /// use las::header::RawHeader;
+    /// use las::raw::Header;
     /// let mut file = File::open("tests/data/autzen.las").unwrap();
-    /// let header = RawHeader::read_from(&mut file).unwrap();
+    /// let header = Header::read_from(&mut file).unwrap();
     /// ```
-    pub fn read_from<R: Read>(mut read: R) -> Result<RawHeader> {
+    pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
+        use byteorder::{LittleEndian, ReadBytesExt};
         let mut file_signature = [0; 4];
         read.read_exact(&mut file_signature)?;
         let file_source_id = read.read_u16::<LittleEndian>()?;
@@ -97,7 +98,7 @@ impl RawHeader {
         } else {
             Vec::new()
         };
-        Ok(RawHeader {
+        Ok(Header {
             file_signature: file_signature,
             file_source_id: file_source_id,
             global_encoding: global_encoding,
@@ -131,91 +132,22 @@ impl RawHeader {
         })
     }
 
-    /// Converts this raw header into a `Header`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::header::RawHeader;
-    /// let raw_header = RawHeader { ..Default::default() };
-    /// let header = raw_header.into_header(Vec::new(), Vec::new()).unwrap();
-    /// ```
-    pub fn into_header(self, vlrs: Vec<Vlr>, vlr_padding: Vec<u8>) -> Result<Header> {
-        let gps_time_type = if (self.global_encoding & 1) == 1 {
-            GpsTimeType::Week
-        } else {
-            GpsTimeType::Standard
-        };
-        if self.header_size < HEADER_SIZE {
-            return Err(Error::HeaderSizeTooSmall(self.header_size));
-        }
-        let vlr_len = vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
-        if self.offset_to_point_data < self.header_size as u32 + vlr_len {
-            return Err(Error::OffsetToDataTooSmall(self.offset_to_point_data));
-        }
-        Ok(Header {
-            file_source_id: self.file_source_id,
-            gps_time_type: gps_time_type,
-            date: Utc.yo_opt(
-                self.file_creation_year as i32,
-                self.file_creation_day_of_year as u32,
-            ).single(),
-            generating_software: self.generating_software.as_ref().to_las_str()?.to_string(),
-            guid: self.guid,
-            // TODO las 1.4 header
-            padding: self.padding,
-            vlr_padding: vlr_padding,
-            point_format: self.point_data_format_id.into(),
-            number_of_points: self.number_of_point_records,
-            number_of_points_by_return: self.number_of_points_by_return,
-            system_identifier: self.system_identifier.as_ref().to_las_str()?.to_string(),
-            transforms: Vector {
-                x: Transform {
-                    scale: self.x_scale_factor,
-                    offset: self.x_offset,
-                },
-                y: Transform {
-                    scale: self.y_scale_factor,
-                    offset: self.y_offset,
-                },
-                z: Transform {
-                    scale: self.z_scale_factor,
-                    offset: self.z_offset,
-                },
-            },
-            bounds: Bounds {
-                min: Vector {
-                    x: self.min_x,
-                    y: self.min_y,
-                    z: self.min_z,
-                },
-                max: Vector {
-                    x: self.max_x,
-                    y: self.max_y,
-                    z: self.max_z,
-                },
-            },
-            version: (self.version_major, self.version_minor),
-            vlrs: vlrs,
-        })
-    }
-
     /// Returns true if this raw header is for compressed las data.
     ///
     /// Though this isn't part of the las spec, the two high bits of the point data format id have
-    /// been used to indicate compressed data, particularily by the laszip library.
+    /// been used to indicate compressed data, though only the high bit is currently used.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use las::header::RawHeader;
-    /// let mut raw_header = RawHeader { ..Default::default() };
-    /// assert!(!raw_header.is_compressed());
-    /// raw_header.point_data_format_id = 131;
-    /// assert!(raw_header.is_compressed());
+    /// use las::raw::Header;
+    /// let mut header = Header::default();
+    /// assert!(!header.is_compressed());
+    /// header.point_data_format_id = 131;
+    /// assert!(header.is_compressed());
     /// ```
     pub fn is_compressed(&self) -> bool {
-        (self.point_data_format_id >> 7) == 1
+        (self.point_data_format_id & IS_COMPRESSED_MASK) == IS_COMPRESSED_MASK
     }
 
     /// Writes a raw header to a `Write`.
@@ -224,12 +156,13 @@ impl RawHeader {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// use las::header::RawHeader;
+    /// use las::raw::Header;
     /// let mut cursor = Cursor::new(Vec::new());
-    /// let raw_header = RawHeader::default();
-    /// raw_header.write_to(&mut cursor).unwrap();
+    /// let header = Header::default();
+    /// header.write_to(&mut cursor).unwrap();
     /// ```
     pub fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
+        use byteorder::{LittleEndian, WriteBytesExt};
         write.write_all(&self.file_signature)?;
         write.write_u16::<LittleEndian>(self.file_source_id)?;
         write.write_u16::<LittleEndian>(self.global_encoding)?;
@@ -276,10 +209,10 @@ impl RawHeader {
     }
 }
 
-impl Default for RawHeader {
-    fn default() -> RawHeader {
-        RawHeader {
-            file_signature: *b"LASF",
+impl Default for Header {
+    fn default() -> Header {
+        Header {
+            file_signature: ::raw::LASF,
             file_source_id: 0,
             global_encoding: 0,
             guid: [0; 16],
@@ -313,98 +246,27 @@ impl Default for RawHeader {
     }
 }
 
-impl Header {
-    /// Converts this header into a `RawHeader.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Header;
-    /// let raw_header = Header { ..Default::default() }.to_raw_header().unwrap();
-    /// ```
-    pub fn to_raw_header(&self) -> Result<RawHeader> {
-        let global_encoding = match self.gps_time_type {
-            GpsTimeType::Week => 0,
-            GpsTimeType::Standard => 1,
-        };
-        let mut system_identifier = [0; 32];
-        system_identifier.as_mut().from_las_str(
-            &self.system_identifier,
-        )?;
-        let mut generating_software = [0; 32];
-        generating_software.as_mut().from_las_str(
-            &self.generating_software,
-        )?;
-        let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
-        Ok(RawHeader {
-            file_signature: *b"LASF",
-            file_source_id: self.file_source_id,
-            global_encoding: global_encoding,
-            guid: self.guid,
-            version_major: self.version.0,
-            version_minor: self.version.1,
-            system_identifier: system_identifier,
-            generating_software: generating_software,
-            file_creation_day_of_year: self.date.map_or(0, |d| d.ordinal() as u16),
-            file_creation_year: self.date.map_or(0, |d| d.year() as u16),
-            header_size: HEADER_SIZE + self.padding.len() as u16,
-            offset_to_point_data: HEADER_SIZE as u32 + self.padding.len() as u32 + vlr_len +
-                self.vlr_padding.len() as u32,
-            number_of_variable_length_records: self.vlrs.len() as u32,
-            point_data_format_id: self.point_format.into(),
-            // TODO extra bytes
-            point_data_record_length: self.point_format.len(),
-            number_of_point_records: self.number_of_points,
-            number_of_points_by_return: self.number_of_points_by_return,
-            x_scale_factor: self.transforms.x.scale,
-            y_scale_factor: self.transforms.y.scale,
-            z_scale_factor: self.transforms.z.scale,
-            x_offset: self.transforms.x.offset,
-            y_offset: self.transforms.y.offset,
-            z_offset: self.transforms.z.offset,
-            max_x: self.bounds.max.x,
-            min_x: self.bounds.min.x,
-            max_y: self.bounds.max.y,
-            min_y: self.bounds.min.y,
-            max_z: self.bounds.max.z,
-            min_z: self.bounds.min.z,
-            padding: self.padding.clone(),
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
 
     #[test]
-    fn no_day_no_date() {
-        let raw_header = RawHeader {
-            file_creation_day_of_year: 0,
-            ..Default::default()
-        };
-        let header = raw_header.into_header(Vec::new(), Vec::new()).unwrap();
-        assert!(header.date.is_none());
+    fn not_lasf() {
+        assert!(Header::read_from(File::open("README.md").unwrap()).is_err());
     }
 
-    #[test]
-    fn no_year_no_date() {
-        let raw_header = RawHeader {
-            file_creation_year: 0,
-            ..Default::default()
-        };
-        let header = raw_header.into_header(Vec::new(), Vec::new()).unwrap();
-        assert!(header.date.is_none());
-    }
+    // TODO test header size is valid
+    // TODO writing without LASF
 
     #[test]
-    fn raw_header_is_compressed() {
-        let mut raw_header = RawHeader {
+    fn is_compressed() {
+        let mut header = Header {
             point_data_format_id: 0,
             ..Default::default()
         };
-        assert!(!raw_header.is_compressed());
-        raw_header.point_data_format_id = 131;
-        assert!(raw_header.is_compressed());
+        assert!(!header.is_compressed());
+        header.point_data_format_id = 131;
+        assert!(header.is_compressed());
     }
 }

@@ -1,4 +1,5 @@
-use point::{Format, RawPoint};
+use point::Format;
+use raw;
 use std::io;
 use std::str;
 
@@ -30,12 +31,12 @@ quick_error! {
             display("the offset to the data is too small: {}", offset)
         }
         /// This format requires color, but it is missing.
-        MissingColor(format: Format, point: RawPoint) {
+        MissingColor(format: Format, point: raw::Point) {
             description("the point format requires color, but it is missing")
             display("point format {} requires color, but the point doesn't have color", format)
         }
         /// This format requires GPS time, but it is missing.
-        MissingGpsTime(format: Format, point: RawPoint) {
+        MissingGpsTime(format: Format, point: raw::Point) {
             description("the point format requires gps time, but it is missing")
             display("point format {} requires gps time, but the point doesn't have gps time", format)
         }

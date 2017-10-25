@@ -3,7 +3,6 @@
 extern crate chrono;
 extern crate las;
 
-
 use las::{Header, Point, Reader, Writer};
 use std::io::Cursor;
 
@@ -50,9 +49,8 @@ macro_rules! roundtrip {
         mod $name {
             use chrono::{Utc, Duration};
 
-            use las::{Header, Point, Transform, Vector};
-            use las::header::GpsTimeType;
-            use las::point::{Color, ScanDirection, Classification};
+            use las::{GpsTimeType, Color, Header, Point, Transform, Vector};
+            use las::point::{ScanDirection, Classification};
 
             const VERSION: (u8, u8) = ($major, $minor);
 
