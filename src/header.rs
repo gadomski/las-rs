@@ -90,7 +90,7 @@ impl Header {
             // TODO las 1.4 header
             padding: header.padding,
             vlr_padding: vlr_padding,
-            point_format: header.point_data_format_id.into(),
+            point_format: Format::new(header.point_data_format_id)?,
             number_of_points: header.number_of_point_records,
             number_of_points_by_return: header.number_of_points_by_return,
             system_identifier: header.system_identifier.as_ref().to_las_str()?.to_string(),
@@ -182,7 +182,7 @@ impl Header {
                 vlr_len +
                 self.vlr_padding.len() as u32,
             number_of_variable_length_records: self.vlrs.len() as u32,
-            point_data_format_id: self.point_format.into(),
+            point_data_format_id: self.point_format.to_u8()?,
             // TODO extra bytes
             point_data_record_length: self.point_format.len(),
             number_of_point_records: self.number_of_points,
@@ -223,7 +223,7 @@ impl Default for Header {
             number_of_points_by_return: [0; 5],
             padding: Vec::new(),
             vlr_padding: Vec::new(),
-            point_format: 0.into(),
+            point_format: Default::default(),
             system_identifier: "las-rs".to_string(),
             transforms: Default::default(),
             version: Default::default(),

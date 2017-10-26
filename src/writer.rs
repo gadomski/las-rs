@@ -42,7 +42,7 @@ impl<W: Seek + Write> Writer<W> {
                 "file source id".to_string(),
             ));
         }
-        if !header.version.supports_color() && header.point_format.has_color() {
+        if !header.version.supports_color() && header.point_format.has_color {
             return Err(Error::VersionDoesNotSupport(
                 header.version,
                 "color".to_string(),
@@ -93,11 +93,9 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-        point.to_raw(&self.header.transforms).and_then(
-            |raw_point| {
-                raw_point.write_to(&mut self.write, self.header.point_format)
-            },
-        )?;
+        point.to_raw(self.header.transforms).and_then(|raw_point| {
+            raw_point.write_to(&mut self.write, self.header.point_format)
+        })?;
         self.header.number_of_points += 1;
         if point.return_number > 0 {
             self.header.number_of_points_by_return[point.return_number as usize - 1] += 1;

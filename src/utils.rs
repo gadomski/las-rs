@@ -1,9 +1,18 @@
 use {Error, Result};
+use num::Zero;
 use std::ascii::AsciiExt;
 use std::str;
 
 pub trait ToLasStr {
     fn to_las_str(&self) -> Result<&str>;
+}
+
+pub trait FromLasStr {
+    fn from_las_str(&mut self, s: &str) -> Result<()>;
+}
+
+pub fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
+    if n.is_zero() { None } else { Some(n) }
 }
 
 impl<'a> ToLasStr for &'a [u8] {
@@ -23,10 +32,6 @@ impl<'a> ToLasStr for &'a [u8] {
             Ok(s)
         }
     }
-}
-
-pub trait FromLasStr {
-    fn from_las_str(&mut self, s: &str) -> Result<()>;
 }
 
 impl<'a> FromLasStr for &'a mut [u8] {

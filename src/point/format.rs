@@ -1,73 +1,142 @@
-use std::fmt;
+use Result;
+
+const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
+const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
+const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
+const NIR_FORMATS: &'static [u8] = &[8, 10];
 
 /// A point format describes the attributes associated with the point.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Format(u8);
+pub struct Format {
+    /// Does this point format include gps time?
+    pub has_gps_time: bool,
+    /// Does this point format include red, green, and blue colors?
+    pub has_color: bool,
+    /// Does this point format use two bytes for its flags and scaled scan angles?
+    pub is_extended: bool,
+    /// Does this point format have waveforms?
+    pub has_waveform: bool,
+    /// Does this point format have near infrared data?
+    pub has_nir: bool,
+}
 
 impl Format {
-    /// Returns true if this format has GPS time attached to each point.
+    /// Creates a new point format from a u8.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use las::point::Format;
-    /// assert!(!Format::from(0).has_gps_time());
-    /// assert!(Format::from(1).has_gps_time());
+    /// use las::point::Format;
+    /// let format = Format::new(0).unwrap();
+    /// assert!(!format.has_gps_time);
+    /// assert!(!format.has_color);
+    ///
+    /// let format = Format::new(3).unwrap();
+    /// assert!(format.has_gps_time);
+    /// assert!(format.has_color);
+    ///
+    /// assert!(Format::new(11).is_err());
     /// ```
-    pub fn has_gps_time(&self) -> bool {
-        self.0 % 2 == 1
+    pub fn new(n: u8) -> Result<Format> {
+        use Error;
+        if n > 10 {
+            Err(Error::InvalidFormatNumber(n))
+        } else {
+            Ok(Format {
+                has_gps_time: TIME_FORMATS.contains(&n),
+                has_color: COLOR_FORMATS.contains(&n),
+                has_waveform: WAVEFORM_FORMATS.contains(&n),
+                has_nir: NIR_FORMATS.contains(&n),
+                is_extended: n >= 6,
+                ..Default::default()
+            })
+        }
     }
 
-    /// Returns true if this point format has color.
+    /// Returns this point format's length.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use las::point::Format;
-    /// assert!(!Format::from(0).has_color());
-    /// assert!(Format::from(2).has_color());
-    /// ```
-    pub fn has_color(&self) -> bool {
-        self.0 / 2 == 1
-    }
-
-    /// Returns the length of this point format.
-    ///
-    /// Does not include any extra bytes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::point::Format;
-    /// assert_eq!(20, Format::from(0).len());
+    /// use las::point::Format;
+    /// let mut format = Format::new(0).unwrap();
+    /// assert_eq!(20, format.len());
+    /// format.has_gps_time = true;
+    /// assert_eq!(28, format.len());
     /// ```
     pub fn len(&self) -> u16 {
-        let mut len = 20;
-        if self.has_gps_time() {
+        let mut len = if self.is_extended { 22 } else { 20 };
+        if self.has_gps_time {
             len += 8;
         }
-        if self.has_color() {
+        if self.has_color {
             len += 6;
+        }
+        if self.has_nir {
+            len += 2;
+        }
+        if self.has_waveform {
+            len += 29;
         }
         len
     }
-}
 
-impl From<u8> for Format {
-    fn from(n: u8) -> Format {
-        Format(n)
-    }
-}
-
-impl From<Format> for u8 {
-    fn from(format: Format) -> u8 {
-        format.0
-    }
-}
-
-impl fmt::Display for Format {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "point format {}", self.0)
+    /// Converts this point format to a u8.
+    ///
+    /// Can return an error if there is an invalid combination of attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Format;
+    /// let mut format = Format::default();
+    /// assert_eq!(0, format.to_u8().unwrap());
+    /// format.is_extended = true;
+    /// assert!(format.to_u8().is_err());
+    /// format.has_gps_time = true;
+    /// assert_eq!(6, format.to_u8().unwrap());
+    /// ```
+    pub fn to_u8(&self) -> Result<u8> {
+        use Error;
+        if self.is_extended {
+            if self.has_gps_time {
+                if self.has_color {
+                    if self.has_nir {
+                        if self.has_waveform { Ok(10) } else { Ok(8) }
+                    } else {
+                        if self.has_waveform {
+                            Err(Error::InvalidFormat(*self))
+                        } else {
+                            Ok(7)
+                        }
+                    }
+                } else {
+                    if self.has_nir {
+                        Err(Error::InvalidFormat(*self))
+                    } else {
+                        if self.has_waveform { Ok(9) } else { Ok(6) }
+                    }
+                }
+            } else {
+                Err(Error::InvalidFormat(*self))
+            }
+        } else if self.has_nir {
+            Err(Error::InvalidFormat(*self))
+        } else {
+            if self.has_waveform {
+                if self.has_gps_time {
+                    if self.has_color { Ok(5) } else { Ok(4) }
+                } else {
+                    Err(Error::InvalidFormat(*self))
+                }
+            } else {
+                let mut n = if self.has_gps_time { 1 } else { 0 };
+                if self.has_color {
+                    n += 2;
+                }
+                Ok(n)
+            }
+        }
     }
 }
 
@@ -75,27 +144,170 @@ impl fmt::Display for Format {
 mod tests {
     use super::*;
 
+    macro_rules! format {
+        ($name:ident, $n:expr, $expected:expr, $len:expr) => {
+            mod $name {
+                use point::Format;
+
+                #[test]
+                fn new() {
+                    assert_eq!($expected, Format::new($n).unwrap());
+                }
+
+                #[test]
+                fn len() {
+                    assert_eq!($len, Format::new($n).unwrap().len());
+                }
+
+                #[test]
+                fn to_u8() {
+                    assert_eq!($n, Format::new($n).unwrap().to_u8().unwrap());
+                }
+            }
+        }
+    }
+
+    format!(format_0, 0, Format::default(), 20);
+    format!(
+        format_1,
+        1,
+        Format {
+            has_gps_time: true,
+            ..Default::default()
+        },
+        28
+    );
+    format!(
+        format_2,
+        2,
+        Format {
+            has_color: true,
+            ..Default::default()
+        },
+        26
+    );
+    format!(
+        format_3,
+        3,
+        Format {
+            has_gps_time: true,
+            has_color: true,
+            ..Default::default()
+        },
+        34
+    );
+    format!(
+        format_4,
+        4,
+        Format {
+            has_gps_time: true,
+            has_waveform: true,
+            ..Default::default()
+        },
+        57
+    );
+    format!(
+        format_5,
+        5,
+        Format {
+            has_gps_time: true,
+            has_color: true,
+            has_waveform: true,
+            ..Default::default()
+        },
+        63
+    );
+    format!(
+        format_6,
+        6,
+        Format {
+            has_gps_time: true,
+            is_extended: true,
+            ..Default::default()
+        },
+        30
+    );
+    format!(
+        format_7,
+        7,
+        Format {
+            has_gps_time: true,
+            has_color: true,
+            is_extended: true,
+            ..Default::default()
+        },
+        36
+    );
+    format!(
+        format_8,
+        8,
+        Format {
+            has_gps_time: true,
+            has_color: true,
+            has_nir: true,
+            is_extended: true,
+            ..Default::default()
+        },
+        38
+    );
+    format!(
+        format_9,
+        9,
+        Format {
+            has_gps_time: true,
+            has_waveform: true,
+            is_extended: true,
+            ..Default::default()
+        },
+        59
+    );
+    format!(
+        format_10,
+        10,
+        Format {
+            has_gps_time: true,
+            has_color: true,
+            has_nir: true,
+            has_waveform: true,
+            is_extended: true,
+        },
+        67
+    );
+
     #[test]
-    fn has_gps_time() {
-        assert!(!Format::from(0).has_gps_time());
-        assert!(Format::from(1).has_gps_time());
-        assert!(!Format::from(2).has_gps_time());
-        assert!(Format::from(3).has_gps_time());
+    fn waveform_without_gps_time() {
+        let format = Format {
+            has_waveform: true,
+            ..Default::default()
+        };
+        assert!(format.to_u8().is_err());
     }
 
     #[test]
-    fn has_color() {
-        assert!(!Format::from(0).has_color());
-        assert!(!Format::from(1).has_color());
-        assert!(Format::from(2).has_color());
-        assert!(Format::from(3).has_color());
+    fn extended_without_gps_time() {
+        let format = Format {
+            is_extended: true,
+            ..Default::default()
+        };
+        assert!(format.to_u8().is_err());
     }
 
     #[test]
-    fn len() {
-        assert_eq!(20, Format::from(0).len());
-        assert_eq!(28, Format::from(1).len());
-        assert_eq!(26, Format::from(2).len());
-        assert_eq!(34, Format::from(3).len());
+    fn nir_without_extended() {
+        let format = Format {
+            has_nir: true,
+            ..Default::default()
+        };
+        assert!(format.to_u8().is_err());
+    }
+
+    #[test]
+    fn nir_without_color() {
+        let format = Format {
+            is_extended: true,
+            has_nir: true,
+            ..Default::default()
+        };
+        assert!(format.to_u8().is_err());
     }
 }

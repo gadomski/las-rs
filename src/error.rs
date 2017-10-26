@@ -1,4 +1,4 @@
-use {Version, raw};
+use Version;
 use point::Format;
 use std::io;
 use std::str;
@@ -30,16 +30,6 @@ quick_error! {
             description("the offset to the data is too small")
             display("the offset to the data is too small: {}", offset)
         }
-        /// This format requires color, but it is missing.
-        MissingColor(format: Format, point: raw::Point) {
-            description("the point format requires color, but it is missing")
-            display("point format {} requires color, but the point doesn't have color", format)
-        }
-        /// This format requires GPS time, but it is missing.
-        MissingGpsTime(format: Format, point: raw::Point) {
-            description("the point format requires gps time, but it is missing")
-            display("point format {} requires gps time, but the point doesn't have gps time", format)
-        }
         /// This string is not ASCII.
         NotAscii(s: String) {
             description("the string is not an ascii string")
@@ -50,6 +40,23 @@ quick_error! {
             description("the bytes are not zero filled")
             display("the bytes are not zero filled: {:?}", bytes)
         }
+        /// An invalid classification number.
+        InvalidClassification(n: u8) {
+            description("invalid classification")
+            display("invalid classification: {}", n)
+        }
+        /// This is an invalid format.
+        ///
+        /// It has a combination of options that can't exist.
+        InvalidFormat(format: Format) {
+            description("invalid format")
+            display("invalid format: {:?}", format)
+        }
+        /// This is an invalid format number.
+        InvalidFormatNumber(n: u8) {
+            description("invalid format number")
+            display("invalid format number: {:?}", n)
+        }
         /// This is not a valid number of returns.
         InvalidNumberOfReturns(n: u8) {
             description("invalid number of returns")
@@ -59,6 +66,11 @@ quick_error! {
         InvalidReturnNumber(n: u8) {
             description("invalid return number")
             display("the return number is invalid: {}", n)
+        }
+        /// This is not a valid scanner channel
+        InvalidScannerChannel(n: u8) {
+            description("invalid scanner channel")
+            display("the scanner channel is invalid: {}", n)
         }
         /// Wrapper around `std::io::Error`.
         Io(err: io::Error) {

@@ -4,7 +4,7 @@
 //! checking. In general, users should prefer to use the non-raw versions, e.g. `las::Header` over
 //! `las::raw::Header`, in order to ensure that they are following The Rules.
 
-mod point;
+pub mod point;
 mod vlr;
 mod header;
 

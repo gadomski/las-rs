@@ -2,13 +2,13 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ScanDirection {
     /// The scan is moving from the right to the left.
-    Negative,
+    RightToLeft,
     /// The scan is moving from the left to the right.
-    Positive,
+    LeftToRight,
 }
 
 impl Default for ScanDirection {
     fn default() -> ScanDirection {
-        ScanDirection::Negative
+        ScanDirection::RightToLeft
     }
 }

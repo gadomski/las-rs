@@ -1,5 +1,4 @@
 use {Result, Version};
-use num::Zero;
 use std::io::{Read, Write};
 
 const IS_COMPRESSED_MASK: u8 = 0x80;
@@ -225,6 +224,8 @@ impl Header {
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
         use byteorder::{LittleEndian, ReadBytesExt};
+        use utils;
+
         let mut file_signature = [0; 4];
         read.read_exact(&mut file_signature)?;
         let file_source_id = read.read_u16::<LittleEndian>()?;
@@ -263,14 +264,14 @@ impl Header {
         let max_z = read.read_f64::<LittleEndian>()?;
         let min_z = read.read_f64::<LittleEndian>()?;
         let start_of_waveform_data_packet_record = if version.supports_waveforms() {
-            some_or_none_if_zero(read.read_u64::<LittleEndian>()?)
+            utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?)
         } else {
             None
         };
         let (start_of_first_evlr, number_of_evlrs) = if version.supports_evlrs() {
             (
-                some_or_none_if_zero(read.read_u64::<LittleEndian>()?),
-                some_or_none_if_zero(read.read_u32::<LittleEndian>()?),
+                utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?),
+                utils::some_or_none_if_zero(read.read_u32::<LittleEndian>()?),
             )
         } else {
             (None, None)
@@ -283,7 +284,7 @@ impl Header {
                     *n = read.read_u64::<LittleEndian>()?
                 }
                 (
-                    some_or_none_if_zero(number_of_point_records_64bit),
+                    utils::some_or_none_if_zero(number_of_point_records_64bit),
                     if number_of_points_by_return_64bit.iter().all(|n| *n == 0) {
                         None
                     } else {
@@ -479,28 +480,9 @@ impl Default for Header {
     }
 }
 
-fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
-    if n.is_zero() { None } else { Some(n) }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn roundtrip(minor: u8) {
-        use std::io::Cursor;
-
-        let version = Version::new(1, minor);
-        let header = Header {
-            version: version,
-            ..Default::default()
-        };
-        let mut cursor = Cursor::new(Vec::new());
-        header.write_to(&mut cursor).unwrap();
-        cursor.set_position(0);
-        let header2 = Header::read_from(cursor).unwrap();
-        assert_eq!(header, header2);
-    }
 
     #[test]
     fn is_compressed() {
@@ -513,28 +495,31 @@ mod tests {
         assert!(header.is_compressed());
     }
 
-    #[test]
-    fn roundtrip_1_0() {
-        roundtrip(0);
+    macro_rules! roundtrip {
+        ($name:ident, $minor:expr) => {
+            mod $name {
+                #[test]
+                fn roundtrip() {
+                    use std::io::Cursor;
+                    use super::*;
+
+                    let version = Version::new(1, $minor);
+                    let header = Header {
+                        version: version,
+                        ..Default::default()
+                    };
+                    let mut cursor = Cursor::new(Vec::new());
+                    header.write_to(&mut cursor).unwrap();
+                    cursor.set_position(0);
+                    assert_eq!(header, Header::read_from(cursor).unwrap());
+                }
+            }
+        }
     }
 
-    #[test]
-    fn roundtrip_1_1() {
-        roundtrip(1);
-    }
-
-    #[test]
-    fn roundtrip_1_2() {
-        roundtrip(2);
-    }
-
-    #[test]
-    fn roundtrip_1_3() {
-        roundtrip(3);
-    }
-
-    #[test]
-    fn roundtrip_1_4() {
-        roundtrip(4);
-    }
+    roundtrip!(las_1_0, 0);
+    roundtrip!(las_1_1, 1);
+    roundtrip!(las_1_2, 2);
+    roundtrip!(las_1_3, 3);
+    roundtrip!(las_1_4, 4);
 }

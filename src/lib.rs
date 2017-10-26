@@ -46,7 +46,12 @@
 //! ```
 //! use std::io::Cursor;
 //! use las::{Writer, Header};
-//! let header = Header { version: (1, 3).into(), point_format: 2.into(), ..Default::default() };
+//! use las::point::Format;
+//! let header = Header {
+//!     version: (1, 3).into(),
+//!     point_format: Format::new(2).unwrap(),
+//!     ..Default::default()
+//! };
 //! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
 //! ```
 //!

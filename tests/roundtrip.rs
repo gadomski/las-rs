@@ -60,7 +60,12 @@ macro_rules! roundtrip {
             }
 
             fn roundtrip_with_format(point: Point, point_format: u8) {
-                let header = Header { version: VERSION.into(), point_format: point_format.into(), ..Default::default() };
+                use las::point::Format;
+                let header = Header {
+                    version: VERSION.into(),
+                    point_format: Format::new(point_format).unwrap(),
+                    ..Default::default()
+                };
                 super::roundtrip(header, point);
             }
 
@@ -105,16 +110,16 @@ macro_rules! roundtrip {
             #[test]
             fn scan_direction_flag() {
                 let point = Point {
-                    scan_direction: ScanDirection::Positive,
+                    scan_direction: ScanDirection::LeftToRight,
                     ..Default::default()
                 };
                 roundtrip(point);
             }
 
             #[test]
-            fn edge_of_flight_line() {
+            fn is_edge_of_flight_line() {
                 let point = Point {
-                    edge_of_flight_line: true,
+                    is_edge_of_flight_line: true,
                     ..Default::default()
                 };
                 roundtrip(point);
@@ -132,7 +137,7 @@ macro_rules! roundtrip {
             #[test]
             fn scan_angle_rank() {
                 let point = Point {
-                    scan_angle_rank: 1,
+                    scan_angle: 2.,
                     ..Default::default()
                 };
                 roundtrip(point);
@@ -228,12 +233,13 @@ macro_rules! roundtrip {
 
             #[test]
             fn color() {
+                use las::point::Format;
                 let point = Point {
                     color: Some(Color { red: 1, green: 2, blue: 3}),
                     ..Default::default()
                 };
                 if VERSION == (1, 0) || VERSION == (1, 1) {
-                    super::new_writer_fail(Header { version: VERSION.into(), point_format: 2.into(), ..Default::default() });
+                    super::new_writer_fail(Header { version: VERSION.into(), point_format: Format::new(2).unwrap(), ..Default::default() });
                 } else {
                     roundtrip_with_format(point, 2.into());
                 }

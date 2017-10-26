@@ -1,5 +1,5 @@
 /// A RGB color value.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Color {
     /// Red channel.
     pub red: u16,

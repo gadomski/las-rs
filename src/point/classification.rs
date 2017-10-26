@@ -1,30 +1,28 @@
 /// ASPRS classification table.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(missing_docs)]
 pub enum Classification {
-    /// Created, never classified.
     CreatedNeverClassified,
-    /// Unclassified.
     Unclassified,
-    /// Ground.
     Ground,
-    /// Low vegetation.
     LowVegetation,
-    /// Medium vegetation.
     MediumVegetation,
-    /// High vegetation.
     HighVegetation,
-    /// Building.
     Building,
-    /// Low point (noise).
     LowPoint,
-    /// Model key-point (mass point).
     ModelKeyPoint,
-    /// Water.
     Water,
-    /// Reserved for ASPRS definition.
-    Reserved(u8),
-    /// Overlap points.
+    Rail,
+    RoadSurface,
     OverlapPoints,
+    WireGuard,
+    WireConductor,
+    TransmissionTower,
+    WireStructureConnector,
+    BridgeDeck,
+    HighNoise,
+    Reserved(u8),
+    UserDefinable(u8),
 }
 
 impl From<u8> for Classification {
@@ -40,8 +38,18 @@ impl From<u8> for Classification {
             7 => Classification::LowPoint,
             8 => Classification::ModelKeyPoint,
             9 => Classification::Water,
+            10 => Classification::Rail,
+            11 => Classification::RoadSurface,
             12 => Classification::OverlapPoints,
-            _ => Classification::Reserved(n),
+            13 => Classification::WireGuard,
+            14 => Classification::WireConductor,
+            15 => Classification::TransmissionTower,
+            16 => Classification::WireStructureConnector,
+            17 => Classification::BridgeDeck,
+            18 => Classification::HighNoise,
+            19...64 => Classification::Reserved(n),
+            64...255 => Classification::UserDefinable(n),
+            _ => unreachable!(),
         }
     }
 }
@@ -59,8 +67,17 @@ impl From<Classification> for u8 {
             Classification::LowPoint => 7,
             Classification::ModelKeyPoint => 8,
             Classification::Water => 9,
+            Classification::Rail => 10,
+            Classification::RoadSurface => 11,
             Classification::OverlapPoints => 12,
+            Classification::WireGuard => 13,
+            Classification::WireConductor => 14,
+            Classification::TransmissionTower => 15,
+            Classification::WireStructureConnector => 16,
+            Classification::BridgeDeck => 17,
+            Classification::HighNoise => 18,
             Classification::Reserved(n) => n,
+            Classification::UserDefinable(n) => n,
         }
     }
 }
