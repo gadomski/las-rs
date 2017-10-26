@@ -1,12 +1,24 @@
-//! Raw structures for las entities.
+//! Raw structures that map directly onto structures as defined in the las format specifications.
 //!
-//! These structures map directly onto the structures as defined in the las formats.
+//! In general, these structures are "dumb", meaning that they do the least amount of validity
+//! checking. For example:
+//!
+//! ```
+//! let raw_header = las::raw::Header::default();
+//! assert_eq!((0, 0), raw_header.version);
+//!
+//! let header = las::Header::default();
+//! assert_eq!(las::Version::new(1, 2), header.version);
+//! ```
+//!
+//! In general, users should prefer to use the non-raw versions, e.g. `las::Header` over
+//! `las::raw::Header`, in order to ensure that they are following The Rules.
 
 mod point;
 mod vlr;
 mod header;
 
-pub use self::header::{HEADER_SIZE, Header};
+pub use self::header::Header;
 pub use self::point::Point;
 pub use self::vlr::Vlr;
 
