@@ -1,8 +1,7 @@
 use Result;
+use raw::HEADER_SIZE;
 use std::io::{Read, Write};
 
-/// The default size of a las header.
-pub const HEADER_SIZE: u16 = 227;
 const IS_COMPRESSED_MASK: u8 = 0x80;
 
 /// A raw header that maps directly onto the file structure.

@@ -27,3 +27,8 @@ pub const LASF: [u8; 4] = *b"LASF";
 
 /// The point data start signature required by las 1.0.
 pub const POINT_DATA_START_SIGNATURE: [u8; 2] = [0xDD, 0xCC];
+
+/// The size of a las header.
+///
+/// FIXME this isn't actually constant, should be version-dependent.
+pub const HEADER_SIZE: u16 = 227;
