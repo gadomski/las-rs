@@ -308,11 +308,30 @@ pub enum ScanAngle {
     Scaled(i16),
 }
 
-/// Flags can be two or three bytes.
+/// These flags hold information about point classification, return number, and more.
+///
+/// In point formats zero through five, two bytes are used to hold all of the information. Point
+/// formats six through ten use an extra byte, to enable more return numbers, more classifications,
+/// and more.
+///
+/// This structure captures those alternatives and provides an API to convert between the two
+/// types. Two-byte flags can always be transformed to three-byte flags, but going from three-bytes
+/// to two-bytes can fail if information would be lost.
+///
+/// ```
+/// use las::raw::point::Flags;
+/// let two_byte = Flags::TwoByte(0b00001001, 1);
+/// assert_eq!(Flags::ThreeByte(0b00010001, 0, 1), two_byte.into());
+///
+/// // Two-byte flags can't handle this large of return numbers.
+/// let three_byte = Flags::ThreeByte(0b10001000, 0, 1);
+/// assert!(three_byte.to_two_bytes().is_err());
+/// ```
 #[derive(Clone, Copy, Debug)]
-#[allow(missing_docs)]
 pub enum Flags {
+    /// Two byte flags, used for point formats zero through five.
     TwoByte(u8, u8),
+    /// Three byte flags, used for point formats six through ten.
     ThreeByte(u8, u8, u8),
 }
 

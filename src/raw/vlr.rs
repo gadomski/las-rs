@@ -1,15 +1,45 @@
 use Result;
 use std::io::{Read, Write};
 
-/// A raw VLR that maps directly onto the LAS specification.
-#[derive(Debug, Default)]
-#[allow(missing_docs)]
+/// A raw variable length record.
+#[derive(Debug, Default, PartialEq)]
 pub struct Vlr {
+    /// This value must be set to zero
     pub reserved: u16,
+
+    /// The User ID field is ASCII character data that identifies the user which created the
+    /// variable length record.
+    ///
+    /// It is possible to have many Variable Length Records from different sources with different
+    /// User IDs. If the character data is less than 16 characters, the remaining data must be
+    /// null. The User ID must be registered with the LAS specification managing body. The
+    /// management of these User IDs ensures that no two individuals accidentally use the same User
+    /// ID.
     pub user_id: [u8; 16],
+
+    /// The Record ID is dependent upon the User ID.
+    ///
+    /// There can be 0 to 65,535 Record IDs for every User ID. The LAS specification manages its
+    /// own Record IDs (User IDs owned by the specification), otherwise Record IDs will be managed
+    /// by the owner of the given User ID. Thus each User ID is allowed to assign 0 to 65,535
+    /// Record IDs in any manner they desire. Publicizing the meaning of a given Record ID is left
+    /// to the owner of the given User ID. Unknown User ID/Record ID combinations should be
+    /// ignored.
     pub record_id: u16,
+
+    /// The record length is the number of bytes for the record after the end of the standard part
+    /// of the header.
+    ///
+    /// Thus the entire record length is 54 bytes (the header size of the VLR) plus the number of
+    /// bytes in the variable length portion of the record.
     pub record_length_after_header: u16,
+
+    /// Optional, null terminated text description of the data.
+    ///
+    /// Any remaining characters not used must be null.
     pub description: [u8; 32],
+
+    #[allow(missing_docs)]
     pub data: Vec<u8>,
 }
 
@@ -74,5 +104,17 @@ impl Vlr {
     }
 }
 
-// TODO test if data length doesn't match record length after header.
-// TODO test if reserved isn't zeros
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn roundtrip() {
+        let vlr = Vlr::default();
+        let mut cursor = Cursor::new(Vec::new());
+        vlr.write_to(&mut cursor).unwrap();
+        cursor.set_position(0);
+        assert_eq!(vlr, Vlr::read_from(cursor).unwrap());
+    }
+}
