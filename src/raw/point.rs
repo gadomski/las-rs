@@ -1,6 +1,6 @@
 use {Color, Result};
 use point::{Format, ScanDirection};
-use std::io::{Cursor, ErrorKind, Read, Write};
+use std::io::{Read, Write};
 
 /// A raw point.
 #[derive(Clone, Copy, Debug, Default)]
@@ -36,6 +36,8 @@ impl Point {
     /// ```
     pub fn read_from<R: Read>(mut read: R, format: Format) -> Result<Option<Point>> {
         use byteorder::{LittleEndian, ReadBytesExt};
+        use std::io::{Cursor, ErrorKind};
+
         let byte = match read.read_u8() {
             Ok(byte) => byte,
             Err(err) => {
