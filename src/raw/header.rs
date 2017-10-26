@@ -1,4 +1,5 @@
 use {Result, Version};
+use num::Zero;
 use std::io::{Read, Write};
 
 const IS_COMPRESSED_MASK: u8 = 0x80;
@@ -8,7 +9,7 @@ const IS_COMPRESSED_MASK: u8 = 0x80;
 /// The documentation for each member is taken directly from the las 1.2 spec, except in cases
 /// where the field's usage has changed, in which case notes about its uses over versions are
 /// included, with particular attention paid to the latest version, 1.4.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Header {
     /// The file signature must contain the four characters “LASF”, and it is required by the LAS
     /// specification.
@@ -262,14 +263,14 @@ impl Header {
         let max_z = read.read_f64::<LittleEndian>()?;
         let min_z = read.read_f64::<LittleEndian>()?;
         let start_of_waveform_data_packet_record = if version.supports_waveforms() {
-            Some(read.read_u64::<LittleEndian>()?)
+            some_or_none_if_zero(read.read_u64::<LittleEndian>()?)
         } else {
             None
         };
         let (start_of_first_evlr, number_of_evlrs) = if version.supports_evlrs() {
             (
-                Some(read.read_u64::<LittleEndian>()?),
-                Some(read.read_u32::<LittleEndian>()?),
+                some_or_none_if_zero(read.read_u64::<LittleEndian>()?),
+                some_or_none_if_zero(read.read_u32::<LittleEndian>()?),
             )
         } else {
             (None, None)
@@ -282,8 +283,12 @@ impl Header {
                     *n = read.read_u64::<LittleEndian>()?
                 }
                 (
-                    Some(number_of_point_records_64bit),
-                    Some(number_of_points_by_return_64bit),
+                    some_or_none_if_zero(number_of_point_records_64bit),
+                    if number_of_points_by_return_64bit.iter().all(|n| *n == 0) {
+                        None
+                    } else {
+                        Some(number_of_points_by_return_64bit)
+                    },
                 )
             } else {
                 (None, None)
@@ -474,9 +479,28 @@ impl Default for Header {
     }
 }
 
+fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
+    if n.is_zero() { None } else { Some(n) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn roundtrip(minor: u8) {
+        use std::io::Cursor;
+
+        let version = Version::new(1, minor);
+        let header = Header {
+            version: version,
+            ..Default::default()
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        header.write_to(&mut cursor).unwrap();
+        cursor.set_position(0);
+        let header2 = Header::read_from(cursor).unwrap();
+        assert_eq!(header, header2);
+    }
 
     #[test]
     fn is_compressed() {
@@ -487,5 +511,30 @@ mod tests {
         assert!(!header.is_compressed());
         header.point_data_format_id = 131;
         assert!(header.is_compressed());
+    }
+
+    #[test]
+    fn roundtrip_1_0() {
+        roundtrip(0);
+    }
+
+    #[test]
+    fn roundtrip_1_1() {
+        roundtrip(1);
+    }
+
+    #[test]
+    fn roundtrip_1_2() {
+        roundtrip(2);
+    }
+
+    #[test]
+    fn roundtrip_1_3() {
+        roundtrip(3);
+    }
+
+    #[test]
+    fn roundtrip_1_4() {
+        roundtrip(4);
     }
 }

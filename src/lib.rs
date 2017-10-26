@@ -77,6 +77,7 @@
 
 extern crate byteorder;
 extern crate chrono;
+extern crate num;
 #[macro_use]
 extern crate quick_error;
 
