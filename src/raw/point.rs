@@ -674,6 +674,8 @@ impl Flags {
                     Err(Error::InvalidNumberOfReturns(self.number_of_returns()))
                 } else if c > 31 {
                     Err(Error::InvalidClassification(c))
+                } else if self.scanner_channel() > 0 {
+                    Err(Error::InvalidScannerChannel(self.scanner_channel()))
                 } else {
                     let mut a = (self.number_of_returns() << 3) + self.return_number();
                     if self.scan_direction() == ScanDirection::LeftToRight {
