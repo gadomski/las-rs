@@ -122,7 +122,7 @@ impl Header {
                     z: header.max_z,
                 },
             },
-            version: Version::new(header.version_major, header.version_minor),
+            version: header.version.into(),
             vlrs: vlrs,
         })
     }
@@ -174,8 +174,7 @@ impl Header {
             file_source_id: self.file_source_id,
             global_encoding: global_encoding,
             guid: self.guid,
-            version_major: self.version.major,
-            version_minor: self.version.minor,
+            version: self.version.into(),
             system_identifier: system_identifier,
             generating_software: generating_software,
             file_creation_day_of_year: self.date.map_or(0, |d| d.ordinal() as u16),

@@ -114,3 +114,9 @@ impl From<(u8, u8)> for Version {
         }
     }
 }
+
+impl From<Version> for (u8, u8) {
+    fn from(version: Version) -> (u8, u8) {
+        (version.major, version.minor)
+    }
+}
