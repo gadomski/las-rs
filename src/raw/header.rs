@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 
 const IS_COMPRESSED_MASK: u8 = 0x80;
 
-/// A raw header that maps directly onto the file structure.
+/// A las header.
 ///
 /// The documentation for each member is taken directly from the las 1.2 spec, except in cases
 /// where the field's usage has changed, in which case notes about its uses over versions are
