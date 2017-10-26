@@ -69,9 +69,7 @@ impl Header {
         } else {
             GpsTimeType::Standard
         };
-        if header.header_size < raw::HEADER_SIZE {
-            return Err(Error::HeaderSizeTooSmall(header.header_size));
-        }
+        // TODO check header size
         let vlr_len = vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
         if header.offset_to_point_data < header.header_size as u32 + vlr_len {
             return Err(Error::OffsetToDataTooSmall(header.offset_to_point_data));
@@ -141,7 +139,7 @@ impl Header {
     /// assert_eq!(228, header.len());
     /// ```
     pub fn len(&self) -> u16 {
-        raw::HEADER_SIZE + self.padding.len() as u16
+        self.version.header_size() + self.padding.len() as u16
     }
 
     /// Converts this header into a `RawHeader.
@@ -174,13 +172,14 @@ impl Header {
             file_source_id: self.file_source_id,
             global_encoding: global_encoding,
             guid: self.guid,
-            version: self.version.into(),
+            version: self.version,
             system_identifier: system_identifier,
             generating_software: generating_software,
             file_creation_day_of_year: self.date.map_or(0, |d| d.ordinal() as u16),
             file_creation_year: self.date.map_or(0, |d| d.year() as u16),
-            header_size: raw::HEADER_SIZE + self.padding.len() as u16,
-            offset_to_point_data: raw::HEADER_SIZE as u32 + self.padding.len() as u32 + vlr_len +
+            header_size: self.version.header_size() + self.padding.len() as u16,
+            offset_to_point_data: self.version.header_size() as u32 + self.padding.len() as u32 +
+                vlr_len +
                 self.vlr_padding.len() as u32,
             number_of_variable_length_records: self.vlrs.len() as u32,
             point_data_format_id: self.point_format.into(),
@@ -200,6 +199,12 @@ impl Header {
             min_y: self.bounds.min.y,
             max_z: self.bounds.max.z,
             min_z: self.bounds.min.z,
+            start_of_waveform_data_packet_record: None,
+            start_of_first_evlr: None,
+            number_of_evlrs: None,
+            // TODO we could populate these
+            number_of_point_records_64bit: None,
+            number_of_points_by_return_64bit: None,
             padding: self.padding.clone(),
         })
     }

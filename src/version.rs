@@ -92,6 +92,68 @@ impl Version {
     pub fn requires_point_data_start_signature(&self) -> bool {
         self == &Version::new(1, 0)
     }
+
+    /// Returns this version's header size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Version;
+    /// assert_eq!(227, Version::new(1, 2).header_size());
+    /// assert_eq!(235, Version::new(1, 3).header_size());
+    /// assert_eq!(375, Version::new(1, 4).header_size());
+    /// ```
+    pub fn header_size(&self) -> u16 {
+        if self <= &Version::new(1, 2) {
+            227
+        } else if self == &Version::new(1, 3) {
+            235
+        } else {
+            375
+        }
+    }
+
+    /// Returns true if this version has 64 bit support.
+    ///
+    /// 64 bit support means that the file's number of point records is stored in a 64 bit value,
+    /// allowing more points in a las file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Version;
+    /// assert!(!Version::new(1, 2).is_64bit());
+    /// assert!(Version::new(1, 4).is_64bit());
+    /// ```
+    pub fn is_64bit(&self) -> bool {
+        self >= &Version::new(1, 4)
+    }
+
+    /// Returns true if this version supports extended variable length records.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Version;
+    /// assert!(!Version::new(1, 2).supports_evlrs());
+    /// assert!(Version::new(1, 4).supports_evlrs());
+    /// ```
+    pub fn supports_evlrs(&self) -> bool {
+        self >= &Version::new(1, 4)
+    }
+
+    /// Returns true if this version supports waveforms.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Version;
+    /// assert!(!Version::new(1, 2).supports_waveforms());
+    /// assert!(Version::new(1, 3).supports_waveforms());
+    /// ```
+    pub fn supports_waveforms(&self) -> bool {
+        self >= &Version::new(1, 3)
+    }
 }
 
 impl Default for Version {

@@ -1,5 +1,4 @@
-use Result;
-use raw::HEADER_SIZE;
+use {Result, Version};
 use std::io::{Read, Write};
 
 const IS_COMPRESSED_MASK: u8 = 0x80;
@@ -56,7 +55,7 @@ pub struct Header {
     /// The major and minor fields combine to form the number that indicates the format number of
     /// the current specification itself. For example, specification number 1.2 (this version)
     /// would contain 1 in the major field and 2 in the minor field.
-    pub version: (u8, u8),
+    pub version: Version,
 
     /// The version 1.0 specification assumes that LAS files are exclusively generated as a result
     /// of collection by a hardware sensor. Version 1.1 recognizes that files often result from
@@ -178,6 +177,36 @@ pub struct Header {
     #[allow(missing_docs)]
     pub min_z: f64,
 
+    /// **las 1.3 and 1.4**: This value provides the offset, in bytes, from the beginning of the
+    /// LAS file to the first byte of the Waveform Data Package Record.
+    ///
+    /// Note that this will be the first byte of the Waveform Data Packet header. If no waveform
+    /// records are contained within the file, this value must be zero. It should be noted that LAS
+    /// 1.4 allows multiple Extended Variable Length Records (EVLR) and that the Waveform Data
+    /// Packet Record is not necessarily the first EVLR in the file.
+    pub start_of_waveform_data_packet_record: Option<u64>,
+
+    /// **las 1.4**: This value provides the offset, in bytes, from the beginning of the LAS file to the first
+    /// byte of the first EVLR.
+    pub start_of_first_evlr: Option<u64>,
+
+    /// **las 1.4**: This field contains the current number of EVLRs (including, if present, the Waveform Data
+    /// Packet Record) that are stored in the file after the Point Data Records. This number must
+    /// be updated if the number of EVLRs changes. If there are no EVLRs this value is zero.
+    pub number_of_evlrs: Option<u32>,
+
+    /// **las 1.4**: This field contains the total number of point records in the file.
+    ///
+    /// Note that this field must always be correctly populated, regardless of legacy mode intent.
+    pub number_of_point_records_64bit: Option<u64>,
+
+    /// **las 1.4**: These fields contain an array of the total point records per return.
+    ///
+    /// The first value will be the total number of records from the first return, the second
+    /// contains the total number for return two, and so on up to fifteen returns. Note that these
+    /// fields must always be correctly populated, regardless of legacy mode intent.
+    pub number_of_points_by_return_64bit: Option<[u64; 15]>,
+
     #[allow(missing_docs)]
     pub padding: Vec<u8>,
 }
@@ -203,6 +232,7 @@ impl Header {
         read.read_exact(&mut guid)?;
         let version_major = read.read_u8()?;
         let version_minor = read.read_u8()?;
+        let version = Version::new(version_major, version_minor);
         let mut system_identifier = [0; 32];
         read.read_exact(&mut system_identifier)?;
         let mut generating_software = [0; 32];
@@ -231,9 +261,35 @@ impl Header {
         let min_y = read.read_f64::<LittleEndian>()?;
         let max_z = read.read_f64::<LittleEndian>()?;
         let min_z = read.read_f64::<LittleEndian>()?;
-        // TODO las 1.4
-        let padding = if header_size > HEADER_SIZE {
-            let mut bytes = vec![0; (header_size - HEADER_SIZE) as usize];
+        let start_of_waveform_data_packet_record = if version.supports_waveforms() {
+            Some(read.read_u64::<LittleEndian>()?)
+        } else {
+            None
+        };
+        let (start_of_first_evlr, number_of_evlrs) = if version.supports_evlrs() {
+            (
+                Some(read.read_u64::<LittleEndian>()?),
+                Some(read.read_u32::<LittleEndian>()?),
+            )
+        } else {
+            (None, None)
+        };
+        let (number_of_point_records_64bit, number_of_points_by_return_64bit) =
+            if version.is_64bit() {
+                let number_of_point_records_64bit = read.read_u64::<LittleEndian>()?;
+                let mut number_of_points_by_return_64bit = [0; 15];
+                for n in &mut number_of_points_by_return_64bit {
+                    *n = read.read_u64::<LittleEndian>()?
+                }
+                (
+                    Some(number_of_point_records_64bit),
+                    Some(number_of_points_by_return_64bit),
+                )
+            } else {
+                (None, None)
+            };
+        let padding = if header_size > version.header_size() {
+            let mut bytes = vec![0; (header_size - version.header_size()) as usize];
             read.read_exact(&mut bytes)?;
             bytes
         } else {
@@ -244,7 +300,7 @@ impl Header {
             file_source_id: file_source_id,
             global_encoding: global_encoding,
             guid: guid,
-            version: (version_major, version_minor),
+            version: version,
             system_identifier: system_identifier,
             generating_software: generating_software,
             file_creation_day_of_year: file_creation_day_of_year,
@@ -268,6 +324,11 @@ impl Header {
             min_y: min_y,
             max_z: max_z,
             min_z: min_z,
+            start_of_waveform_data_packet_record: start_of_waveform_data_packet_record,
+            start_of_first_evlr: start_of_first_evlr,
+            number_of_evlrs: number_of_evlrs,
+            number_of_point_records_64bit: number_of_point_records_64bit,
+            number_of_points_by_return_64bit: number_of_points_by_return_64bit,
             padding: padding,
         })
     }
@@ -303,12 +364,13 @@ impl Header {
     /// ```
     pub fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
+
         write.write_all(&self.file_signature)?;
         write.write_u16::<LittleEndian>(self.file_source_id)?;
         write.write_u16::<LittleEndian>(self.global_encoding)?;
         write.write_all(&self.guid)?;
-        write.write_u8(self.version.0)?;
-        write.write_u8(self.version.1)?;
+        write.write_u8(self.version.major)?;
+        write.write_u8(self.version.minor)?;
         write.write_all(&self.system_identifier)?;
         write.write_all(&self.generating_software)?;
         write.write_u16::<LittleEndian>(
@@ -342,6 +404,27 @@ impl Header {
         write.write_f64::<LittleEndian>(self.min_y)?;
         write.write_f64::<LittleEndian>(self.max_z)?;
         write.write_f64::<LittleEndian>(self.min_z)?;
+        if self.version.supports_waveforms() {
+            write.write_u64::<LittleEndian>(
+                self.start_of_waveform_data_packet_record.unwrap_or(0),
+            )?;
+        }
+        if self.version.supports_evlrs() {
+            write.write_u64::<LittleEndian>(
+                self.start_of_first_evlr.unwrap_or(0),
+            )?;
+            write.write_u32::<LittleEndian>(
+                self.number_of_evlrs.unwrap_or(0),
+            )?;
+        }
+        if self.version.is_64bit() {
+            write.write_u64::<LittleEndian>(
+                self.number_of_point_records_64bit.unwrap_or(0),
+            )?;
+            for n in &self.number_of_points_by_return_64bit.unwrap_or([0; 15]) {
+                write.write_u64::<LittleEndian>(*n)?;
+            }
+        }
         if !self.padding.is_empty() {
             write.write_all(&self.padding)?;
         }
@@ -351,18 +434,19 @@ impl Header {
 
 impl Default for Header {
     fn default() -> Header {
+        let version = Version::new(1, 2);
         Header {
             file_signature: ::raw::LASF,
             file_source_id: 0,
             global_encoding: 0,
             guid: [0; 16],
-            version: (0, 0),
+            version: version,
             system_identifier: [0; 32],
             generating_software: [0; 32],
             file_creation_day_of_year: 0,
             file_creation_year: 0,
-            header_size: HEADER_SIZE,
-            offset_to_point_data: HEADER_SIZE as u32,
+            header_size: version.header_size(),
+            offset_to_point_data: version.header_size() as u32,
             number_of_variable_length_records: 0,
             point_data_format_id: 0,
             point_data_record_length: 0,
@@ -380,6 +464,11 @@ impl Default for Header {
             min_y: 0.,
             max_z: 0.,
             min_z: 0.,
+            start_of_waveform_data_packet_record: None,
+            start_of_first_evlr: None,
+            number_of_evlrs: None,
+            number_of_point_records_64bit: None,
+            number_of_points_by_return_64bit: None,
             padding: Vec::new(),
         }
     }
@@ -388,15 +477,6 @@ impl Default for Header {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
-
-    #[test]
-    fn not_lasf() {
-        assert!(Header::read_from(File::open("README.md").unwrap()).is_err());
-    }
-
-    // TODO test header size is valid
-    // TODO writing without LASF
 
     #[test]
     fn is_compressed() {
