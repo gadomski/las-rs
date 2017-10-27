@@ -3,8 +3,8 @@ use num::Zero;
 use std::ascii::AsciiExt;
 use std::str;
 
-pub trait ToLasStr {
-    fn to_las_str(&self) -> Result<&str>;
+pub trait AsLasStr {
+    fn as_las_str(&self) -> Result<&str>;
 }
 
 pub trait FromLasStr {
@@ -15,8 +15,8 @@ pub fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
     if n.is_zero() { None } else { Some(n) }
 }
 
-impl<'a> ToLasStr for &'a [u8] {
-    fn to_las_str(&self) -> Result<&str> {
+impl<'a> AsLasStr for &'a [u8] {
+    fn as_las_str(&self) -> Result<&str> {
         let s = if let Some(position) = self.iter().position(|c| *c == 0) {
             if self[position..].iter().any(|c| *c != 0) {
                 return Err(Error::NotZeroFilled(self.to_vec()));
@@ -53,25 +53,25 @@ mod tests {
     #[test]
     fn to_good_las_str() {
         let bytes = b"Beer!";
-        assert_eq!("Beer!", bytes.as_ref().to_las_str().unwrap());
+        assert_eq!("Beer!", bytes.as_ref().as_las_str().unwrap());
     }
 
     #[test]
     fn to_just_a_zero() {
         let bytes = [0];
-        assert_eq!("", bytes.as_ref().to_las_str().unwrap());
+        assert_eq!("", bytes.as_ref().as_las_str().unwrap());
     }
 
     #[test]
     fn to_not_nul_filled() {
         let bytes = [60, 0, 60];
-        assert!(bytes.as_ref().to_las_str().is_err());
+        assert!(bytes.as_ref().as_las_str().is_err());
     }
 
     #[test]
     fn to_not_ascii() {
         let bytes = [0xf0, 0x9f, 0x8d, 0xba];
-        assert!(bytes.as_ref().to_las_str().is_err());
+        assert!(bytes.as_ref().as_las_str().is_err());
     }
 
     #[test]

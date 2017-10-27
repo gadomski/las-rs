@@ -151,9 +151,9 @@ impl Point {
     pub fn flags(&self) -> Result<raw::point::Flags> {
         use Error;
         if self.return_number > 15 {
-            Err(Error::InvalidReturnNumber(self.return_number))
+            Err(Error::InvalidReturnNumber(self.return_number, None))
         } else if self.number_of_returns > 15 {
-            Err(Error::InvalidNumberOfReturns(self.number_of_returns))
+            Err(Error::InvalidReturnNumber(self.number_of_returns, None))
         } else if self.scanner_channel > 3 {
             Err(Error::InvalidScannerChannel(self.scanner_channel))
         } else {

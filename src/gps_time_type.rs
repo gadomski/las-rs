@@ -24,3 +24,22 @@ impl GpsTimeType {
         }
     }
 }
+
+impl From<GpsTimeType> for u16 {
+    fn from(gps_time_type: GpsTimeType) -> u16 {
+        match gps_time_type {
+            GpsTimeType::Week => 0,
+            GpsTimeType::Standard => 1,
+        }
+    }
+}
+
+impl From<u16> for GpsTimeType {
+    fn from(n: u16) -> GpsTimeType {
+        match n & 1 {
+            0 => GpsTimeType::Week,
+            1 => GpsTimeType::Standard,
+            _ => unreachable!(),
+        }
+    }
+}

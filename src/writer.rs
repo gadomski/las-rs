@@ -1,4 +1,5 @@
 use {Error, Header, Point, Result};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -56,7 +57,7 @@ impl<W: Seek + Write> Writer<W> {
         }
         header.bounds = Default::default();
         header.number_of_points = 0;
-        header.number_of_points_by_return = [0; 5];
+        header.number_of_points_by_return = HashMap::new();
         if header.version.requires_point_data_start_signature() {
             header.vlr_padding = ::raw::POINT_DATA_START_SIGNATURE.to_vec();
         }
@@ -97,9 +98,11 @@ impl<W: Seek + Write> Writer<W> {
             raw_point.write_to(&mut self.write, self.header.point_format)
         })?;
         self.header.number_of_points += 1;
-        if point.return_number > 0 {
-            self.header.number_of_points_by_return[point.return_number as usize - 1] += 1;
-        }
+        let entry = self.header
+            .number_of_points_by_return
+            .entry(point.return_number)
+            .or_insert(0);
+        *entry += 1;
         self.header.bounds.grow(point);
         Ok(())
     }

@@ -29,11 +29,11 @@ impl Vlr {
     /// let vlr = Vlr::new(raw_vlr).unwrap();
     /// ```
     pub fn new(raw_vlr: raw::Vlr) -> Result<Vlr> {
-        use utils::ToLasStr;
+        use utils::AsLasStr;
         Ok(Vlr {
-            user_id: raw_vlr.user_id.as_ref().to_las_str()?.to_string(),
+            user_id: raw_vlr.user_id.as_ref().as_las_str()?.to_string(),
             record_id: raw_vlr.record_id,
-            description: raw_vlr.description.as_ref().to_las_str()?.to_string(),
+            description: raw_vlr.description.as_ref().as_las_str()?.to_string(),
             data: raw_vlr.data,
         })
     }

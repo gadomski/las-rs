@@ -87,6 +87,7 @@ extern crate num;
 extern crate quick_error;
 
 pub mod point;
+pub mod header;
 pub mod raw;
 pub mod reader;
 
@@ -94,7 +95,6 @@ mod bounds;
 mod color;
 mod error;
 mod gps_time_type;
-mod header;
 mod transform;
 mod utils;
 mod vector;

@@ -1,4 +1,5 @@
 use Result;
+use std::fmt;
 
 /// A scale and an offset that transforms xyz coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,7 +41,7 @@ impl Transform {
 
         let n = ((n - self.offset) / self.scale).round();
         if n > i32::MAX as f64 {
-            Err(Error::CannotBeI32(n))
+            Err(Error::InverseTransform(n, *self))
         } else {
             Ok(n as i32)
         }
@@ -53,5 +54,11 @@ impl Default for Transform {
             scale: 0.001,
             offset: 0.,
         }
+    }
+}
+
+impl fmt::Display for Transform {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "`{} * x + {}`", self.scale, self.offset)
     }
 }

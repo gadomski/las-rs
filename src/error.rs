@@ -1,4 +1,4 @@
-use Version;
+use {Transform, Version, header};
 use point::Format;
 use std::io;
 use std::str;
@@ -7,28 +7,25 @@ quick_error! {
     /// Crate-specific error enum.
     #[derive(Debug)]
     pub enum Error {
-        /// The value can't be represnted as an i32.
-        CannotBeI32(n: f64) {
-            description("the float value cannot be an i32")
-            display("the float value cannot be an i32: {}", n)
+        /// The value can't have the inverse transform applied.
+        InverseTransform(n: f64, transform: Transform) {
+            description("cannot apply inverse transform")
+            display("the transform {} cannot be inversely applied to {}", transform, n)
         }
         /// The writer is closed.
         ClosedWriter {
             description("the writer is closed")
         }
-        /// The header size is too small.
-        HeaderSizeTooSmall(header_size: u16) {
-            description("the header size is too small")
-            display("the header size is too small: {}", header_size)
-        }
         /// The las data is laszip compressed.
         Laszip {
             description("the las data is laszip compressed, and laszip compression is not supported by this build")
         }
-        /// The offset to data is too small.
-        OffsetToDataTooSmall(offset: u32) {
-            description("the offset to the data is too small")
-            display("the offset to the data is too small: {}", offset)
+        /// A wrapper around `las::header::Error`.
+        Header(err: header::Error) {
+            from()
+            cause(err)
+            description("las header error")
+            display("header error: {}", err)
         }
         /// This string is not ASCII.
         NotAscii(s: String) {
@@ -57,15 +54,10 @@ quick_error! {
             description("invalid format number")
             display("invalid format number: {:?}", n)
         }
-        /// This is not a valid number of returns.
-        InvalidNumberOfReturns(n: u8) {
-            description("invalid number of returns")
-            display("the number of returns is invalid: {}", n)
-        }
         /// This is not a valid return number.
-        InvalidReturnNumber(n: u8) {
+        InvalidReturnNumber(n: u8, version: Option<Version>) {
             description("invalid return number")
-            display("the return number is invalid: {}", n)
+            display("invalid return number: {} (for version: {:?})", n, version)
         }
         /// This is not a valid scanner channel
         InvalidScannerChannel(n: u8) {
