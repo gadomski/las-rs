@@ -32,6 +32,11 @@ pub struct Vlr {
     pub description: String,
     /// The data themselves.
     pub data: Vec<u8>,
+    /// Should this vlr be written "extended", i.e. at the end of the file.
+    ///
+    /// Note that not all las versions support extended vlrs, and extra-long vlrs might be written
+    /// as extended even if this flag is not set.
+    pub is_extended: bool,
 }
 
 impl Vlr {
@@ -50,21 +55,36 @@ impl Vlr {
             user_id: raw_vlr.user_id.as_ref().as_las_str()?.to_string(),
             record_id: raw_vlr.record_id,
             description: raw_vlr.description.as_ref().as_las_str()?.to_string(),
+            is_extended: raw_vlr.is_extended(),
             data: raw_vlr.data,
         })
     }
 
     /// Converts this vlr to a raw vlr.
     ///
+    /// The second argument works like this:
+    ///
+    /// - If `Some(false)`, create a normal vlr.
+    /// - If `Some(true)`, create an extended vlr.
+    /// - If `None`, fall back to the default as defined by the `extended` flag on this vlr.
+    ///
+    /// Note that you can just pass `true` or `false` and it will be converted to the option type.
+    ///
     /// # Examples
     ///
     /// ```
     /// use las::Vlr;
-    /// let raw_vlr =  Vlr::default().to_raw().unwrap();
+    /// let raw_vlr =  Vlr::default().to_raw(false).unwrap();
+    /// let raw_evlr =  Vlr::default().to_raw(true).unwrap();
+    /// let raw_vlr2 =  Vlr::default().to_raw(None).unwrap();
     /// ```
-    pub fn to_raw(&self) -> Result<raw::Vlr> {
+    pub fn to_raw<T>(&self, force_extended: T) -> Result<raw::Vlr>
+    where
+        T: Into<Option<bool>>,
+    {
         use utils::FromLasStr;
 
+        let extended = force_extended.into().unwrap_or(self.is_extended);
         let mut user_id = [0; 16];
         user_id.as_mut().from_las_str(&self.user_id)?;
         let mut description = [0; 32];
@@ -73,7 +93,7 @@ impl Vlr {
             reserved: 0,
             user_id: user_id,
             record_id: self.record_id,
-            record_length_after_header: self.record_length_after_header()?,
+            record_length_after_header: self.record_length_after_header(extended)?,
             description: description,
             data: self.data.clone(),
         })
@@ -92,12 +112,39 @@ impl Vlr {
         self.data.len() + HEADER_SIZE
     }
 
-    fn record_length_after_header(&self) -> Result<u16> {
+    /// Returns true if this vlr is extended.
+    ///
+    /// True either if the flag is set, or the data is too long for a normal vlr.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::u16;
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// assert!(!vlr.is_extended());
+    /// vlr.is_extended = true;
+    /// assert!(vlr.is_extended());
+    ///
+    /// vlr.is_extended = false;
+    /// vlr.data = vec![0; u16::MAX as usize + 1];
+    /// assert!(vlr.is_extended());
+    /// ```
+    pub fn is_extended(&self) -> bool {
         use std::u16;
-        if self.data.len() > u16::MAX as usize {
-            Err(Error::TooLong(self.data.len()).into())
+        self.is_extended || self.data.len() > u16::MAX as usize
+    }
+
+    fn record_length_after_header(&self, extended: bool) -> Result<raw::vlr::RecordLength> {
+        if extended {
+            Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))
         } else {
-            Ok(self.data.len() as u16)
+            use std::u16;
+            if self.data.len() > u16::MAX as usize {
+                Err(Error::TooLong(self.data.len()).into())
+            } else {
+                Ok(raw::vlr::RecordLength::Vlr(self.data.len() as u16))
+            }
         }
     }
 }
@@ -124,6 +171,6 @@ mod tests {
             data: data,
             ..Default::default()
         };
-        assert!(vlr.to_raw().is_err());
+        assert!(vlr.to_raw(false).is_err());
     }
 }

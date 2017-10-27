@@ -25,12 +25,12 @@
 //! // And read them back.
 //! Point::read_from(&mut cursor, point_format).unwrap();
 //! Header::read_from(&mut cursor).unwrap();
-//! Vlr::read_from(&mut cursor).unwrap();
+//! Vlr::read_from(&mut cursor, false).unwrap();
 //! ```
 
 pub mod point;
-mod vlr;
-mod header;
+pub mod vlr;
+pub mod header;
 
 pub use self::header::Header;
 pub use self::point::Point;

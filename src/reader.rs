@@ -3,18 +3,18 @@
 use {Error, Header, Point, Result, Vlr};
 use raw;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 /// Reads LAS data.
 #[derive(Debug)]
-pub struct Reader<R: Read> {
+pub struct Reader<R> {
     /// The `Header`, as read.
     pub header: Header,
     read: R,
 }
 
-impl<R: Read> Reader<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Creates a new reader.
     ///
     /// This does *not* wrap the `Read` in a `BufRead`, so if you're concered about performance you
@@ -34,15 +34,13 @@ impl<R: Read> Reader<R> {
         if raw_header.is_compressed() {
             return Err(Error::Laszip);
         }
-        let vlrs = (0..raw_header.number_of_variable_length_records)
-            .map(|_| {
-                raw::Vlr::read_from(&mut read).and_then(|raw_vlr| Vlr::new(raw_vlr))
-            })
-            .collect::<Result<Vec<Vlr>>>()?;
-        let position = vlrs.iter().fold(
-            raw_header.header_size as usize,
-            |acc, vlr| acc + vlr.len(),
-        );
+        let mut vlrs = Vec::new();
+        let mut position = raw_header.header_size as usize;
+        for _ in 0..raw_header.number_of_variable_length_records {
+            let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
+            position += vlr.len();
+            vlrs.push(vlr);
+        }
         let vlr_padding = if position < raw_header.offset_to_point_data as usize {
             let mut bytes = vec![0; raw_header.offset_to_point_data as usize - position];
             read.read_exact(&mut bytes)?;
@@ -50,13 +48,22 @@ impl<R: Read> Reader<R> {
         } else {
             Vec::new()
         };
+        if let Some(evlr) = raw_header.evlr {
+            read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
+            vlrs.push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
+        }
+        read.seek(SeekFrom::Start(
+            u64::from(raw_header.offset_to_point_data),
+        ))?;
         let header = Header::new(raw_header, vlrs, vlr_padding)?;
         Ok(Reader {
             header: header,
             read: read,
         })
     }
+}
 
+impl<R: Read> Reader<R> {
     /// Reads a point.
     ///
     /// # Examples

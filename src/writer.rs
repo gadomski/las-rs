@@ -29,6 +29,9 @@ pub struct Writer<W: Seek + Write> {
 impl<W: Seek + Write> Writer<W> {
     /// Creates a new writer.
     ///
+    /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
+    /// points, etc.
+    ///
     /// # Examples
     ///
     /// ```
@@ -37,7 +40,7 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        use feature::{Color, FileSourceId, GpsStandardTime};
+        use feature::{Color, Evlrs, FileSourceId, GpsStandardTime};
 
         if header.file_source_id != 0 {
             header.version.verify_support_for::<FileSourceId>()?;
@@ -48,6 +51,9 @@ impl<W: Seek + Write> Writer<W> {
         if header.gps_time_type.is_standard() {
             header.version.verify_support_for::<GpsStandardTime>()?;
         }
+        if header.evlrs().len() > 0 {
+            header.version.verify_support_for::<Evlrs>()?;
+        }
         header.bounds = Default::default();
         header.number_of_points = 0;
         header.number_of_points_by_return = HashMap::new();
@@ -57,8 +63,8 @@ impl<W: Seek + Write> Writer<W> {
         header.to_raw().and_then(
             |raw_header| raw_header.write_to(&mut write),
         )?;
-        for vlr in header.vlrs.iter() {
-            vlr.to_raw().and_then(
+        for vlr in header.vlrs().iter() {
+            vlr.to_raw(false).and_then(
                 |raw_vlr| raw_vlr.write_to(&mut write),
             )?;
         }
@@ -115,6 +121,13 @@ impl<W: Seek + Write> Writer<W> {
     ///
     pub fn close(&mut self) -> Result<()> {
         if !self.closed {
+            // TODO evlr padding?
+            for raw_evlr in self.header.evlrs().into_iter().map(
+                |evlr| evlr.to_raw(true),
+            )
+            {
+                raw_evlr?.write_to(&mut self.write)?;
+            }
             self.write.seek(SeekFrom::Start(0))?;
             self.header.to_raw().and_then(|raw_header| {
                 raw_header.write_to(&mut self.write)

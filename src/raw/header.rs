@@ -1,5 +1,7 @@
+//! Raw file metadata.
+
 use {Result, Version};
-use byteorder::LittleEndian;
+use byteorder::{LittleEndian, ReadBytesExt};
 use feature::{Evlrs, LargeFiles, Waveforms};
 use std::io::{Read, Write};
 
@@ -188,14 +190,8 @@ pub struct Header {
     /// Packet Record is not necessarily the first EVLR in the file.
     pub start_of_waveform_data_packet_record: Option<u64>,
 
-    /// **las 1.4**: This value provides the offset, in bytes, from the beginning of the LAS file to the first
-    /// byte of the first EVLR.
-    pub start_of_first_evlr: Option<u64>,
-
-    /// **las 1.4**: This field contains the current number of EVLRs (including, if present, the Waveform Data
-    /// Packet Record) that are stored in the file after the Point Data Records. This number must
-    /// be updated if the number of EVLRs changes. If there are no EVLRs this value is zero.
-    pub number_of_evlrs: Option<u32>,
+    #[allow(missing_docs)]
+    pub evlr: Option<Evlr>,
 
     /// **las 1.4**: This field contains the total number of point records in the file.
     ///
@@ -213,6 +209,19 @@ pub struct Header {
     pub padding: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[allow(missing_docs)]
+pub struct Evlr {
+    /// **las 1.4**: This value provides the offset, in bytes, from the beginning of the LAS file to the first
+    /// byte of the first EVLR.
+    pub start_of_first_evlr: u64,
+
+    /// **las 1.4**: This field contains the current number of EVLRs (including, if present, the Waveform Data
+    /// Packet Record) that are stored in the file after the Point Data Records. This number must
+    /// be updated if the number of EVLRs changes. If there are no EVLRs this value is zero.
+    pub number_of_evlrs: u32,
+}
+
 impl Header {
     /// Reads a raw header from a `Read`.
     ///
@@ -225,7 +234,6 @@ impl Header {
     /// let header = Header::read_from(&mut file).unwrap();
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
-        use byteorder::ReadBytesExt;
         use utils;
 
         let mut file_signature = [0; 4];
@@ -270,13 +278,10 @@ impl Header {
         } else {
             None
         };
-        let (start_of_first_evlr, number_of_evlrs) = if version.supports::<Evlrs>() {
-            (
-                utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?),
-                utils::some_or_none_if_zero(read.read_u32::<LittleEndian>()?),
-            )
+        let evlr = if version.supports::<Evlrs>() {
+            Evlr::read_from(&mut read)?.into_option()
         } else {
-            (None, None)
+            None
         };
         let (number_of_point_records_64bit, number_of_points_by_return_64bit) =
             if version.supports::<LargeFiles>() {
@@ -333,8 +338,7 @@ impl Header {
             max_z: max_z,
             min_z: min_z,
             start_of_waveform_data_packet_record: start_of_waveform_data_packet_record,
-            start_of_first_evlr: start_of_first_evlr,
-            number_of_evlrs: number_of_evlrs,
+            evlr: evlr,
             number_of_point_records_64bit: number_of_point_records_64bit,
             number_of_points_by_return_64bit: number_of_points_by_return_64bit,
             padding: padding,
@@ -418,12 +422,9 @@ impl Header {
             )?;
         }
         if self.version.supports::<Evlrs>() {
-            write.write_u64::<LittleEndian>(
-                self.start_of_first_evlr.unwrap_or(0),
-            )?;
-            write.write_u32::<LittleEndian>(
-                self.number_of_evlrs.unwrap_or(0),
-            )?;
+            let elvr = self.evlr.unwrap_or_else(Evlr::default);
+            write.write_u64::<LittleEndian>(elvr.start_of_first_evlr)?;
+            write.write_u32::<LittleEndian>(elvr.number_of_evlrs)?;
         }
         if self.version.supports::<LargeFiles>() {
             write.write_u64::<LittleEndian>(
@@ -473,11 +474,27 @@ impl Default for Header {
             max_z: 0.,
             min_z: 0.,
             start_of_waveform_data_packet_record: None,
-            start_of_first_evlr: None,
-            number_of_evlrs: None,
+            evlr: None,
             number_of_point_records_64bit: None,
             number_of_points_by_return_64bit: None,
             padding: Vec::new(),
+        }
+    }
+}
+
+impl Evlr {
+    fn read_from<R: Read>(mut read: R) -> Result<Evlr> {
+        Ok(Evlr {
+            start_of_first_evlr: read.read_u64::<LittleEndian>()?,
+            number_of_evlrs: read.read_u32::<LittleEndian>()?,
+        })
+    }
+
+    fn into_option(self) -> Option<Evlr> {
+        if self.start_of_first_evlr == 0 && self.number_of_evlrs == 0 {
+            None
+        } else {
+            Some(self)
         }
     }
 }

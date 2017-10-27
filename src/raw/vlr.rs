@@ -1,3 +1,5 @@
+//! Variable length records, both extended and regular.
+
 use Result;
 use std::io::{Read, Write};
 
@@ -32,7 +34,7 @@ pub struct Vlr {
     ///
     /// Thus the entire record length is 54 bytes (the header size of the VLR) plus the number of
     /// bytes in the variable length portion of the record.
-    pub record_length_after_header: u16,
+    pub record_length_after_header: RecordLength,
 
     /// Optional, null terminated text description of the data.
     ///
@@ -43,8 +45,17 @@ pub struct Vlr {
     pub data: Vec<u8>,
 }
 
+/// The length of the data in the vlr.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RecordLength {
+    /// Vlrs use u16.
+    Vlr(u16),
+    /// Evlrs use u64.
+    Evlr(u64),
+}
+
 impl Vlr {
-    /// Reads a raw VLR.
+    /// Reads a raw VLR or EVLR.
     ///
     /// # Examples
     ///
@@ -54,21 +65,25 @@ impl Vlr {
     /// use las::raw::Vlr;
     /// let mut file = File::open("tests/data/autzen.las").unwrap();
     /// file.seek(SeekFrom::Start(227));
-    /// let vlr = Vlr::read_from(file).unwrap();
+    /// // If the second parameter were true, it would be read as an extended vlr.
+    /// let vlr = Vlr::read_from(file, false).unwrap();
     /// ```
-    pub fn read_from<R: Read>(mut read: R) -> Result<Vlr> {
+    pub fn read_from<R: Read>(mut read: R, extended: bool) -> Result<Vlr> {
         use byteorder::{LittleEndian, ReadBytesExt};
         let reserved = read.read_u16::<LittleEndian>()?;
         let mut user_id = [0; 16];
         read.read_exact(&mut user_id)?;
         let record_id = read.read_u16::<LittleEndian>()?;
-        let record_length_after_header = read.read_u16::<LittleEndian>()?;
+        let record_length_after_header = if extended {
+            RecordLength::Evlr(read.read_u64::<LittleEndian>()?)
+        } else {
+            RecordLength::Vlr(read.read_u16::<LittleEndian>()?)
+        };
         let mut description = [0; 32];
         read.read_exact(&mut description)?;
-        let mut data = Vec::with_capacity(record_length_after_header as usize);
-        read.take(record_length_after_header as u64).read_to_end(
-            &mut data,
-        )?;
+        let mut data = Vec::with_capacity(usize::from(record_length_after_header));
+        read.take(u64::from(record_length_after_header))
+            .read_to_end(&mut data)?;
         Ok(Vlr {
             reserved: reserved,
             user_id: user_id,
@@ -77,6 +92,27 @@ impl Vlr {
             description: description,
             data: data,
         })
+    }
+
+    /// Is this vlr extended?
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::raw::Vlr;
+    /// assert!(!Vlr::default().is_extended());
+    ///
+    /// use las::raw::vlr::RecordLength;
+    /// assert!(Vlr {
+    ///     record_length_after_header: RecordLength::Evlr(0),
+    ///     ..Default::default()
+    /// }.is_extended());
+    /// ```
+    pub fn is_extended(&self) -> bool {
+        match self.record_length_after_header {
+            RecordLength::Vlr(_) => false,
+            RecordLength::Evlr(_) => true,
+        }
     }
 
     /// Writes a raw VLR.
@@ -95,12 +131,34 @@ impl Vlr {
         write.write_u16::<LittleEndian>(self.reserved)?;
         write.write_all(&self.user_id)?;
         write.write_u16::<LittleEndian>(self.record_id)?;
-        write.write_u16::<LittleEndian>(
-            self.record_length_after_header,
-        )?;
+        match self.record_length_after_header {
+            RecordLength::Vlr(n) => write.write_u16::<LittleEndian>(n)?,
+            RecordLength::Evlr(n) => write.write_u64::<LittleEndian>(n)?,
+        }
         write.write_all(&self.description)?;
         write.write_all(&self.data)?;
         Ok(())
+    }
+}
+
+impl From<RecordLength> for u64 {
+    fn from(record_length: RecordLength) -> u64 {
+        match record_length {
+            RecordLength::Vlr(n) => u64::from(n),
+            RecordLength::Evlr(n) => n,
+        }
+    }
+}
+
+impl From<RecordLength> for usize {
+    fn from(record_length: RecordLength) -> usize {
+        u64::from(record_length) as usize
+    }
+}
+
+impl Default for RecordLength {
+    fn default() -> RecordLength {
+        RecordLength::Vlr(0)
     }
 }
 
@@ -115,6 +173,19 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         vlr.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        assert_eq!(vlr, Vlr::read_from(cursor).unwrap());
+        assert_eq!(vlr, Vlr::read_from(cursor, false).unwrap());
+    }
+
+    #[test]
+    fn roundtrip_evlr() {
+        let evlr = Vlr {
+            record_length_after_header: RecordLength::Evlr(0),
+            ..Default::default()
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        evlr.write_to(&mut cursor).unwrap();
+        cursor.set_position(0);
+        assert_eq!(evlr, Vlr::read_from(cursor, true).unwrap());
+
     }
 }

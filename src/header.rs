@@ -15,6 +15,11 @@ quick_error! {
             description("the header is too large to convert to a raw header")
             display("the header is too large to convert to a raw header: {} bytes", len)
         }
+        /// Too many extended variable length records.
+        TooManyEvlrs(count: usize) {
+            description("too many extended variable length records")
+            display("too many extended variable length records: {}", count)
+        }
         /// Too many variable length records.
         TooManyVlrs(count: usize) {
             description("too many variable length records")
@@ -157,6 +162,62 @@ impl Header {
         })
     }
 
+    /// Returns this header's variable length records.
+    ///
+    /// This checks through all of the variable length records, and only includes those that (a)
+    /// are small enough to fit in as a vlr and (b) aren't marked as extended.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::u16;
+    /// use las::{Header, Vlr};
+    /// let mut header = Header::default();
+    /// header.version = (1, 4).into();
+    /// header.vlrs = vec![
+    ///     Vlr::default(),
+    ///     Vlr { is_extended: true, ..Default::default() },
+    ///     Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() },
+    /// ];
+    /// assert_eq!(1, header.vlrs().len());
+    ///
+    /// header.version = (1, 2).into();
+    /// assert_eq!(2, header.vlrs().len());
+    /// ```
+    pub fn vlrs(&self) -> Vec<&Vlr> {
+        self.filter_vlrs(false)
+    }
+
+    /// Returns this header's extended variable length records.
+    ///
+    /// If this header supports evlrs, this checks through all of the variable length records, and
+    /// only includes those that (a) are marked as extended or (b) are too large to fit into a vlr.
+    ///
+    /// If this header doesn't support evlrs, this will instead return all *forced* evlrs, i.e. all
+    /// vlrs that can't be downgraded to a vlr. The idea is that an upstream will then reject the
+    /// header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::u16;
+    /// use las::{Header, Vlr};
+    /// let mut header = Header::default();
+    /// header.version = (1, 4).into();
+    /// header.vlrs = vec![
+    ///     Vlr::default(),
+    ///     Vlr { is_extended: true, ..Default::default() },
+    ///     Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() },
+    /// ];
+    /// assert_eq!(2, header.evlrs().len());
+    ///
+    /// header.version = (1, 2).into();
+    /// assert_eq!(1, header.evlrs().len());
+    /// ```
+    pub fn evlrs(&self) -> Vec<&Vlr> {
+        self.filter_vlrs(true)
+    }
+
     /// Converts this header into a raw header.
     ///
     /// This method does some rules-checking.
@@ -201,9 +262,7 @@ impl Header {
             max_z: self.bounds.max.z,
             min_z: self.bounds.min.z,
             start_of_waveform_data_packet_record: None,
-            start_of_first_evlr: None,
-            number_of_evlrs: None,
-            // TODO we could populate these
+            evlr: self.evlr()?,
             number_of_point_records_64bit: None,
             number_of_points_by_return_64bit: None,
             padding: self.padding.clone(),
@@ -213,10 +272,11 @@ impl Header {
     fn number_of_variable_length_records(&self) -> Result<u32> {
         use std::u32;
 
-        if self.vlrs.len() > u32::MAX as usize {
-            Err(Error::TooManyVlrs(self.vlrs.len()).into())
+        let n = self.vlrs().len();
+        if n > u32::MAX as usize {
+            Err(Error::TooManyVlrs(n).into())
         } else {
-            Ok(self.vlrs.len() as u32)
+            Ok(n as u32)
         }
     }
 
@@ -234,7 +294,7 @@ impl Header {
     fn offset_to_point_data(&self) -> Result<u32> {
         use std::u32;
 
-        let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
+        let vlr_len = self.vlrs().iter().fold(0, |acc, vlr| acc + vlr.len());
         let offset = self.header_size()? as usize + vlr_len + self.vlr_padding.len();
         if offset > u32::MAX as usize {
             Err(Error::OffsetToPointDataTooLarge(offset).into())
@@ -269,6 +329,43 @@ impl Header {
             }
         }
         Ok(number_of_points_by_return)
+    }
+
+    fn evlr(&self) -> Result<Option<raw::header::Evlr>> {
+        use std::u32;
+
+        let n = self.evlrs().len();
+        if n == 0 {
+            Ok(None)
+        } else if n > u32::MAX as usize {
+            Err(Error::TooManyEvlrs(n).into())
+        } else {
+            let start_of_first_evlr = u64::from(self.offset_to_point_data()?) +
+                self.point_data_len();
+            Ok(Some(raw::header::Evlr {
+                start_of_first_evlr: start_of_first_evlr,
+                number_of_evlrs: n as u32,
+            }))
+        }
+    }
+
+    fn point_data_len(&self) -> u64 {
+        // TODO extra bytes
+        u64::from(self.number_of_points) * u64::from(self.point_format.len())
+    }
+
+    fn filter_vlrs(&self, extended: bool) -> Vec<&Vlr> {
+        use std::u16;
+        use feature::Evlrs;
+
+        self.vlrs
+            .iter()
+            .filter(|vlr| {
+                (vlr.len() > u16::MAX as usize ||
+                     (self.version.supports::<Evlrs>() && vlr.is_extended)) ==
+                    extended
+            })
+            .collect()
     }
 }
 

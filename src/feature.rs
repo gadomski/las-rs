@@ -53,6 +53,6 @@ macro_rules! feature {
 feature!(FileSourceId, 1, 2, 3, 4);
 feature!(Color, 2, 3, 4);
 feature!(GpsStandardTime, 2, 3, 4);
-feature!(Waveforms, 4);
+feature!(Waveforms, 3, 4);
 feature!(LargeFiles, 4);
 feature!(Evlrs, 4);

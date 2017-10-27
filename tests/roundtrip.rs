@@ -16,7 +16,9 @@ pub fn roundtrip(header: Header, point: Point) {
     let mut reader = Reader::new(cursor).unwrap();
     let other = reader.read().unwrap().unwrap();
     assert_eq!(point, other);
-    assert!(reader.read().expect("Error when reading EOF").is_none());
+    if reader.header.evlrs().len() == 0 {
+        assert!(reader.read().expect("Error when reading EOF").is_none());
+    }
 
     let other = reader.header;
     assert_eq!(header.guid, other.guid);
@@ -259,6 +261,19 @@ macro_rules! roundtrip {
                     super::new_writer_fail(header);
                 } else {
                     super::roundtrip(header, Default::default());
+                }
+            }
+
+            #[test]
+            fn evlr() {
+                use las::Vlr;
+                use std::u16;
+                let vlrs = vec![Vlr { is_extended: true, data: vec![42; u16::MAX as usize + 1], ..Default::default() }];
+                let header = Header { version: VERSION.into(), vlrs: vlrs, ..Default::default() };
+                if VERSION == (1, 4) {
+                    super::roundtrip(header, Default::default());
+                } else {
+                    super::new_writer_fail(header);
                 }
             }
         }
