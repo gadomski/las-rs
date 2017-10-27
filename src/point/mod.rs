@@ -5,10 +5,10 @@ mod format;
 mod point;
 mod scan_direction;
 
-pub use point::classification::Classification;
-pub use point::format::Format;
-pub use point::point::Point;
-pub use point::scan_direction::ScanDirection;
+pub use self::classification::Classification;
+pub use self::format::Format;
+pub use self::point::Point;
+pub use self::scan_direction::ScanDirection;
 
 quick_error! {
     /// Point-specific errors
