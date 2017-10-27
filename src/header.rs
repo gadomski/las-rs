@@ -263,8 +263,7 @@ impl Header {
             min_z: self.bounds.min.z,
             start_of_waveform_data_packet_record: None,
             evlr: self.evlr()?,
-            number_of_point_records_64bit: None,
-            number_of_points_by_return_64bit: None,
+            large_file: self.large_file()?,
             padding: self.padding.clone(),
         })
     }
@@ -347,6 +346,10 @@ impl Header {
                 number_of_evlrs: n as u32,
             }))
         }
+    }
+
+    fn large_file(&self) -> Result<Option<raw::header::LargeFile>> {
+        unimplemented!()
     }
 
     fn point_data_len(&self) -> u64 {

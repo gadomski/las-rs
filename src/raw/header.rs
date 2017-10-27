@@ -193,17 +193,8 @@ pub struct Header {
     #[allow(missing_docs)]
     pub evlr: Option<Evlr>,
 
-    /// **las 1.4**: This field contains the total number of point records in the file.
-    ///
-    /// Note that this field must always be correctly populated, regardless of legacy mode intent.
-    pub number_of_point_records_64bit: Option<u64>,
-
-    /// **las 1.4**: These fields contain an array of the total point records per return.
-    ///
-    /// The first value will be the total number of records from the first return, the second
-    /// contains the total number for return two, and so on up to fifteen returns. Note that these
-    /// fields must always be correctly populated, regardless of legacy mode intent.
-    pub number_of_points_by_return_64bit: Option<[u64; 15]>,
+    #[allow(missing_docs)]
+    pub large_file: Option<LargeFile>,
 
     #[allow(missing_docs)]
     pub padding: Vec<u8>,
@@ -220,6 +211,22 @@ pub struct Evlr {
     /// Packet Record) that are stored in the file after the Point Data Records. This number must
     /// be updated if the number of EVLRs changes. If there are no EVLRs this value is zero.
     pub number_of_evlrs: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[allow(missing_docs)]
+pub struct LargeFile {
+    /// **las 1.4**: This field contains the total number of point records in the file.
+    ///
+    /// Note that this field must always be correctly populated, regardless of legacy mode intent.
+    pub number_of_point_records: u64,
+
+    /// **las 1.4**: These fields contain an array of the total point records per return.
+    ///
+    /// The first value will be the total number of records from the first return, the second
+    /// contains the total number for return two, and so on up to fifteen returns. Note that these
+    /// fields must always be correctly populated, regardless of legacy mode intent.
+    pub number_of_points_by_return: [u64; 15],
 }
 
 impl Header {
@@ -283,24 +290,11 @@ impl Header {
         } else {
             None
         };
-        let (number_of_point_records_64bit, number_of_points_by_return_64bit) =
-            if version.supports::<LargeFiles>() {
-                let number_of_point_records_64bit = read.read_u64::<LittleEndian>()?;
-                let mut number_of_points_by_return_64bit = [0; 15];
-                for n in &mut number_of_points_by_return_64bit {
-                    *n = read.read_u64::<LittleEndian>()?
-                }
-                (
-                    utils::some_or_none_if_zero(number_of_point_records_64bit),
-                    if number_of_points_by_return_64bit.iter().all(|n| *n == 0) {
-                        None
-                    } else {
-                        Some(number_of_points_by_return_64bit)
-                    },
-                )
-            } else {
-                (None, None)
-            };
+        let large_file = if version.supports::<LargeFiles>() {
+            Some(LargeFile::read_from(&mut read)?)
+        } else {
+            None
+        };
         let padding = if header_size > version.header_size() {
             let mut bytes = vec![0; (header_size - version.header_size()) as usize];
             read.read_exact(&mut bytes)?;
@@ -339,8 +333,7 @@ impl Header {
             min_z: min_z,
             start_of_waveform_data_packet_record: start_of_waveform_data_packet_record,
             evlr: evlr,
-            number_of_point_records_64bit: number_of_point_records_64bit,
-            number_of_points_by_return_64bit: number_of_points_by_return_64bit,
+            large_file: large_file,
             padding: padding,
         })
     }
@@ -427,10 +420,11 @@ impl Header {
             write.write_u32::<LittleEndian>(elvr.number_of_evlrs)?;
         }
         if self.version.supports::<LargeFiles>() {
+            let large_file = self.large_file.unwrap_or_else(LargeFile::default);
             write.write_u64::<LittleEndian>(
-                self.number_of_point_records_64bit.unwrap_or(0),
+                large_file.number_of_point_records,
             )?;
-            for n in &self.number_of_points_by_return_64bit.unwrap_or([0; 15]) {
+            for n in &large_file.number_of_points_by_return {
                 write.write_u64::<LittleEndian>(*n)?;
             }
         }
@@ -475,8 +469,7 @@ impl Default for Header {
             min_z: 0.,
             start_of_waveform_data_packet_record: None,
             evlr: None,
-            number_of_point_records_64bit: None,
-            number_of_points_by_return_64bit: None,
+            large_file: None,
             padding: Vec::new(),
         }
     }
@@ -496,6 +489,20 @@ impl Evlr {
         } else {
             Some(self)
         }
+    }
+}
+
+impl LargeFile {
+    fn read_from<R: Read>(mut read: R) -> Result<LargeFile> {
+        let number_of_point_records = read.read_u64::<LittleEndian>()?;
+        let mut number_of_points_by_return = [0; 15];
+        for n in &mut number_of_points_by_return {
+            *n = read.read_u64::<LittleEndian>()?
+        }
+        Ok(LargeFile {
+            number_of_point_records: number_of_point_records,
+            number_of_points_by_return: number_of_points_by_return,
+        })
     }
 }
 
@@ -523,10 +530,13 @@ mod tests {
                     use super::*;
 
                     let version = Version::new(1, $minor);
-                    let header = Header {
+                    let mut header = Header {
                         version: version,
                         ..Default::default()
                     };
+                    if version.minor == 4 {
+                        header.large_file = Some(LargeFile::default());
+                    }
                     let mut cursor = Cursor::new(Vec::new());
                     header.write_to(&mut cursor).unwrap();
                     cursor.set_position(0);
