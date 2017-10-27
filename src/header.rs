@@ -10,6 +10,11 @@ quick_error! {
     /// Header-specific errors.
     #[derive(Clone, Copy, Debug)]
     pub enum Error {
+        /// The file signature is not LASF.
+        FileSignature(b: [u8; 4]) {
+            description("the file signature was not LASF")
+            display("the file signature was not LASF: {:?}", b)
+        }
         /// The header size, as computed, is too large.
         TooLarge(len: usize) {
             description("the header is too large to convert to a raw header")

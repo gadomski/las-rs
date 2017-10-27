@@ -3,6 +3,7 @@
 use {Result, Version};
 use byteorder::{LittleEndian, ReadBytesExt};
 use feature::{Evlrs, LargeFiles, Waveforms};
+use raw::LASF;
 use std::io::{Read, Write};
 
 const IS_COMPRESSED_MASK: u8 = 0x80;
@@ -242,9 +243,13 @@ impl Header {
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
         use utils;
+        use header::Error;
 
         let mut file_signature = [0; 4];
         read.read_exact(&mut file_signature)?;
+        if file_signature != LASF {
+            return Err(Error::FileSignature(file_signature).into());
+        }
         let file_source_id = read.read_u16::<LittleEndian>()?;
         let global_encoding = read.read_u16::<LittleEndian>()?;
         let mut guid = [0; 16];
@@ -439,7 +444,7 @@ impl Default for Header {
     fn default() -> Header {
         let version = Version::new(1, 2);
         Header {
-            file_signature: ::raw::LASF,
+            file_signature: LASF,
             file_source_id: 0,
             global_encoding: 0,
             guid: [0; 16],
@@ -509,6 +514,19 @@ impl LargeFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn file_signature() {
+        let raw_header = Header {
+            file_signature: *b"ABCD",
+            ..Default::default()
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        raw_header.write_to(&mut cursor).unwrap();
+        cursor.set_position(0);
+        assert!(Header::read_from(cursor).is_err());
+    }
 
     #[test]
     fn is_compressed() {
