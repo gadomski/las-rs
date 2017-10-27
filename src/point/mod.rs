@@ -24,12 +24,12 @@ quick_error! {
         /// It has a combination of options that can't exist.
         Format(format: Format) {
             description("invalid format")
-            display("invalid format: {:?}", format)
+            display("invalid format: {}", format)
         }
         /// This is an invalid format number.
         FormatNumber(n: u8) {
             description("invalid format number")
-            display("invalid format number: {:?}", n)
+            display("invalid format number: {}", n)
         }
         /// This is not a valid return number.
         ReturnNumber(n: u8, version: Option<::Version>) {

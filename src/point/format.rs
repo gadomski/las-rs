@@ -1,5 +1,6 @@
 use Result;
 use point::Error;
+use std::fmt;
 
 const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
@@ -135,6 +136,16 @@ impl Format {
                 }
                 Ok(n)
             }
+        }
+    }
+}
+
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Ok(n) = self.to_u8() {
+            write!(f, "point format {}", n)
+        } else {
+            write!(f, "point format that does not map onto a code: {:?}", self)
         }
     }
 }

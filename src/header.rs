@@ -40,6 +40,11 @@ quick_error! {
             description("the offset to the point data is too large")
             display("the offset to the point data is too large: {}", offset)
         }
+        /// Wkt is required for this point format.
+        WktRequired(format: Format) {
+            description("wkt is required for this point format")
+            display("wkt is required for point format {}", format)
+        }
     }
 }
 
@@ -112,6 +117,11 @@ impl Header {
     pub fn new(raw_header: raw::Header, vlrs: Vec<Vlr>, vlr_padding: Vec<u8>) -> Result<Header> {
         use chrono::TimeZone;
 
+        let point_format = Format::new(raw_header.point_data_format_id)?;
+        if !is_wkt_bit_set(raw_header.global_encoding) && point_format.is_extended {
+            return Err(Error::WktRequired(point_format).into());
+        }
+
         let number_of_points = if raw_header.number_of_point_records > 0 {
             raw_header.number_of_point_records as u64
         } else {
@@ -145,7 +155,7 @@ impl Header {
             guid: raw_header.guid,
             padding: raw_header.padding,
             vlr_padding: vlr_padding,
-            point_format: Format::new(raw_header.point_data_format_id)?,
+            point_format: point_format,
             number_of_points: number_of_points,
             number_of_points_by_return: number_of_points_by_return,
             system_identifier: raw_header
@@ -469,6 +479,10 @@ fn number_of_points_hash_map<T: Copy + Into<u64>>(slice: &[T]) -> HashMap<u8, u6
         .collect()
 }
 
+fn is_wkt_bit_set(n: u16) -> bool {
+    n & 8 == 8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,4 +646,38 @@ mod tests {
             raw_header.large_file.unwrap().number_of_points_by_return[0]
         );
     }
+
+    macro_rules! point_format {
+        ($name:ident, $format:expr) => {
+            mod $name {
+                use super::*;
+
+                #[test]
+                fn wkt() {
+                    let raw_header = raw::Header {
+                        version: (1, 4).into(),
+                        point_data_format_id: $format,
+                        ..Default::default()
+                    };
+                    if $format < 6 {
+                        Header::new(raw_header, vec![], vec![]).unwrap();
+                    } else {
+                        assert!(Header::new(raw_header, vec![], vec![]).is_err());
+                    }
+                }
+            }
+        }
+    }
+
+    point_format!(point_format_0, 0);
+    point_format!(point_format_1, 1);
+    point_format!(point_format_2, 2);
+    point_format!(point_format_3, 3);
+    point_format!(point_format_4, 4);
+    point_format!(point_format_5, 5);
+    point_format!(point_format_6, 6);
+    point_format!(point_format_7, 7);
+    point_format!(point_format_8, 8);
+    point_format!(point_format_9, 9);
+    point_format!(point_format_10, 10);
 }
