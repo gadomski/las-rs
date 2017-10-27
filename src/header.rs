@@ -20,6 +20,11 @@ quick_error! {
             description("too many extended variable length records")
             display("too many extended variable length records: {}", count)
         }
+        /// Too many points for this version.
+        TooManyPoints(n: u64, version: Version) {
+            description("too many points for this version")
+            display("too many points for this version {}: {}", version, n)
+        }
         /// Too many variable length records.
         TooManyVlrs(count: usize) {
             description("too many variable length records")
@@ -85,10 +90,10 @@ pub struct Header {
     pub bounds: Bounds,
 
     /// The number of points.
-    pub number_of_points: u32,
+    pub number_of_points: u64,
 
-    /// The number of points of each return type (1-5).
-    pub number_of_points_by_return: HashMap<u8, u32>,
+    /// The number of points of each return number.
+    pub number_of_points_by_return: HashMap<u8, u64>,
 
     /// Variable length records.
     pub vlrs: Vec<Vlr>,
@@ -104,60 +109,77 @@ impl Header {
     /// let raw_header = raw::Header::default();
     /// let header = Header::new(raw_header, vec![], vec![]).unwrap();
     /// ```
-    pub fn new(header: raw::Header, vlrs: Vec<Vlr>, vlr_padding: Vec<u8>) -> Result<Header> {
+    pub fn new(raw_header: raw::Header, vlrs: Vec<Vlr>, vlr_padding: Vec<u8>) -> Result<Header> {
         use chrono::TimeZone;
 
+        let number_of_points = if raw_header.number_of_point_records > 0 {
+            raw_header.number_of_point_records as u64
+        } else {
+            raw_header
+                .large_file
+                .map(|f| f.number_of_point_records)
+                .unwrap_or(0)
+        };
+        let number_of_points_by_return =
+            if raw_header.number_of_points_by_return.iter().any(|&n| n > 0) {
+                number_of_points_hash_map(&raw_header.number_of_points_by_return)
+            } else {
+                raw_header
+                    .large_file
+                    .map(|f| number_of_points_hash_map(&f.number_of_points_by_return))
+                    .unwrap_or_else(HashMap::new)
+            };
+
         Ok(Header {
-            file_source_id: header.file_source_id,
-            gps_time_type: header.global_encoding.into(),
+            file_source_id: raw_header.file_source_id,
+            gps_time_type: raw_header.global_encoding.into(),
             date: Utc.yo_opt(
-                header.file_creation_year as i32,
-                header.file_creation_day_of_year as u32,
+                raw_header.file_creation_year as i32,
+                raw_header.file_creation_day_of_year as u32,
             ).single(),
-            generating_software: header
+            generating_software: raw_header
                 .generating_software
                 .as_ref()
                 .as_las_str()?
                 .to_string(),
-            guid: header.guid,
-            padding: header.padding,
+            guid: raw_header.guid,
+            padding: raw_header.padding,
             vlr_padding: vlr_padding,
-            point_format: Format::new(header.point_data_format_id)?,
-            number_of_points: header.number_of_point_records,
-            number_of_points_by_return: header
-                .number_of_points_by_return
-                .into_iter()
-                .enumerate()
-                .map(|(i, &n)| (i as u8 + 1, n))
-                .collect(),
-            system_identifier: header.system_identifier.as_ref().as_las_str()?.to_string(),
+            point_format: Format::new(raw_header.point_data_format_id)?,
+            number_of_points: number_of_points,
+            number_of_points_by_return: number_of_points_by_return,
+            system_identifier: raw_header
+                .system_identifier
+                .as_ref()
+                .as_las_str()?
+                .to_string(),
             transforms: Vector {
                 x: Transform {
-                    scale: header.x_scale_factor,
-                    offset: header.x_offset,
+                    scale: raw_header.x_scale_factor,
+                    offset: raw_header.x_offset,
                 },
                 y: Transform {
-                    scale: header.y_scale_factor,
-                    offset: header.y_offset,
+                    scale: raw_header.y_scale_factor,
+                    offset: raw_header.y_offset,
                 },
                 z: Transform {
-                    scale: header.z_scale_factor,
-                    offset: header.z_offset,
+                    scale: raw_header.z_scale_factor,
+                    offset: raw_header.z_offset,
                 },
             },
             bounds: Bounds {
                 min: Vector {
-                    x: header.min_x,
-                    y: header.min_y,
-                    z: header.min_z,
+                    x: raw_header.min_x,
+                    y: raw_header.min_y,
+                    z: raw_header.min_z,
                 },
                 max: Vector {
-                    x: header.max_x,
-                    y: header.max_y,
-                    z: header.max_z,
+                    x: raw_header.max_x,
+                    y: raw_header.max_y,
+                    z: raw_header.max_z,
                 },
             },
-            version: header.version,
+            version: raw_header.version,
             vlrs: vlrs,
         })
     }
@@ -237,8 +259,8 @@ impl Header {
             global_encoding: self.gps_time_type.into(),
             guid: self.guid,
             version: self.version,
-            system_identifier: self.raw_system_identifier()?,
-            generating_software: self.raw_generating_software()?,
+            system_identifier: self.system_identifier()?,
+            generating_software: self.generating_software()?,
             file_creation_day_of_year: self.date.map_or(0, |d| d.ordinal() as u16),
             file_creation_year: self.date.map_or(0, |d| d.year() as u16),
             header_size: self.header_size()?,
@@ -247,8 +269,8 @@ impl Header {
             point_data_format_id: self.point_format.to_u8()?,
             // TODO extra bytes
             point_data_record_length: self.point_format.len(),
-            number_of_point_records: self.number_of_points,
-            number_of_points_by_return: self.raw_number_of_points_by_return()?,
+            number_of_point_records: self.number_of_points()?,
+            number_of_points_by_return: self.number_of_points_by_return()?,
             x_scale_factor: self.transforms.x.scale,
             y_scale_factor: self.transforms.y.scale,
             z_scale_factor: self.transforms.z.scale,
@@ -302,7 +324,7 @@ impl Header {
         }
     }
 
-    fn raw_system_identifier(&self) -> Result<[u8; 32]> {
+    fn system_identifier(&self) -> Result<[u8; 32]> {
         let mut system_identifier = [0; 32];
         system_identifier.as_mut().from_las_str(
             &self.system_identifier,
@@ -310,7 +332,7 @@ impl Header {
         Ok(system_identifier)
     }
 
-    fn raw_generating_software(&self) -> Result<[u8; 32]> {
+    fn generating_software(&self) -> Result<[u8; 32]> {
         let mut generating_software = [0; 32];
         generating_software.as_mut().from_las_str(
             &self.generating_software,
@@ -318,13 +340,41 @@ impl Header {
         Ok(generating_software)
     }
 
-    fn raw_number_of_points_by_return(&self) -> Result<[u32; 5]> {
+    fn number_of_points(&self) -> Result<u32> {
+        use std::u32;
+        use feature::LargeFiles;
+
+        if self.number_of_points > u32::MAX as u64 {
+            if self.version.supports::<LargeFiles>() {
+                Ok(0)
+            } else {
+                Err(
+                    Error::TooManyPoints(self.number_of_points, self.version).into(),
+                )
+            }
+        } else {
+            Ok(self.number_of_points as u32)
+        }
+    }
+
+    fn number_of_points_by_return(&self) -> Result<[u32; 5]> {
+        use std::u32;
+        use feature::LargeFiles;
+
         let mut number_of_points_by_return = [0; 5];
         for (&i, &n) in &self.number_of_points_by_return {
             if i > 5 {
-                return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
+                if !self.version.supports::<LargeFiles>() {
+                    return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
+                }
             } else if i > 0 {
-                number_of_points_by_return[i as usize - 1] = n;
+                if n > u32::MAX as u64 {
+                    if !self.version.supports::<LargeFiles>() {
+                        return Err(Error::TooManyPoints(n, self.version).into());
+                    }
+                } else {
+                    number_of_points_by_return[i as usize - 1] = n as u32;
+                }
             }
         }
         Ok(number_of_points_by_return)
@@ -349,7 +399,18 @@ impl Header {
     }
 
     fn large_file(&self) -> Result<Option<raw::header::LargeFile>> {
-        unimplemented!()
+        let mut number_of_points_by_return = [0; 15];
+        for (&i, &n) in &self.number_of_points_by_return {
+            if i > 15 {
+                return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
+            } else if i > 0 {
+                number_of_points_by_return[i as usize - 1] = n;
+            }
+        }
+        Ok(Some(raw::header::LargeFile {
+            number_of_point_records: self.number_of_points,
+            number_of_points_by_return: number_of_points_by_return,
+        }))
     }
 
     fn point_data_len(&self) -> u64 {
@@ -392,6 +453,20 @@ impl Default for Header {
             vlrs: Vec::new(),
         }
     }
+}
+
+fn number_of_points_hash_map<T: Copy + Into<u64>>(slice: &[T]) -> HashMap<u8, u64> {
+    use std::u8;
+    assert!(slice.len() < u8::MAX as usize);
+    slice
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &n)| if n.into() > 0 {
+            Some((i as u8 + 1, n.into()))
+        } else {
+            None
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -463,5 +538,98 @@ mod tests {
             ..Default::default()
         };
         assert!(header.to_raw().is_err());
+    }
+
+    #[test]
+    fn synchronize_legacy_fields() {
+        let mut header = Header {
+            version: (1, 4).into(),
+            number_of_points: 42,
+            ..Default::default()
+        };
+        header.number_of_points_by_return.insert(2, 42);
+        let raw_header = header.to_raw().unwrap();
+        assert_eq!(42, raw_header.number_of_point_records);
+        assert_eq!([0, 42, 0, 0, 0], raw_header.number_of_points_by_return);
+        assert_eq!(42, raw_header.large_file.unwrap().number_of_point_records);
+        assert_eq!(
+            [0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            raw_header.large_file.unwrap().number_of_points_by_return
+        );
+    }
+
+    #[test]
+    fn zero_legacy_fields_when_too_large() {
+        use std::u32;
+
+        let mut header = Header {
+            version: (1, 4).into(),
+            number_of_points: u32::MAX as u64 + 1,
+            ..Default::default()
+        };
+        header.number_of_points_by_return.insert(6, 42);
+        let raw_header = header.to_raw().unwrap();
+        assert_eq!(0, raw_header.number_of_point_records);
+        assert_eq!(
+            u32::MAX as u64 + 1,
+            raw_header.large_file.unwrap().number_of_point_records
+        );
+        assert_eq!([0; 5], raw_header.number_of_points_by_return);
+        assert_eq!(
+            [0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            raw_header.large_file.unwrap().number_of_points_by_return
+        );
+    }
+
+    #[test]
+    fn prefer_legacy_fields() {
+        let mut raw_header = raw::Header::default();
+        raw_header.version = (1, 4).into();
+        raw_header.number_of_point_records = 42;
+        raw_header.number_of_points_by_return[0] = 42;
+        let mut large_file = raw::header::LargeFile::default();
+        large_file.number_of_point_records = 43;
+        large_file.number_of_points_by_return[0] = 43;
+        raw_header.large_file = Some(large_file);
+        let header = Header::new(raw_header, vec![], vec![]).unwrap();
+        assert_eq!(42, header.number_of_points);
+        assert_eq!(42, header.number_of_points_by_return[&1]);
+    }
+
+    #[test]
+    fn number_of_points_large() {
+        use std::u32;
+
+        let mut header = Header::default();
+        header.version = (1, 2).into();
+        header.number_of_points = u32::MAX as u64 + 1;
+        assert!(header.to_raw().is_err());
+        header.version = (1, 4).into();
+        let raw_header = header.to_raw().unwrap();
+        assert_eq!(0, raw_header.number_of_point_records);
+        assert_eq!(
+            u32::MAX as u64 + 1,
+            raw_header.large_file.unwrap().number_of_point_records
+        );
+    }
+
+    #[test]
+    fn number_of_points_by_return_large() {
+        use std::u32;
+
+        let mut header = Header::default();
+        header.version = (1, 2).into();
+        header.number_of_points_by_return.insert(
+            1,
+            u32::MAX as u64 + 1,
+        );
+        assert!(header.to_raw().is_err());
+        header.version = (1, 4).into();
+        let raw_header = header.to_raw().unwrap();
+        assert_eq!(0, raw_header.number_of_points_by_return[0]);
+        assert_eq!(
+            u32::MAX as u64 + 1,
+            raw_header.large_file.unwrap().number_of_points_by_return[0]
+        );
     }
 }
