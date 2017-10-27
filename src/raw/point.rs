@@ -9,7 +9,7 @@ const SCAN_ANGLE_SCALE_FACTOR: f32 = 0.006;
 /// A raw point.
 ///
 /// The documentation for struct members is taken directly from the las 1.4 spec.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Point {
     /// The X, Y, and Z values are stored as long integers.
     ///
@@ -235,6 +235,9 @@ pub struct Point {
 
     /// The NIR (near infrared) channel value associated with this point.
     pub nir: Option<u16>,
+
+    #[allow(missing_docs)]
+    pub extra_bytes: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -407,7 +410,8 @@ impl Point {
         } else {
             None
         };
-        // TODO read extra bytes
+        let mut extra_bytes = vec![0; format.extra_bytes as usize];
+        read.read_exact(&mut extra_bytes)?;
         Ok(Some(Point {
             x: x,
             y: y,
@@ -421,6 +425,7 @@ impl Point {
             color: color,
             waveform: waveform,
             nir: nir,
+            extra_bytes: extra_bytes,
         }))
     }
 
@@ -440,6 +445,7 @@ impl Point {
     /// ```
     pub fn write_to<W: Write>(&self, mut write: W, format: Format) -> Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
+        assert_eq!(format.extra_bytes as usize, self.extra_bytes.len());
 
         write.write_i32::<LittleEndian>(self.x)?;
         write.write_i32::<LittleEndian>(self.y)?;
@@ -481,6 +487,7 @@ impl Point {
                 &mut write,
             )?;
         }
+        write.write_all(&self.extra_bytes)?;
         Ok(())
     }
 }
@@ -833,8 +840,10 @@ mod tests {
                     use std::io::Cursor;
                     use super::*;
 
-                    let format = Format::new($format).unwrap();
+                    let mut format = Format::new($format).unwrap();
+                    format.extra_bytes = 1;
                     let mut point = Point::default();
+                    point.extra_bytes = vec![42];
                     if format.has_color {
                         point.color = Some(Color::new(0, 0, 0));
                     }

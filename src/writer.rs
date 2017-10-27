@@ -1,8 +1,25 @@
-use {Error, Header, Point, Result};
+use {Header, Point, Result};
+use point::Format;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
+
+quick_error! {
+    /// Writer errors.
+    #[derive(Debug)]
+    pub enum Error {
+        /// The writer is closed.
+        Closed {
+            description("the writer is closed")
+        }
+        /// The point format has extra bytes, but the point doesn't.
+        MissingExtraBytes(format: Format, point: Point) {
+            description("the point format has extra bytes, but the point doesn't")
+            display("point format {} has extra bytes, but point {:?} doesn't", format, point)
+        }
+    }
+}
 
 /// Writes LAS data.
 ///
@@ -87,22 +104,31 @@ impl<W: Seek + Write> Writer<W> {
     /// # use las::Writer;
     ///
     /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
-    /// writer.write(&Default::default()).unwrap();
+    /// writer.write(Default::default()).unwrap();
     /// ```
-    pub fn write(&mut self, point: &Point) -> Result<()> {
+    pub fn write(&mut self, point: Point) -> Result<()> {
         if self.closed {
-            return Err(Error::ClosedWriter);
+            return Err(Error::Closed.into());
         }
-        point.to_raw(self.header.transforms).and_then(|raw_point| {
-            raw_point.write_to(&mut self.write, self.header.point_format)
-        })?;
+        if self.header.point_format.extra_bytes as usize != point.extra_bytes.len() {
+            return Err(
+                Error::MissingExtraBytes(self.header.point_format, point).into(),
+            );
+        }
         self.header.number_of_points += 1;
-        let entry = self.header
-            .number_of_points_by_return
-            .entry(point.return_number)
-            .or_insert(0);
-        *entry += 1;
-        self.header.bounds.grow(point);
+        {
+            let entry = self.header
+                .number_of_points_by_return
+                .entry(point.return_number)
+                .or_insert(0);
+            *entry += 1;
+        }
+        self.header.bounds.grow(&point);
+        point.into_raw(self.header.transforms).and_then(
+            |raw_point| {
+                raw_point.write_to(&mut self.write, self.header.point_format)
+            },
+        )?;
         Ok(())
     }
 
@@ -148,7 +174,7 @@ impl Writer<BufWriter<File>> {
     /// let writer = Writer::from_path("/dev/null", Default::default());
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P, header: Header) -> Result<Writer<BufWriter<File>>> {
-        File::create(path).map_err(Error::from).and_then(|file| {
+        File::create(path).map_err(::Error::from).and_then(|file| {
             Writer::new(BufWriter::new(file), header)
         })
     }
@@ -182,7 +208,7 @@ mod tests {
                 ..Default::default()
             };
             let mut writer = Writer::new(&mut cursor, header).unwrap();
-            writer.write(&Default::default()).unwrap();
+            writer.write(Default::default()).unwrap();
         }
         cursor.set_position(281);
         assert_eq!(0xCCDD, cursor.read_u16::<LittleEndian>().unwrap());
@@ -190,9 +216,25 @@ mod tests {
 
     #[test]
     fn writer_cant_write_closed() {
-        let mut cursor = Cursor::new(Vec::new());
-        let mut writer = Writer::new(&mut cursor, Default::default()).unwrap();
+        let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
         writer.close().unwrap();
-        assert!(writer.write(&Default::default()).is_err());
+        assert!(writer.write(Default::default()).is_err());
+    }
+
+    #[test]
+    fn write_point_with_incorrect_extra_bytes() {
+        use point::Format;
+        let format = Format {
+            extra_bytes: 1,
+            ..Default::default()
+        };
+        let mut writer = Writer::new(
+            Cursor::new(Vec::new()),
+            Header {
+                point_format: format,
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(writer.write(Default::default()).is_err());
     }
 }

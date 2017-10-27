@@ -69,7 +69,7 @@
 //! use las::{Writer, Point};
 //! let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
 //! let point = Point { x: 1., y: 2., z: 3., ..Default::default() };
-//! writer.write(&point).unwrap();
+//! writer.write(point).unwrap();
 //! ```
 
 #![deny(missing_docs,

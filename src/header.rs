@@ -15,6 +15,16 @@ quick_error! {
             description("the file signature was not LASF")
             display("the file signature was not LASF: {:?}", b)
         }
+        /// The offset to point data is too large.
+        OffsetToPointDataTooLarge(offset: usize) {
+            description("the offset to the point data is too large")
+            display("the offset to the point data is too large: {}", offset)
+        }
+        /// The point data record length is too small for the format.
+        PointDataRecordLength(len: u16, format: Format) {
+            description("the point data record length is too small for the format")
+            display("the point data record length {} is too small for format {}", len, format)
+        }
         /// The header size, as computed, is too large.
         TooLarge(len: usize) {
             description("the header is too large to convert to a raw header")
@@ -39,11 +49,6 @@ quick_error! {
         TooSmall(len: u16) {
             description("the header size is too small")
             display("the header size is too small: {}", len)
-        }
-        /// The offset to point data is too large.
-        OffsetToPointDataTooLarge(offset: usize) {
-            description("the offset to the point data is too large")
-            display("the offset to the point data is too large: {}", offset)
         }
         /// Wkt is required for this point format.
         WktRequired(format: Format) {
@@ -122,7 +127,15 @@ impl Header {
     pub fn new(raw_header: raw::Header, vlrs: Vec<Vlr>, vlr_padding: Vec<u8>) -> Result<Header> {
         use chrono::TimeZone;
 
-        let point_format = Format::new(raw_header.point_data_format_id)?;
+        let mut point_format = Format::new(raw_header.point_data_format_id)?;
+        if raw_header.point_data_record_length > point_format.len() {
+            point_format.extra_bytes = raw_header.point_data_record_length - point_format.len();
+        } else if raw_header.point_data_record_length < point_format.len() {
+            return Err(
+                Error::PointDataRecordLength(raw_header.point_data_record_length, point_format)
+                    .into(),
+            );
+        }
         if !is_wkt_bit_set(raw_header.global_encoding) && point_format.is_extended {
             return Err(Error::WktRequired(point_format).into());
         }
@@ -493,6 +506,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn point_data_record_length_too_small() {
+        let raw_header = raw::Header {
+            point_data_record_length: 19,
+            ..Default::default()
+        };
+        assert!(Header::new(raw_header, vec![], vec![]).is_err());
+    }
+
+    #[test]
+    fn extra_bytes() {
+        let raw_header = raw::Header {
+            point_data_record_length: 21,
+            ..Default::default()
+        };
+        let header = Header::new(raw_header, vec![], vec![]).unwrap();
+        assert_eq!(1, header.point_format.extra_bytes);
+    }
+
+    #[test]
     fn no_day_no_date() {
         let raw_header = raw::Header {
             file_creation_day_of_year: 0,
@@ -662,6 +694,7 @@ mod tests {
                     let raw_header = raw::Header {
                         version: (1, 4).into(),
                         point_data_format_id: $format,
+                        point_data_record_length: Format::new($format).unwrap().len(),
                         ..Default::default()
                     };
                     if $format < 6 {

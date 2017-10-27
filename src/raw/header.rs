@@ -457,7 +457,7 @@ impl Default for Header {
             offset_to_point_data: version.header_size() as u32,
             number_of_variable_length_records: 0,
             point_data_format_id: 0,
-            point_data_record_length: 0,
+            point_data_record_length: ::point::Format::new(0).unwrap().len(),
             number_of_point_records: 0,
             number_of_points_by_return: [0; 5],
             x_scale_factor: 0.,

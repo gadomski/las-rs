@@ -2,7 +2,7 @@ use {Color, Result, Transform, Vector, raw};
 use point::{Classification, Error, ScanDirection};
 
 /// A point is the basic unit of information in LAS data.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Point {
     /// The x coordinate, as a float.
     pub x: f64,
@@ -75,6 +75,11 @@ pub struct Point {
 
     /// This point's near infrared value.
     pub nir: Option<u16>,
+
+    /// This point's extra bytes.
+    ///
+    /// These can have structure and meaning, but for now they don't.
+    pub extra_bytes: Vec<u8>,
 }
 
 impl Point {
@@ -111,6 +116,7 @@ impl Point {
             color: raw_point.color,
             waveform: raw_point.waveform,
             nir: raw_point.nir,
+            extra_bytes: raw_point.extra_bytes,
         }
     }
     /// Creates a raw las point from this point.
@@ -120,9 +126,9 @@ impl Point {
     /// ```
     /// use las::Point;
     /// let point = Point::default();
-    /// let raw_point = point.to_raw(Default::default()).unwrap();
+    /// let raw_point = point.into_raw(Default::default()).unwrap();
     /// ```
-    pub fn to_raw(&self, transforms: Vector<Transform>) -> Result<raw::Point> {
+    pub fn into_raw(self, transforms: Vector<Transform>) -> Result<raw::Point> {
         Ok(raw::Point {
             x: transforms.x.inverse(self.x)?,
             y: transforms.y.inverse(self.y)?,
@@ -136,6 +142,7 @@ impl Point {
             color: self.color,
             waveform: self.waveform,
             nir: self.nir,
+            extra_bytes: self.extra_bytes,
         })
     }
 

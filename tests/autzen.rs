@@ -19,7 +19,7 @@ macro_rules! autzen {
                     ..Default::default()
                 }).unwrap();
                 for point in reader.points() {
-                    writer.write(&point.unwrap()).unwrap();
+                    writer.write(point.unwrap()).unwrap();
                 }
                 writer.close().unwrap();
             }

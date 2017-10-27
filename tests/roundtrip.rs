@@ -10,7 +10,7 @@ pub fn roundtrip(header: Header, point: Point) {
     let mut cursor = Cursor::new(Vec::new());
     {
         let mut writer = Writer::new(&mut cursor, header.clone()).unwrap();
-        writer.write(&point).unwrap();
+        writer.write(point.clone()).unwrap();
     }
     cursor.set_position(0);
     let mut reader = Reader::new(cursor).unwrap();
@@ -275,6 +275,15 @@ macro_rules! roundtrip {
                 } else {
                     super::new_writer_fail(header);
                 }
+            }
+
+            #[test]
+            fn extra_bytes() {
+                use las::point::Format;
+                let format = Format { extra_bytes: 1, ..Default::default() };
+                let header = Header { version: VERSION.into(), point_format: format, ..Default::default() };
+                let point = Point { extra_bytes: vec![42], ..Default::default() };
+                super::roundtrip(header, point);
             }
         }
     }

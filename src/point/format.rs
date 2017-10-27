@@ -20,6 +20,8 @@ pub struct Format {
     pub has_waveform: bool,
     /// Does this point format have near infrared data?
     pub has_nir: bool,
+    /// The number of extra bytes on each point.
+    pub extra_bytes: u16,
 }
 
 impl Format {
@@ -66,7 +68,7 @@ impl Format {
     /// assert_eq!(28, format.len());
     /// ```
     pub fn len(&self) -> u16 {
-        let mut len = if self.is_extended { 22 } else { 20 };
+        let mut len = if self.is_extended { 22 } else { 20 } + self.extra_bytes;
         if self.has_gps_time {
             len += 8;
         }
@@ -280,6 +282,7 @@ mod tests {
             has_nir: true,
             has_waveform: true,
             is_extended: true,
+            ..Default::default()
         },
         67
     );
@@ -319,5 +322,14 @@ mod tests {
             ..Default::default()
         };
         assert!(format.to_u8().is_err());
+    }
+
+    #[test]
+    fn extra_bytes() {
+        let format = Format {
+            extra_bytes: 1,
+            ..Default::default()
+        };
+        assert_eq!(21, format.len());
     }
 }

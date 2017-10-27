@@ -1,4 +1,4 @@
-use {Transform, Version, header, point, vlr};
+use {Transform, Version, header, point, vlr, writer};
 use std::io;
 use std::str;
 
@@ -6,10 +6,6 @@ quick_error! {
     /// Crate-specific error enum.
     #[derive(Debug)]
     pub enum Error {
-        /// The writer is closed.
-        ClosedWriter {
-            description("the writer is closed")
-        }
         /// Feature is not supported by version.
         Feature(version: Version, feature: &'static str) {
             description("feature is not supported by version")
@@ -66,6 +62,13 @@ quick_error! {
             cause(err)
             description(err.description())
             display("utf8 error: {}", err)
+        }
+        /// Wrapper around `las::writer::Error`.
+        Writer(err: writer::Error) {
+            from()
+            cause(err)
+            description("writer error")
+            display("writer error: {}", err)
         }
         /// Wrapper around `las::vlr::Error`.
         Vlr(err: vlr::Error) {
