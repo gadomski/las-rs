@@ -1,3 +1,5 @@
+use {Error, Result};
+use Feature;
 use std::fmt;
 
 /// LAS version.
@@ -33,53 +35,6 @@ impl Version {
         }
     }
 
-    /// Does this version support file source id?
-    ///
-    /// Only 1.0 does not.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Version;
-    /// assert!(!Version::new(1, 0).supports_file_source_id());
-    /// assert!(Version::new(1, 1).supports_file_source_id());
-    /// ```
-    pub fn supports_file_source_id(&self) -> bool {
-        self > &Version::new(1, 0)
-    }
-
-    /// Does this version support color?
-    ///
-    /// 1.1 and 1.0 do not.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Version;
-    /// assert!(!Version::new(1, 0).supports_color());
-    /// assert!(!Version::new(1, 1).supports_color());
-    /// assert!(Version::new(1, 2).supports_color());
-    /// ```
-    pub fn supports_color(&self) -> bool {
-        self > &Version::new(1, 1)
-    }
-
-    /// Does this version support gps standard time?
-    ///
-    /// 1.1 and 1.0 do not.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Version;
-    /// assert!(!Version::new(1, 0).supports_gps_standard_time());
-    /// assert!(!Version::new(1, 1).supports_gps_standard_time());
-    /// assert!(Version::new(1, 2).supports_gps_standard_time());
-    /// ```
-    pub fn supports_gps_standard_time(&self) -> bool {
-        self > &Version::new(1, 1)
-    }
-
     /// Does this version require the point data start signature?
     ///
     /// Only 1.0 does.
@@ -113,46 +68,36 @@ impl Version {
         }
     }
 
-    /// Returns true if this version has 64 bit support.
-    ///
-    /// 64 bit support means that the file's number of point records is stored in a 64 bit value,
-    /// allowing more points in a las file.
+    /// Checks whether this version supports the feature, returning an error if not.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::Version;
-    /// assert!(!Version::new(1, 2).is_64bit());
-    /// assert!(Version::new(1, 4).is_64bit());
+    /// use las::feature::Color;
+    /// Version::new(1, 2).verify_support_for::<Color>().unwrap();
+    /// assert!(Version::new(1, 0).verify_support_for::<Color>().is_err());
     /// ```
-    pub fn is_64bit(&self) -> bool {
-        self >= &Version::new(1, 4)
+    pub fn verify_support_for<F: Feature>(&self) -> Result<()> {
+        if self.supports::<F>() {
+            Ok(())
+        } else {
+            Err(Error::Feature(*self, F::name()))
+        }
     }
 
-    /// Returns true if this version supports extended variable length records.
+    /// Checks whether this version supports the feature.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::Version;
-    /// assert!(!Version::new(1, 2).supports_evlrs());
-    /// assert!(Version::new(1, 4).supports_evlrs());
+    /// use las::feature::Color;
+    /// assert!(Version::new(1, 2).supports::<Color>());
+    /// assert!(!Version::new(1, 0).supports::<Color>());
     /// ```
-    pub fn supports_evlrs(&self) -> bool {
-        self >= &Version::new(1, 4)
-    }
-
-    /// Returns true if this version supports waveforms.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Version;
-    /// assert!(!Version::new(1, 2).supports_waveforms());
-    /// assert!(Version::new(1, 3).supports_waveforms());
-    /// ```
-    pub fn supports_waveforms(&self) -> bool {
-        self >= &Version::new(1, 3)
+    pub fn supports<F: Feature>(&self) -> bool {
+        F::is_supported_by(*self)
     }
 }
 

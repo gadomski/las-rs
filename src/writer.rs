@@ -37,23 +37,16 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        if !header.version.supports_file_source_id() && header.file_source_id != 0 {
-            return Err(Error::VersionDoesNotSupport(
-                header.version,
-                "file source id".to_string(),
-            ));
+        use feature::{Color, FileSourceId, GpsStandardTime};
+
+        if header.file_source_id != 0 {
+            header.version.verify_support_for::<FileSourceId>()?;
         }
-        if !header.version.supports_color() && header.point_format.has_color {
-            return Err(Error::VersionDoesNotSupport(
-                header.version,
-                "color".to_string(),
-            ));
+        if header.point_format.has_color {
+            header.version.verify_support_for::<Color>()?;
         }
-        if !header.version.supports_gps_standard_time() && header.gps_time_type.is_standard() {
-            return Err(Error::VersionDoesNotSupport(
-                header.version,
-                "GPS standard time".to_string(),
-            ));
+        if header.gps_time_type.is_standard() {
+            header.version.verify_support_for::<GpsStandardTime>()?;
         }
         header.bounds = Default::default();
         header.number_of_points = 0;

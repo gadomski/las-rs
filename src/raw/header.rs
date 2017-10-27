@@ -1,4 +1,6 @@
 use {Result, Version};
+use byteorder::LittleEndian;
+use feature::{Evlrs, LargeFiles, Waveforms};
 use std::io::{Read, Write};
 
 const IS_COMPRESSED_MASK: u8 = 0x80;
@@ -223,7 +225,7 @@ impl Header {
     /// let header = Header::read_from(&mut file).unwrap();
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
-        use byteorder::{LittleEndian, ReadBytesExt};
+        use byteorder::ReadBytesExt;
         use utils;
 
         let mut file_signature = [0; 4];
@@ -263,12 +265,12 @@ impl Header {
         let min_y = read.read_f64::<LittleEndian>()?;
         let max_z = read.read_f64::<LittleEndian>()?;
         let min_z = read.read_f64::<LittleEndian>()?;
-        let start_of_waveform_data_packet_record = if version.supports_waveforms() {
+        let start_of_waveform_data_packet_record = if version.supports::<Waveforms>() {
             utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?)
         } else {
             None
         };
-        let (start_of_first_evlr, number_of_evlrs) = if version.supports_evlrs() {
+        let (start_of_first_evlr, number_of_evlrs) = if version.supports::<Evlrs>() {
             (
                 utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?),
                 utils::some_or_none_if_zero(read.read_u32::<LittleEndian>()?),
@@ -277,7 +279,7 @@ impl Header {
             (None, None)
         };
         let (number_of_point_records_64bit, number_of_points_by_return_64bit) =
-            if version.is_64bit() {
+            if version.supports::<LargeFiles>() {
                 let number_of_point_records_64bit = read.read_u64::<LittleEndian>()?;
                 let mut number_of_points_by_return_64bit = [0; 15];
                 for n in &mut number_of_points_by_return_64bit {
@@ -369,7 +371,7 @@ impl Header {
     /// header.write_to(&mut cursor).unwrap();
     /// ```
     pub fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
-        use byteorder::{LittleEndian, WriteBytesExt};
+        use byteorder::WriteBytesExt;
 
         write.write_all(&self.file_signature)?;
         write.write_u16::<LittleEndian>(self.file_source_id)?;
@@ -410,12 +412,12 @@ impl Header {
         write.write_f64::<LittleEndian>(self.min_y)?;
         write.write_f64::<LittleEndian>(self.max_z)?;
         write.write_f64::<LittleEndian>(self.min_z)?;
-        if self.version.supports_waveforms() {
+        if self.version.supports::<Waveforms>() {
             write.write_u64::<LittleEndian>(
                 self.start_of_waveform_data_packet_record.unwrap_or(0),
             )?;
         }
-        if self.version.supports_evlrs() {
+        if self.version.supports::<Evlrs>() {
             write.write_u64::<LittleEndian>(
                 self.start_of_first_evlr.unwrap_or(0),
             )?;
@@ -423,7 +425,7 @@ impl Header {
                 self.number_of_evlrs.unwrap_or(0),
             )?;
         }
-        if self.version.is_64bit() {
+        if self.version.supports::<LargeFiles>() {
             write.write_u64::<LittleEndian>(
                 self.number_of_point_records_64bit.unwrap_or(0),
             )?;

@@ -10,6 +10,11 @@ quick_error! {
         ClosedWriter {
             description("the writer is closed")
         }
+        /// Feature is not supported by version.
+        Feature(version: Version, feature: &'static str) {
+            description("feature is not supported by version")
+            display("feature {} is not supported by version {}", feature, version)
+        }
         /// A wrapper around `las::header::Error`.
         Header(err: header::Error) {
             from()
@@ -61,11 +66,6 @@ quick_error! {
             cause(err)
             description(err.description())
             display("utf8 error: {}", err)
-        }
-        /// This version does not support the feature.
-        VersionDoesNotSupport(version: Version, s: String) {
-            description("las version does not support the provided feature")
-            display("las version {} does not support feature: {}", version, s)
         }
         /// Wrapper around `las::vlr::Error`.
         Vlr(err: vlr::Error) {

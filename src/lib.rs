@@ -86,8 +86,9 @@ extern crate num;
 #[macro_use]
 extern crate quick_error;
 
-pub mod point;
+pub mod feature;
 pub mod header;
+pub mod point;
 pub mod raw;
 pub mod reader;
 pub mod vlr;
@@ -105,6 +106,7 @@ mod writer;
 pub use bounds::Bounds;
 pub use color::Color;
 pub use error::Error;
+pub use feature::Feature;
 pub use gps_time_type::GpsTimeType;
 pub use header::Header;
 pub use point::Point;
