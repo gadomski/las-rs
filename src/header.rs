@@ -263,7 +263,7 @@ impl Header {
         let mut number_of_points_by_return = [0; 5];
         for (&i, &n) in &self.number_of_points_by_return {
             if i > 5 {
-                return Err(::Error::InvalidReturnNumber(i, Some(self.version)));
+                return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
             } else if i > 0 {
                 number_of_points_by_return[i as usize - 1] = n;
             }

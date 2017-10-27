@@ -1,5 +1,5 @@
 use {Color, Result, Transform, Vector, raw};
-use point::{Classification, ScanDirection};
+use point::{Classification, Error, ScanDirection};
 
 /// A point is the basic unit of information in LAS data.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -149,13 +149,12 @@ impl Point {
     /// assert_eq!((1, 0, 0), point.flags().unwrap().into());
     /// ```
     pub fn flags(&self) -> Result<raw::point::Flags> {
-        use Error;
         if self.return_number > 15 {
-            Err(Error::InvalidReturnNumber(self.return_number, None))
+            Err(Error::ReturnNumber(self.return_number, None).into())
         } else if self.number_of_returns > 15 {
-            Err(Error::InvalidReturnNumber(self.number_of_returns, None))
+            Err(Error::ReturnNumber(self.number_of_returns, None).into())
         } else if self.scanner_channel > 3 {
-            Err(Error::InvalidScannerChannel(self.scanner_channel))
+            Err(Error::ScannerChannel(self.scanner_channel).into())
         } else {
             let a = (self.number_of_returns << 4) + self.return_number;
             let mut b = self.scanner_channel << 4;

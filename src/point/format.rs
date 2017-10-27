@@ -1,4 +1,5 @@
 use Result;
+use point::Error;
 
 const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
@@ -38,9 +39,8 @@ impl Format {
     /// assert!(Format::new(11).is_err());
     /// ```
     pub fn new(n: u8) -> Result<Format> {
-        use Error;
         if n > 10 {
-            Err(Error::InvalidFormatNumber(n))
+            Err(Error::FormatNumber(n).into())
         } else {
             Ok(Format {
                 has_gps_time: TIME_FORMATS.contains(&n),
@@ -97,7 +97,6 @@ impl Format {
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
-        use Error;
         if self.is_extended {
             if self.has_gps_time {
                 if self.has_color {
@@ -105,29 +104,29 @@ impl Format {
                         if self.has_waveform { Ok(10) } else { Ok(8) }
                     } else {
                         if self.has_waveform {
-                            Err(Error::InvalidFormat(*self))
+                            Err(Error::Format(*self).into())
                         } else {
                             Ok(7)
                         }
                     }
                 } else {
                     if self.has_nir {
-                        Err(Error::InvalidFormat(*self))
+                        Err(Error::Format(*self).into())
                     } else {
                         if self.has_waveform { Ok(9) } else { Ok(6) }
                     }
                 }
             } else {
-                Err(Error::InvalidFormat(*self))
+                Err(Error::Format(*self).into())
             }
         } else if self.has_nir {
-            Err(Error::InvalidFormat(*self))
+            Err(Error::Format(*self).into())
         } else {
             if self.has_waveform {
                 if self.has_gps_time {
                     if self.has_color { Ok(5) } else { Ok(4) }
                 } else {
-                    Err(Error::InvalidFormat(*self))
+                    Err(Error::Format(*self).into())
                 }
             } else {
                 let mut n = if self.has_gps_time { 1 } else { 0 };

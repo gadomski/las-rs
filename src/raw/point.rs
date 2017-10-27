@@ -1,7 +1,7 @@
 //! Defines raw las points and some enums required to handle the various point formats.
 
 use {Color, Result};
-use point::{Classification, Format, ScanDirection};
+use point::{Classification, Error, Format, ScanDirection};
 use std::io::{Read, Write};
 
 const SCAN_ANGLE_SCALE_FACTOR: f32 = 0.006;
@@ -683,18 +683,17 @@ impl Flags {
     /// assert!(Flags::ThreeByte(0b00001000, 0, 0).to_two_bytes().is_err());
     /// ```
     pub fn to_two_bytes(&self) -> Result<(u8, u8)> {
-        use Error;
         match *self {
             Flags::TwoByte(a, b) => Ok((a, b)),
             Flags::ThreeByte(_, _, c) => {
                 if self.return_number() > 7 {
-                    Err(Error::InvalidReturnNumber(self.return_number(), None))
+                    Err(Error::ReturnNumber(self.return_number(), None).into())
                 } else if self.number_of_returns() > 7 {
-                    Err(Error::InvalidReturnNumber(self.number_of_returns(), None))
+                    Err(Error::ReturnNumber(self.number_of_returns(), None).into())
                 } else if c > 31 {
-                    Err(Error::InvalidClassification(c))
+                    Err(Error::Classification(c).into())
                 } else if self.scanner_channel() > 0 {
-                    Err(Error::InvalidScannerChannel(self.scanner_channel()))
+                    Err(Error::ScannerChannel(self.scanner_channel()).into())
                 } else {
                     let mut a = (self.number_of_returns() << 3) + self.return_number();
                     if self.scan_direction() == ScanDirection::LeftToRight {
