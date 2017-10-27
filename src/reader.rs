@@ -40,11 +40,11 @@ impl<R: Read> Reader<R> {
             })
             .collect::<Result<Vec<Vlr>>>()?;
         let position = vlrs.iter().fold(
-            raw_header.header_size as u32,
+            raw_header.header_size as usize,
             |acc, vlr| acc + vlr.len(),
         );
-        let vlr_padding = if position < raw_header.offset_to_point_data {
-            let mut bytes = vec![0; (raw_header.offset_to_point_data - position) as usize];
+        let vlr_padding = if position < raw_header.offset_to_point_data as usize {
+            let mut bytes = vec![0; raw_header.offset_to_point_data as usize - position];
             read.read_exact(&mut bytes)?;
             bytes
         } else {

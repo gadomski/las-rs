@@ -1,4 +1,4 @@
-use {Transform, Version, header};
+use {Transform, Version, header, vlr};
 use point::Format;
 use std::io;
 use std::str;
@@ -88,10 +88,12 @@ quick_error! {
             description("las version does not support the provided feature")
             display("las version {} does not support feature: {}", version, s)
         }
-        /// The data in the VLR are too long for LAS.
-        VlrDataTooLong(n: usize) {
-            description("the data in the vlr are too long for las")
-            display("vlr data of length {} are too long", n)
+        /// Wrapper around `las::vlr::Error`.
+        Vlr(err: vlr::Error) {
+            from()
+            cause(err)
+            description("vlr error")
+            display("vlr error: {}", err)
         }
     }
 }

@@ -1,6 +1,17 @@
 use {Result, raw};
 
-const HEADER_SIZE: u32 = 54;
+const HEADER_SIZE: usize = 54;
+
+quick_error! {
+    /// Vlr-specific errors.
+    #[derive(Debug, Clone, Copy)]
+    pub enum Error {
+        TooLong(len: usize) {
+            description("The vlr is too long")
+            display("the vlr is too long: {}", len)
+        }
+    }
+}
 
 /// A variable length record.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -47,13 +58,8 @@ impl Vlr {
     /// let raw_vlr =  Vlr::default().to_raw().unwrap();
     /// ```
     pub fn to_raw(&self) -> Result<raw::Vlr> {
-        use Error;
-        use std::u16;
         use utils::FromLasStr;
 
-        if self.data.len() > u16::MAX as usize {
-            return Err(Error::VlrDataTooLong(self.data.len()));
-        }
         let mut user_id = [0; 16];
         user_id.as_mut().from_las_str(&self.user_id)?;
         let mut description = [0; 32];
@@ -62,7 +68,7 @@ impl Vlr {
             reserved: 0,
             user_id: user_id,
             record_id: self.record_id,
-            record_length_after_header: self.data.len() as u16,
+            record_length_after_header: self.record_length_after_header()?,
             description: description,
             data: self.data.clone(),
         })
@@ -77,8 +83,17 @@ impl Vlr {
     /// let vlr = Vlr::default();
     /// assert_eq!(54, vlr.len());
     /// ```
-    pub fn len(&self) -> u32 {
-        HEADER_SIZE + self.data.len() as u32
+    pub fn len(&self) -> usize {
+        self.data.len() + HEADER_SIZE
+    }
+
+    fn record_length_after_header(&self) -> Result<u16> {
+        use std::u16;
+        if self.data.len() > u16::MAX as usize {
+            Err(Error::TooLong(self.data.len()).into())
+        } else {
+            Ok(self.data.len() as u16)
+        }
     }
 }
 
@@ -97,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    fn too_long_vlr_data() {
+    fn too_long() {
         use std::u16;
         let data = vec![0; u16::MAX as usize + 1];
         let vlr = Vlr {

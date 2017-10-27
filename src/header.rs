@@ -234,10 +234,7 @@ impl Header {
     fn offset_to_point_data(&self) -> Result<u32> {
         use std::u32;
 
-        let vlr_len = self.vlrs.iter().fold(
-            0,
-            |acc, vlr| acc + vlr.len() as usize,
-        );
+        let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
         let offset = self.header_size()? as usize + vlr_len + self.vlr_padding.len();
         if offset > u32::MAX as usize {
             Err(Error::OffsetToPointDataTooLarge(offset).into())
