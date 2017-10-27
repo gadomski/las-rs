@@ -90,6 +90,7 @@ pub mod point;
 pub mod header;
 pub mod raw;
 pub mod reader;
+pub mod vlr;
 
 mod bounds;
 mod color;
@@ -99,7 +100,6 @@ mod transform;
 mod utils;
 mod vector;
 mod version;
-mod vlr;
 mod writer;
 
 pub use bounds::Bounds;

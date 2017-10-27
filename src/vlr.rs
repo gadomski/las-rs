@@ -1,3 +1,7 @@
+//! Variable length records.
+//!
+//! This includes regular and extended.
+
 use {Result, raw};
 
 const HEADER_SIZE: usize = 54;
@@ -6,6 +10,7 @@ quick_error! {
     /// Vlr-specific errors.
     #[derive(Debug, Clone, Copy)]
     pub enum Error {
+        /// The vlr data is too long.
         TooLong(len: usize) {
             description("The vlr is too long")
             display("the vlr is too long: {}", len)
