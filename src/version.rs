@@ -1,5 +1,6 @@
 use {Error, Result};
 use Feature;
+use point::Format;
 use std::fmt;
 
 /// LAS version.
@@ -74,9 +75,9 @@ impl Version {
     ///
     /// ```
     /// use las::Version;
-    /// use las::feature::Color;
-    /// Version::new(1, 2).verify_support_for::<Color>().unwrap();
-    /// assert!(Version::new(1, 0).verify_support_for::<Color>().is_err());
+    /// use las::feature::Waveforms;
+    /// Version::new(1, 4).verify_support_for::<Waveforms>().unwrap();
+    /// assert!(Version::new(1, 2).verify_support_for::<Waveforms>().is_err());
     /// ```
     pub fn verify_support_for<F: Feature>(&self) -> Result<()> {
         if self.supports::<F>() {
@@ -92,12 +93,39 @@ impl Version {
     ///
     /// ```
     /// use las::Version;
-    /// use las::feature::Color;
-    /// assert!(Version::new(1, 2).supports::<Color>());
-    /// assert!(!Version::new(1, 0).supports::<Color>());
+    /// use las::feature::Waveforms;
+    /// assert!(Version::new(1, 4).supports::<Waveforms>());
+    /// assert!(!Version::new(1, 2).supports::<Waveforms>());
     /// ```
     pub fn supports<F: Feature>(&self) -> bool {
         F::is_supported_by(*self)
+    }
+
+    /// Checks whether this version supports the given point format.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Version;
+    /// use las::point::Format;
+    /// let las_1_2 = Version::new(1, 2);
+    /// let las_1_4 = Version::new(1, 4);
+    /// assert!(las_1_2.supports_point_format(Format::new(3).unwrap()));
+    /// assert!(!las_1_2.supports_point_format(Format::new(4).unwrap()));
+    /// assert!(las_1_4.supports_point_format(Format::new(4).unwrap()));
+    /// ```
+    pub fn supports_point_format(&self, format: Format) -> bool {
+        if self.major != 1 {
+            return false;
+        }
+        match self.minor {
+            0 => !(format.has_color || format.is_extended || format.has_waveform || format.has_nir),
+            1 => !(format.has_color || format.is_extended || format.has_waveform || format.has_nir),
+            2 => !(format.is_extended || format.has_waveform || format.has_nir),
+            3 => !(format.is_extended || format.has_nir),
+            4 => true,
+            _ => false,
+        }
     }
 }
 
@@ -126,4 +154,47 @@ impl From<Version> for (u8, u8) {
     fn from(version: Version) -> (u8, u8) {
         (version.major, version.minor)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! version {
+        ($name:ident, $major:expr, $minor:expr, $supports:expr, $max_point_format:expr) => {
+            mod $name {
+                use super::*;
+                use feature::*;
+
+                #[test]
+                fn features() {
+                    let version = Version::new($major, $minor);
+                    assert_eq!($supports[0], version.supports::<FileSourceId>());
+                    assert_eq!($supports[1], version.supports::<GpsStandardTime>());
+                    assert_eq!($supports[2], version.supports::<Waveforms>());
+                    assert_eq!($supports[3], version.supports::<LargeFiles>());
+                    assert_eq!($supports[4], version.supports::<Evlrs>());
+                }
+
+                #[test]
+                fn point_formats() {
+                    let version = Version::new($major, $minor);
+                    for n in 0..11 {
+                        let format = Format::new(n).unwrap();
+                        if n <= $max_point_format {
+                            assert!(version.supports_point_format(format));
+                        } else {
+                            assert!(!version.supports_point_format(format));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    version!(las_1_0, 1, 0, [false; 5], 1);
+    version!(las_1_1, 1, 1, [true, false, false, false, false], 1);
+    version!(las_1_2, 1, 2, [true, true, false, false, false], 3);
+    version!(las_1_3, 1, 3, [true, true, true, false, false], 5);
+    version!(las_1_4, 1, 4, [true; 5], 10);
 }

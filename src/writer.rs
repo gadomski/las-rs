@@ -1,4 +1,4 @@
-use {Header, Point, Result};
+use {Header, Point, Result, Version};
 use point::Format;
 use std::collections::HashMap;
 use std::fs::File;
@@ -12,6 +12,11 @@ quick_error! {
         /// The writer is closed.
         Closed {
             description("the writer is closed")
+        }
+        /// Format is not supported by version.
+        Format(version: Version, format: Format) {
+            description("format is not supported by version")
+            display("format {} is not supported by version {}", format, version)
         }
         /// The point format has extra bytes, but the point doesn't.
         MissingExtraBytes(format: Format, point: Point) {
@@ -57,20 +62,22 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        use feature::{Color, Evlrs, FileSourceId, GpsStandardTime};
+        use feature::{Evlrs, FileSourceId, GpsStandardTime};
 
         if header.file_source_id != 0 {
             header.version.verify_support_for::<FileSourceId>()?;
         }
-        if header.point_format.has_color {
-            header.version.verify_support_for::<Color>()?;
-        }
         if header.gps_time_type.is_standard() {
             header.version.verify_support_for::<GpsStandardTime>()?;
         }
+        if !header.version.supports_point_format(header.point_format) {
+            return Err(Error::Format(header.version, header.point_format).into());
+        }
+        // TODO check waveforms
         if header.evlrs().len() > 0 {
             header.version.verify_support_for::<Evlrs>()?;
         }
+
         header.bounds = Default::default();
         header.number_of_points = 0;
         header.number_of_points_by_return = HashMap::new();

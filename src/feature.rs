@@ -11,10 +11,10 @@ pub trait Feature {
     /// # Examples
     ///
     /// ```
-    /// use las::feature::{Color, Feature};
+    /// use las::feature::{Waveforms, Feature};
     /// use las::Version;
-    /// assert!(Color::is_supported_by(Version::new(1, 2)));
-    /// assert!(!Color::is_supported_by(Version::new(1, 0)));
+    /// assert!(!Waveforms::is_supported_by(Version::new(1, 2)));
+    /// assert!(Waveforms::is_supported_by(Version::new(1, 4)));
     /// ```
     fn is_supported_by(version: Version) -> bool;
 
@@ -23,8 +23,8 @@ pub trait Feature {
     /// # Examples
     ///
     /// ```
-    /// use las::feature::{Color, Feature};
-    /// assert_eq!("Color", Color::name());
+    /// use las::feature::{Waveforms, Feature};
+    /// assert_eq!("Waveforms", Waveforms::name());
     /// ```
     fn name() -> &'static str;
 }
@@ -51,7 +51,6 @@ macro_rules! feature {
 }
 
 feature!(FileSourceId, 1, 2, 3, 4);
-feature!(Color, 2, 3, 4);
 feature!(GpsStandardTime, 2, 3, 4);
 feature!(Waveforms, 3, 4);
 feature!(LargeFiles, 4);
