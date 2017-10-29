@@ -12,6 +12,8 @@ pub struct Reader<R> {
     /// The `Header`, as read.
     pub header: Header,
     read: R,
+    number_of_points: u64,
+    number_read: u64,
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -57,8 +59,10 @@ impl<R: Read + Seek> Reader<R> {
         ))?;
         let header = Header::new(raw_header, vlrs, vlr_padding)?;
         Ok(Reader {
+            number_of_points: header.number_of_points,
             header: header,
             read: read,
+            number_read: 0,
         })
     }
 }
@@ -74,9 +78,16 @@ impl<R: Read> Reader<R> {
     /// let point = reader.read().unwrap().unwrap();
     /// ```
     pub fn read(&mut self) -> Result<Option<Point>> {
-        raw::Point::read_from(&mut self.read, self.header.point_format).map(|option| {
-            option.map(|raw_point| Point::new(raw_point, self.header.transforms))
-        })
+        if self.number_read >= self.number_of_points {
+            Ok(None)
+        } else {
+            let point = raw::Point::read_from(&mut self.read, self.header.point_format)
+                .map(|raw_point| {
+                    Some(Point::new(raw_point, self.header.transforms))
+                });
+            self.number_read += 1;
+            point
+        }
     }
 
     /// Returns an iterator over this reader's points.

@@ -341,8 +341,6 @@ pub enum Flags {
 impl Point {
     /// Reads a raw point.
     ///
-    /// If there are exactly zero bytes left in the `Read`, then this function returns `Ok(None)`.
-    ///
     /// # Examples
     ///
     /// ```
@@ -354,24 +352,11 @@ impl Point {
     /// file.seek(SeekFrom::Start(1994)).unwrap();
     /// let point = Point::read_from(file, Format::new(1).unwrap()).unwrap();
     /// ```
-    pub fn read_from<R: Read>(mut read: R, format: Format) -> Result<Option<Point>> {
+    pub fn read_from<R: Read>(mut read: R, format: Format) -> Result<Point> {
         use byteorder::{LittleEndian, ReadBytesExt};
-        use std::io::{Cursor, ErrorKind};
         use utils;
 
-        let byte = match read.read_u8() {
-            Ok(byte) => byte,
-            Err(err) => {
-                match err.kind() {
-                    ErrorKind::UnexpectedEof => return Ok(None),
-                    _ => return Err(err.into()),
-                }
-            }
-        };
-        let mut next_three = [0; 3];
-        read.read_exact(&mut next_three)?;
-        let mut cursor = Cursor::new([byte, next_three[0], next_three[1], next_three[2]]);
-        let x = cursor.read_i32::<LittleEndian>()?;
+        let x = read.read_i32::<LittleEndian>()?;
         let y = read.read_i32::<LittleEndian>()?;
         let z = read.read_i32::<LittleEndian>()?;
         let intensity = read.read_u16::<LittleEndian>()?;
@@ -412,7 +397,7 @@ impl Point {
         };
         let mut extra_bytes = vec![0; format.extra_bytes as usize];
         read.read_exact(&mut extra_bytes)?;
-        Ok(Some(Point {
+        Ok(Point {
             x: x,
             y: y,
             z: z,
@@ -426,7 +411,7 @@ impl Point {
             waveform: waveform,
             nir: nir,
             extra_bytes: extra_bytes,
-        }))
+        })
     }
 
     /// Writes a raw pont.
@@ -814,23 +799,6 @@ impl PartialEq for ScanAngle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
-
-    #[test]
-    fn read_eof() {
-        let cursor = Cursor::new(Vec::new());
-        assert!(
-            Point::read_from(cursor, Default::default())
-                .unwrap()
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn read_one_byte() {
-        let cursor = Cursor::new(vec![1]);
-        assert!(Point::read_from(cursor, Default::default()).is_err());
-    }
 
     macro_rules! roundtrip {
         ($name:ident, $format:expr) => {
@@ -853,7 +821,7 @@ mod tests {
                     let mut cursor = Cursor::new(Vec::new());
                     point.write_to(&mut cursor, format).unwrap();
                     cursor.set_position(0);
-                    assert_eq!(point, Point::read_from(cursor, format).unwrap().unwrap());
+                    assert_eq!(point, Point::read_from(cursor, format).unwrap());
                 }
             }
         }
