@@ -11,7 +11,7 @@ macro_rules! autzen {
             #[test]
             fn read_write() {
                 let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-                let mut header = reader.header.clone();
+                let mut header = reader.header().clone();
                 header.version = Version::new($major, $minor);
                 let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
                 for point in reader.points() {

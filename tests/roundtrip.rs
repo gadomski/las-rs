@@ -38,7 +38,7 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
         reader.read().expect("Error when reading past last point")
     );
 
-    let other = reader.header;
+    let other = reader.header();
     assert_eq!(header.file_source_id, other.file_source_id);
     assert_eq!(header.gps_time_type, other.gps_time_type);
     assert_eq!(header.guid, other.guid);

@@ -9,8 +9,7 @@ use std::path::Path;
 /// Reads LAS data.
 #[derive(Debug)]
 pub struct Reader<R> {
-    /// The `Header`, as read.
-    pub header: Header,
+    header: Header,
     read: R,
     number_of_points: u64,
     number_read: u64,
@@ -68,6 +67,19 @@ impl<R: Read + Seek> Reader<R> {
 }
 
 impl<R: Read> Reader<R> {
+    /// Returns a reference to this reader's header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Reader;
+    /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let header = reader.header();
+    /// ```
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
     /// Reads a point.
     ///
     /// # Examples
