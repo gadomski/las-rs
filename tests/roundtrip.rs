@@ -190,7 +190,7 @@ mod $name {
             vlr.data = vec![42; u16::MAX as usize + 1];
             h.vlrs = vec![vlr];
         }, 4);
-        roundtrip_header!(has_synthetic_return_numbers, |h: &mut Header| h.has_synthetic_return_numbers = true, 3);
+        roundtrip_header!(end_of_points_padding, |h: &mut Header| h.end_of_points_padding = vec![42]);
     }
 }
 }}

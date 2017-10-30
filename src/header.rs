@@ -120,8 +120,8 @@ pub struct Header {
     /// Variable length records.
     pub vlrs: Vec<Vlr>,
 
-    /// Padding between the end of the points and the EVLRs.
-    pub evlr_padding: Vec<u8>,
+    /// Padding at the end of the points.
+    pub end_of_points_padding: Vec<u8>,
 }
 
 impl Header {
@@ -220,7 +220,7 @@ impl Header {
             },
             version: raw_header.version,
             vlrs: vec![],
-            evlr_padding: vec![],
+            end_of_points_padding: vec![],
         })
     }
 
@@ -278,6 +278,25 @@ impl Header {
     /// ```
     pub fn evlrs(&self) -> Vec<&Vlr> {
         self.filter_vlrs(true)
+    }
+
+    /// Returns the position of the first byte after the point records end.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    /// let mut header = Header::default();
+    /// assert_eq!(227, header.offset_to_end_of_points().unwrap());
+    /// header.number_of_points = 1;
+    /// assert_eq!(247, header.offset_to_end_of_points().unwrap());
+    /// header.point_format.extra_bytes = 1;
+    /// assert_eq!(248, header.offset_to_end_of_points().unwrap());
+    /// ```
+    pub fn offset_to_end_of_points(&self) -> Result<u64> {
+        self.offset_to_point_data().map(|n| {
+            u64::from(n) + self.point_data_len()
+        })
     }
 
     /// Converts this header into a raw header.
@@ -503,7 +522,7 @@ impl Default for Header {
             transforms: Default::default(),
             version: Default::default(),
             vlrs: Vec::new(),
-            evlr_padding: Vec::new(),
+            end_of_points_padding: Vec::new(),
         }
     }
 }

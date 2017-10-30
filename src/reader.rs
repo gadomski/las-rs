@@ -15,6 +15,11 @@ quick_error! {
             description("offset to point data too small")
             display("offset to point data too small: {}", offset)
         }
+        /// The offset to the start of the evlrs is too small.
+        OffsetToEvlrsTooSmall(offset: u64) {
+            description("offset the evlrs is too small")
+            display("offset to the evlrs is too small: {}", offset)
+        }
     }
 }
 
@@ -68,12 +73,27 @@ impl<R: Read + Seek> Reader<R> {
                 .take(offset_to_point_data - position)
                 .read_to_end(&mut header.vlr_padding)?;
         }
+        let offset_to_end_of_points = header.offset_to_end_of_points()?;
         if let Some(evlr) = evlr {
+            if evlr.start_of_first_evlr < offset_to_end_of_points {
+                return Err(
+                    Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into(),
+                );
+            } else if evlr.start_of_first_evlr > offset_to_end_of_points {
+                let n = evlr.start_of_first_evlr - offset_to_end_of_points;
+                read.by_ref().take(n).read_to_end(
+                    &mut header.end_of_points_padding,
+                )?;
+            }
             read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
             vlrs.push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
+        } else {
+            read.read_to_end(&mut header.end_of_points_padding)?;
         }
         header.vlrs = vlrs;
+
         read.seek(SeekFrom::Start(offset_to_point_data))?;
+
         Ok(Reader {
             number_of_points: header.number_of_points,
             header: header,
