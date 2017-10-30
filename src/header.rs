@@ -325,15 +325,34 @@ impl Header {
         })
     }
 
-    fn number_of_variable_length_records(&self) -> Result<u32> {
-        use std::u32;
+    fn global_encoding(&self) -> Result<u16> {
+        use feature::SyntheticReturnNumbers;
 
-        let n = self.vlrs().len();
-        if n > u32::MAX as usize {
-            Err(Error::TooManyVlrs(n).into())
-        } else {
-            Ok(n as u32)
+        let mut bits = self.gps_time_type.into();
+        if self.has_synthetic_return_numbers {
+            self.version.verify_support_for::<SyntheticReturnNumbers>()?;
+            bits |= 8;
         }
+        if self.point_format.is_extended {
+            bits |= 16;
+        }
+        Ok(bits)
+    }
+
+    fn system_identifier(&self) -> Result<[u8; 32]> {
+        let mut system_identifier = [0; 32];
+        system_identifier.as_mut().from_las_str(
+            &self.system_identifier,
+        )?;
+        Ok(system_identifier)
+    }
+
+    fn generating_software(&self) -> Result<[u8; 32]> {
+        let mut generating_software = [0; 32];
+        generating_software.as_mut().from_las_str(
+            &self.generating_software,
+        )?;
+        Ok(generating_software)
     }
 
     fn header_size(&self) -> Result<u16> {
@@ -359,20 +378,15 @@ impl Header {
         }
     }
 
-    fn system_identifier(&self) -> Result<[u8; 32]> {
-        let mut system_identifier = [0; 32];
-        system_identifier.as_mut().from_las_str(
-            &self.system_identifier,
-        )?;
-        Ok(system_identifier)
-    }
+    fn number_of_variable_length_records(&self) -> Result<u32> {
+        use std::u32;
 
-    fn generating_software(&self) -> Result<[u8; 32]> {
-        let mut generating_software = [0; 32];
-        generating_software.as_mut().from_las_str(
-            &self.generating_software,
-        )?;
-        Ok(generating_software)
+        let n = self.vlrs().len();
+        if n > u32::MAX as usize {
+            Err(Error::TooManyVlrs(n).into())
+        } else {
+            Ok(n as u32)
+        }
     }
 
     fn number_of_points(&self) -> Result<u32> {
@@ -449,7 +463,6 @@ impl Header {
     }
 
     fn point_data_len(&self) -> u64 {
-        // TODO extra bytes
         u64::from(self.number_of_points) * u64::from(self.point_format.len())
     }
 
@@ -465,20 +478,6 @@ impl Header {
                     extended
             })
             .collect()
-    }
-
-    fn global_encoding(&self) -> Result<u16> {
-        use feature::SyntheticReturnNumbers;
-
-        let mut bits = self.gps_time_type.into();
-        if self.has_synthetic_return_numbers {
-            self.version.verify_support_for::<SyntheticReturnNumbers>()?;
-            bits |= 8;
-        }
-        if self.point_format.is_extended {
-            bits |= 16;
-        }
-        Ok(bits)
     }
 }
 
