@@ -41,6 +41,10 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
     let other = reader.header();
     assert_eq!(header.file_source_id, other.file_source_id);
     assert_eq!(header.gps_time_type, other.gps_time_type);
+    assert_eq!(
+        header.has_synthetic_return_numbers,
+        other.has_synthetic_return_numbers
+    );
     assert_eq!(header.guid, other.guid);
     assert_eq!(header.version, other.version);
     assert_eq!(header.system_identifier, other.system_identifier);
@@ -186,6 +190,7 @@ macro_rules! version {
                     vlr.data = vec![42; u16::MAX as usize + 1];
                     h.vlrs = vec![vlr];
                 }, 4);
+                roundtrip_header!(has_synthetic_return_numbers, |h: &mut Header| h.has_synthetic_return_numbers = true, 3);
             }
         }
     }

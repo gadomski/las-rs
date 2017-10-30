@@ -67,6 +67,13 @@ pub struct Header {
     /// The time type for GPS time.
     pub gps_time_type: GpsTimeType,
 
+    /// Are the return numbers sythetic?
+    ///
+    /// This could be the case, for example, when a composite file is created by combining a First
+    /// Return File and a Last Return File.  In this case, first return data will be labeled "1 of
+    /// 2" and second return data will be labeled "2 of 2".
+    pub has_synthetic_return_numbers: bool,
+
     /// Optional globally-unique identifier.
     pub guid: [u8; 16],
 
@@ -161,6 +168,7 @@ impl Header {
         Ok(Header {
             file_source_id: raw_header.file_source_id,
             gps_time_type: raw_header.global_encoding.into(),
+            has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
             date: Utc.yo_opt(
                 raw_header.file_creation_year as i32,
                 raw_header.file_creation_day_of_year as u32,
@@ -283,7 +291,7 @@ impl Header {
         Ok(raw::Header {
             file_signature: raw::LASF,
             file_source_id: self.file_source_id,
-            global_encoding: self.global_encoding(),
+            global_encoding: self.global_encoding()?,
             guid: self.guid,
             version: self.version,
             system_identifier: self.system_identifier()?,
@@ -459,12 +467,18 @@ impl Header {
             .collect()
     }
 
-    fn global_encoding(&self) -> u16 {
+    fn global_encoding(&self) -> Result<u16> {
+        use feature::SyntheticReturnNumbers;
+
         let mut bits = self.gps_time_type.into();
+        if self.has_synthetic_return_numbers {
+            self.version.verify_support_for::<SyntheticReturnNumbers>()?;
+            bits |= 8;
+        }
         if self.point_format.is_extended {
             bits |= 16;
         }
-        bits
+        Ok(bits)
     }
 }
 
@@ -473,6 +487,7 @@ impl Default for Header {
         Header {
             file_source_id: 0,
             gps_time_type: GpsTimeType::Week,
+            has_synthetic_return_numbers: false,
             bounds: Default::default(),
             date: Some(Utc::today()),
             generating_software: format!("las-rs {}", env!("CARGO_PKG_VERSION")),
