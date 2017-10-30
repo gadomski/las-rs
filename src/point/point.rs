@@ -93,7 +93,10 @@ impl Point {
     /// let raw_point = raw::Point::default();
     /// let point = Point::new(raw_point, Default::default());
     /// ```
-    pub fn new(raw_point: raw::Point, transforms: Vector<Transform>) -> Point {
+    pub fn new(mut raw_point: raw::Point, transforms: Vector<Transform>) -> Point {
+        let is_overlap = raw_point.flags.is_overlap();
+        raw_point.flags.clear_overlap_class();
+
         Point {
             x: transforms.x.direct(raw_point.x),
             y: transforms.y.direct(raw_point.y),
@@ -103,11 +106,13 @@ impl Point {
             number_of_returns: raw_point.flags.number_of_returns(),
             scan_direction: raw_point.flags.scan_direction(),
             is_edge_of_flight_line: raw_point.flags.is_edge_of_flight_line(),
-            classification: raw_point.flags.into(),
+            classification: raw_point.flags.to_classification().expect(
+                "Overlap classification should have been cleared",
+            ),
             is_synthetic: raw_point.flags.is_synthetic(),
             is_key_point: raw_point.flags.is_key_point(),
             is_withheld: raw_point.flags.is_withheld(),
-            is_overlap: raw_point.flags.is_overlap(),
+            is_overlap: is_overlap,
             scan_angle: raw_point.scan_angle.into(),
             scanner_channel: raw_point.flags.scanner_channel(),
             user_data: raw_point.user_data,
@@ -227,5 +232,19 @@ mod tests {
             }.flags()
                 .is_err()
         );
+    }
+
+    #[test]
+    fn overlap() {
+        use raw::point::Flags;
+
+        let raw_point = raw::Point {
+            flags: Flags::TwoByte(0, 12),
+            ..Default::default()
+        };
+        let point = Point::new(raw_point, Default::default());
+        assert_eq!(Classification::Unclassified, point.classification);
+        assert!(point.is_overlap);
+
     }
 }

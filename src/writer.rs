@@ -26,7 +26,7 @@ quick_error! {
         /// The point format has extra bytes, but the point doesn't.
         MissingExtraBytes(format: Format, point: Point) {
             description("the point format has extra bytes, but the point doesn't")
-            display("point format {} has extra bytes, but point {:?} doesn't", format, point)
+            display("point format {} has {} extra bytes, but point {:?} has {}", format, format.extra_bytes, point, point.extra_bytes.len())
         }
         /// The point format has gps time, but the point doesn't.
         MissingGpsTime(format: Format, point: Point) {

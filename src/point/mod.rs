@@ -31,6 +31,10 @@ quick_error! {
             description("invalid format number")
             display("invalid format number: {}", n)
         }
+        /// Overlap points are handled by an attribute on `las::Point`, not by a classification.
+        OverlapClassification {
+            description("Overlap points are handled by the `is_overlap` member of `las::Point`, not by classifications")
+        }
         /// This is not a valid return number.
         ReturnNumber(n: u8, version: Option<::Version>) {
             description("invalid return number")

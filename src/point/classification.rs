@@ -1,4 +1,17 @@
+use Result;
+use point::Error;
+
 /// ASPRS classification table.
+///
+/// We make one modification to this table from the reference by removing `OverlapPoints`, code 12.
+/// In later versions (e.g. 1.4) extended point formats were added, where each point can have an
+/// `is_overlap` bit set. To handle both of these schemes:
+///
+/// - If the point format doesn't support the overlap bit, the classification is overwritten with
+/// the code for overlap points (12). On ingest, points with an overlap classification are given
+/// the `Unclassified` code and are flagged as `is_overlap.
+/// - If the point format does support the overlap bit, that is preferred.
+///
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Classification {
@@ -14,7 +27,6 @@ pub enum Classification {
     Water,
     Rail,
     RoadSurface,
-    OverlapPoints,
     WireGuard,
     WireConductor,
     TransmissionTower,
@@ -25,9 +37,20 @@ pub enum Classification {
     UserDefinable(u8),
 }
 
-impl From<u8> for Classification {
-    fn from(n: u8) -> Classification {
-        match n {
+impl Classification {
+    /// Creates a new classification.
+    ///
+    /// Throws an error if the classification is 12 (overlap).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Classification;
+    /// assert_eq!(Classification::Ground, Classification::new(2).unwrap());
+    /// assert!(Classification::new(12).is_err());
+    /// ```
+    pub fn new(n: u8) -> Result<Classification> {
+        Ok(match n {
             0 => Classification::CreatedNeverClassified,
             1 => Classification::Unclassified,
             2 => Classification::Ground,
@@ -40,7 +63,7 @@ impl From<u8> for Classification {
             9 => Classification::Water,
             10 => Classification::Rail,
             11 => Classification::RoadSurface,
-            12 => Classification::OverlapPoints,
+            12 => return Err(Error::OverlapClassification.into()),
             13 => Classification::WireGuard,
             14 => Classification::WireConductor,
             15 => Classification::TransmissionTower,
@@ -50,7 +73,7 @@ impl From<u8> for Classification {
             19...64 => Classification::Reserved(n),
             64...255 => Classification::UserDefinable(n),
             _ => unreachable!(),
-        }
+        })
     }
 }
 
@@ -69,7 +92,6 @@ impl From<Classification> for u8 {
             Classification::Water => 9,
             Classification::Rail => 10,
             Classification::RoadSurface => 11,
-            Classification::OverlapPoints => 12,
             Classification::WireGuard => 13,
             Classification::WireConductor => 14,
             Classification::TransmissionTower => 15,

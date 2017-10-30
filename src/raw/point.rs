@@ -5,6 +5,7 @@ use point::{Classification, Error, Format, ScanDirection};
 use std::io::{Read, Write};
 
 const SCAN_ANGLE_SCALE_FACTOR: f32 = 0.006;
+const OVERLAP_CLASSIFICATION_CODE: u8 = 12;
 
 /// A raw point.
 ///
@@ -624,7 +625,7 @@ impl Flags {
     /// ```
     pub fn is_overlap(&self) -> bool {
         match *self {
-            Flags::TwoByte(_, _) => Classification::from(*self) == Classification::OverlapPoints,
+            Flags::TwoByte(_, b) => b & 0b1111 == OVERLAP_CLASSIFICATION_CODE,
             Flags::ThreeByte(_, b, _) => b & 8 == 8,
         }
     }
@@ -695,7 +696,7 @@ impl Flags {
                         a += 128;
                     }
                     let mut b = if self.is_overlap() {
-                        Classification::OverlapPoints.into()
+                        OVERLAP_CLASSIFICATION_CODE
                     } else {
                         c
                     };
@@ -710,6 +711,56 @@ impl Flags {
                     }
                     Ok((a, b))
                 }
+            }
+        }
+    }
+
+    /// Converts these flags to a classification.
+    ///
+    /// Throws an error of the classifiction is 12 (overlap points), because we don't have an
+    /// overlap points class in this library. See the `las::point::Classification` documentation
+    /// for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::raw::point::Flags;
+    /// use las::point::Classification;
+    /// assert_eq!(Classification::Ground, Flags::TwoByte(0, 2).to_classification().unwrap());
+    /// assert_eq!(Classification::Ground, Flags::ThreeByte(0, 0, 2).to_classification().unwrap());
+    /// assert!(Flags::TwoByte(0, 12).to_classification().is_err());
+    /// assert!(Flags::ThreeByte(0, 0, 12).to_classification().is_err());
+    /// ```
+    pub fn to_classification(&self) -> Result<Classification> {
+        match *self {
+            Flags::TwoByte(_, b) => Classification::new(b & 0b00011111),
+            Flags::ThreeByte(_, _, c) => Classification::new(c),
+        }
+    }
+
+    /// Clears any overlap classes in these flags.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::raw::point::Flags;
+    ///
+    /// let mut flags = Flags::TwoByte(0, 12);
+    /// flags.clear_overlap_class();
+    /// assert_eq!(Flags::TwoByte(0, 1), flags);
+    ///
+    /// let mut flags = Flags::ThreeByte(0, 0, 12);
+    /// flags.clear_overlap_class();
+    /// assert_eq!(Flags::ThreeByte(0, 8, 1), flags);
+    /// ```
+    pub fn clear_overlap_class(&mut self) {
+        match *self {
+            Flags::TwoByte(_, ref mut b) => if *b & 0b11111 == OVERLAP_CLASSIFICATION_CODE {
+                *b = (*b & 0b11100000) + u8::from(Classification::Unclassified);
+            }
+            Flags::ThreeByte(_, ref mut b, ref mut c) => if *c == OVERLAP_CLASSIFICATION_CODE {
+                *b |= 8;
+                *c = u8::from(Classification::Unclassified);
             }
         }
     }
@@ -730,15 +781,6 @@ impl From<Flags> for (u8, u8, u8) {
                 ((number_of_returns << 4) + return_number, 0, b)
             }
             Flags::ThreeByte(a, b, c) => (a, b, c),
-        }
-    }
-}
-
-impl From<Flags> for Classification {
-    fn from(flags: Flags) -> Classification {
-        match flags {
-            Flags::TwoByte(_, b) => Classification::from(b & 0b00011111),
-            Flags::ThreeByte(_, _, c) => Classification::from(c),
         }
     }
 }
@@ -907,10 +949,13 @@ mod tests {
     #[test]
     fn is_overlap() {
         assert!(!Flags::TwoByte(0, 0).is_overlap());
-        assert!(Flags::TwoByte(0, 12).is_overlap());
+        assert!(Flags::TwoByte(0, OVERLAP_CLASSIFICATION_CODE).is_overlap());
         assert!(!Flags::ThreeByte(0, 0, 0).is_overlap());
         assert!(Flags::ThreeByte(0, 8, 0).is_overlap());
-        assert_eq!((0, 12), Flags::ThreeByte(0, 8, 0).to_two_bytes().unwrap());
+        assert_eq!(
+            (0, OVERLAP_CLASSIFICATION_CODE),
+            Flags::ThreeByte(0, 8, 0).to_two_bytes().unwrap()
+        );
     }
 
     #[test]
