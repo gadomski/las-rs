@@ -56,6 +56,25 @@ impl Format {
         }
     }
 
+    /// Converts this point format into an extended format.
+    ///
+    /// "Extended" formats can contain more information per point, and must have gps time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Format;
+    /// let mut format = Format::default();
+    /// assert!(!format.has_gps_time);
+    /// assert!(!format.is_extended);
+    /// format.extend();
+    /// assert!(format.has_gps_time);
+    /// assert!(format.is_extended);
+    pub fn extend(&mut self) {
+        self.has_gps_time = true;
+        self.is_extended = true;
+    }
+
     /// Returns this point format's length.
     ///
     /// # Examples
