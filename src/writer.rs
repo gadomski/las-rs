@@ -190,7 +190,6 @@ impl<W: Seek + Write> Writer<W> {
     ///
     pub fn close(&mut self) -> Result<()> {
         if !self.closed {
-            // TODO evlr padding?
             for raw_evlr in self.header.evlrs().into_iter().map(
                 |evlr| evlr.to_raw(true),
             )

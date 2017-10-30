@@ -163,6 +163,7 @@ mod $name {
 
         roundtrip_header!(file_source_id, |h: &mut Header| h.file_source_id = 42, 1);
         roundtrip_header!(gps_time_type, |h: &mut Header| h.gps_time_type = GpsTimeType::Standard, 2);
+        roundtrip_header!(has_synthetic_return_numbers, |h: &mut Header| h.has_synthetic_return_numbers = true, 3);
         roundtrip_header!(guid, |h: &mut Header| h.guid = [42; 16]);
         roundtrip_header!(system_identifier, |h: &mut Header| h.system_identifier = "roundtrip test".to_string());
         roundtrip_header!(generating_software, |h: &mut Header| h.generating_software = "roundtrip test".to_string());

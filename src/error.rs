@@ -1,4 +1,4 @@
-use {Transform, Version, header, point, vlr, writer};
+use {Transform, Version, header, point, reader, vlr, writer};
 use std::io;
 use std::str;
 
@@ -50,6 +50,13 @@ quick_error! {
             cause(err)
             description("point error")
             display("point error: {}", err)
+        }
+        /// Wrapper around `las::reader::Error`.
+        Reader(err: reader::Error) {
+            from()
+            cause(err)
+            description("reader error")
+            display("reader error: {}", err)
         }
         /// This string is too long for the target slice.
         StringTooLong(s: String, len: usize) {

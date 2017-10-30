@@ -13,7 +13,7 @@ const IS_COMPRESSED_MASK: u8 = 0x80;
 /// The documentation for each member is taken directly from the las 1.2 spec, except in cases
 /// where the field's usage has changed, in which case notes about its uses over versions are
 /// included, with particular attention paid to the latest version, 1.4.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Header {
     /// The file signature must contain the four characters “LASF”, and it is required by the LAS
     /// specification.

@@ -119,19 +119,22 @@ pub struct Header {
 
     /// Variable length records.
     pub vlrs: Vec<Vlr>,
+
+    /// Padding between the end of the points and the EVLRs.
+    pub evlr_padding: Vec<u8>,
 }
 
 impl Header {
-    /// Creates a new header from a raw header, vlrs, and vlr padding.
+    /// Creates a new header from a raw header.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::{raw, Header};
     /// let raw_header = raw::Header::default();
-    /// let header = Header::new(raw_header, vec![], vec![]).unwrap();
+    /// let header = Header::new(raw_header).unwrap();
     /// ```
-    pub fn new(raw_header: raw::Header, vlrs: Vec<Vlr>, vlr_padding: Vec<u8>) -> Result<Header> {
+    pub fn new(raw_header: raw::Header) -> Result<Header> {
         use chrono::TimeZone;
 
         let mut point_format = Format::new(raw_header.point_data_format_id)?;
@@ -180,7 +183,7 @@ impl Header {
                 .to_string(),
             guid: raw_header.guid,
             padding: raw_header.padding,
-            vlr_padding: vlr_padding,
+            vlr_padding: vec![],
             point_format: point_format,
             number_of_points: number_of_points,
             number_of_points_by_return: number_of_points_by_return,
@@ -216,7 +219,8 @@ impl Header {
                 },
             },
             version: raw_header.version,
-            vlrs: vlrs,
+            vlrs: vec![],
+            evlr_padding: vec![],
         })
     }
 
@@ -499,6 +503,7 @@ impl Default for Header {
             transforms: Default::default(),
             version: Default::default(),
             vlrs: Vec::new(),
+            evlr_padding: Vec::new(),
         }
     }
 }
@@ -531,7 +536,7 @@ mod tests {
             point_data_record_length: 19,
             ..Default::default()
         };
-        assert!(Header::new(raw_header, vec![], vec![]).is_err());
+        assert!(Header::new(raw_header).is_err());
     }
 
     #[test]
@@ -540,7 +545,7 @@ mod tests {
             point_data_record_length: 21,
             ..Default::default()
         };
-        let header = Header::new(raw_header, vec![], vec![]).unwrap();
+        let header = Header::new(raw_header).unwrap();
         assert_eq!(1, header.point_format.extra_bytes);
     }
 
@@ -550,7 +555,7 @@ mod tests {
             file_creation_day_of_year: 0,
             ..Default::default()
         };
-        let header = Header::new(raw_header, Vec::new(), Vec::new()).unwrap();
+        let header = Header::new(raw_header).unwrap();
         assert!(header.date.is_none());
     }
 
@@ -560,7 +565,7 @@ mod tests {
             file_creation_year: 0,
             ..Default::default()
         };
-        let header = Header::new(raw_header, Vec::new(), Vec::new()).unwrap();
+        let header = Header::new(raw_header).unwrap();
         assert!(header.date.is_none());
     }
 
@@ -662,7 +667,7 @@ mod tests {
         large_file.number_of_point_records = 43;
         large_file.number_of_points_by_return[0] = 43;
         raw_header.large_file = Some(large_file);
-        let header = Header::new(raw_header, vec![], vec![]).unwrap();
+        let header = Header::new(raw_header).unwrap();
         assert_eq!(42, header.number_of_points);
         assert_eq!(42, header.number_of_points_by_return[&1]);
     }
@@ -729,9 +734,9 @@ mod tests {
                         ..Default::default()
                     };
                     if $format < 6 {
-                        Header::new(raw_header, vec![], vec![]).unwrap();
+                        Header::new(raw_header).unwrap();
                     } else {
-                        assert!(Header::new(raw_header, vec![], vec![]).is_err());
+                        assert!(Header::new(raw_header).is_err());
                     }
                 }
             }

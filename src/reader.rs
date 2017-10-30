@@ -1,10 +1,22 @@
 //! Read las points.
 
-use {Error, Header, Point, Result, Vlr};
+use {Header, Point, Result, Vlr};
 use raw;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+
+quick_error! {
+    /// Error while reading.
+    #[derive(Clone, Copy, Debug)]
+    pub enum Error {
+        /// The offset to the point data was too small.
+        OffsetToPointDataTooSmall(offset: u32) {
+            description("offset to point data too small")
+            display("offset to point data too small: {}", offset)
+        }
+    }
+}
 
 /// Reads LAS data.
 #[derive(Debug)]
@@ -33,30 +45,35 @@ impl<R: Read + Seek> Reader<R> {
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let raw_header = raw::Header::read_from(&mut read)?;
         if raw_header.is_compressed() {
-            return Err(Error::Laszip);
+            return Err(::Error::Laszip);
         }
+        let mut position = u64::from(raw_header.header_size);
+        let number_of_variable_length_records = raw_header.number_of_variable_length_records;
+        let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
+        let evlr = raw_header.evlr;
+        let mut header = Header::new(raw_header)?;
+
         let mut vlrs = Vec::new();
-        let mut position = raw_header.header_size as usize;
-        for _ in 0..raw_header.number_of_variable_length_records {
+        for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
-            position += vlr.len();
+            position += vlr.len() as u64;
             vlrs.push(vlr);
         }
-        let vlr_padding = if position < raw_header.offset_to_point_data as usize {
-            let mut bytes = vec![0; raw_header.offset_to_point_data as usize - position];
-            read.read_exact(&mut bytes)?;
-            bytes
-        } else {
-            Vec::new()
-        };
-        if let Some(evlr) = raw_header.evlr {
+        if position > offset_to_point_data {
+            return Err(
+                Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into(),
+            );
+        } else if position < offset_to_point_data {
+            read.by_ref()
+                .take(offset_to_point_data - position)
+                .read_to_end(&mut header.vlr_padding)?;
+        }
+        if let Some(evlr) = evlr {
             read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
             vlrs.push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
         }
-        read.seek(SeekFrom::Start(
-            u64::from(raw_header.offset_to_point_data),
-        ))?;
-        let header = Header::new(raw_header, vlrs, vlr_padding)?;
+        header.vlrs = vlrs;
+        read.seek(SeekFrom::Start(offset_to_point_data))?;
         Ok(Reader {
             number_of_points: header.number_of_points,
             header: header,
@@ -128,7 +145,7 @@ impl Reader<BufReader<File>> {
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
-        File::open(path).map_err(Error::from).and_then(|file| {
+        File::open(path).map_err(::Error::from).and_then(|file| {
             Reader::new(BufReader::new(file))
         })
     }
