@@ -6,18 +6,14 @@ macro_rules! autzen {
     ($name:ident, $major:expr, $minor:expr) => {
         mod $name {
             use std::io::Cursor;
-
-            use las::{Reader, Header, Writer};
-
-            const VERSION: (u8, u8) = ($major, $minor);
+            use las::{Version, Reader, Writer};
 
             #[test]
             fn read_write() {
                 let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-                let mut writer = Writer::new(Cursor::new(Vec::new()), Header {
-                    version: VERSION.into(),
-                    ..Default::default()
-                }).unwrap();
+                let mut header = reader.header.clone();
+                header.version = Version::new($major, $minor);
+                let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
                 for point in reader.points() {
                     writer.write(point.unwrap()).unwrap();
                 }
