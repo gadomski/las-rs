@@ -280,11 +280,10 @@ impl Header {
     /// ```
     pub fn to_raw(&self) -> Result<raw::Header> {
         use chrono::Datelike;
-
         Ok(raw::Header {
             file_signature: raw::LASF,
             file_source_id: self.file_source_id,
-            global_encoding: self.gps_time_type.into(),
+            global_encoding: self.global_encoding(),
             guid: self.guid,
             version: self.version,
             system_identifier: self.system_identifier()?,
@@ -459,6 +458,14 @@ impl Header {
             })
             .collect()
     }
+
+    fn global_encoding(&self) -> u16 {
+        let mut bits = self.gps_time_type.into();
+        if self.point_format.is_extended {
+            bits |= 16;
+        }
+        bits
+    }
 }
 
 impl Default for Header {
@@ -498,7 +505,7 @@ fn number_of_points_hash_map<T: Copy + Into<u64>>(slice: &[T]) -> HashMap<u8, u6
 }
 
 fn is_wkt_bit_set(n: u16) -> bool {
-    n & 8 == 8
+    n & 16 == 16
 }
 
 #[cfg(test)]
@@ -682,6 +689,17 @@ mod tests {
             u32::MAX as u64 + 1,
             raw_header.large_file.unwrap().number_of_points_by_return[0]
         );
+    }
+
+    #[test]
+    fn wkt_bit() {
+        let mut header = Header::default();
+        header.version = (1, 4).into();
+        let raw_header = header.to_raw().unwrap();
+        assert_eq!(0, raw_header.global_encoding);
+        header.point_format = Format::new(6).unwrap();
+        let raw_header = header.to_raw().unwrap();
+        assert_eq!(0b10000, raw_header.global_encoding);
     }
 
     macro_rules! point_format {
