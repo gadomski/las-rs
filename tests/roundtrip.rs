@@ -17,9 +17,6 @@ pub fn roundtrip(header: Header, point: Point) {
     let other = reader.read().unwrap().unwrap();
     assert_eq!(point, other);
     assert_eq!(None, reader.read().unwrap());
-    if reader.header.evlrs().len() == 0 {
-        assert!(reader.read().expect("Error when reading EOF").is_none());
-    }
 
     let other = reader.header;
     assert_eq!(header.guid, other.guid);
