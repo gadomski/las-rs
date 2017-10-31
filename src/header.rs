@@ -23,12 +23,12 @@
 //! use std::u32;
 //! use las::Header;
 //! let mut header = Header::default();
-//! assert!(header.to_raw().is_ok()); // the default header is legal
+//! assert!(header.clone().into_raw().is_ok()); // the default header is legal
 //! header.version = (1, 2).into();
 //! header.number_of_points = u32::MAX as u64 + 1;
-//! assert!(header.to_raw().is_err()); // las 1.2 files can't have this many points
+//! assert!(header.clone().into_raw().is_err()); // las 1.2 files can't have this many points
 //! header.version = (1, 4).into();
-//! assert!(header.to_raw().is_ok()); // but las 1.4 files can
+//! assert!(header.into_raw().is_ok()); // but las 1.4 files can
 //! ```
 
 use {Bounds, GpsTimeType, Result, Transform, Vector, Version, Vlr, raw};
@@ -357,12 +357,12 @@ impl Header {
     /// ```
     /// use las::{Header, GpsTimeType};
     /// let mut header = Header::default();
-    /// let raw_header = header.to_raw().unwrap();
+    /// let raw_header = header.clone().into_raw().unwrap();
     /// header.gps_time_type = GpsTimeType::Standard;
     /// header.version = (1, 0).into();
-    /// assert!(header.to_raw().is_err());
+    /// assert!(header.into_raw().is_err());
     /// ```
-    pub fn to_raw(&self) -> Result<raw::Header> {
+    pub fn into_raw(self) -> Result<raw::Header> {
         if self.file_source_id != 0 {
             self.version.verify_support_for::<FileSourceId>()?;
         }
@@ -402,7 +402,7 @@ impl Header {
             start_of_waveform_data_packet_record: None,
             evlr: self.evlr()?,
             large_file: self.large_file()?,
-            padding: self.padding.clone(),
+            padding: self.padding,
         })
     }
 
@@ -655,7 +655,10 @@ mod tests {
     fn number_of_points_by_return_zero_return_number() {
         let mut header = Header::default();
         header.number_of_points_by_return.insert(0, 1);
-        assert_eq!([0; 5], header.to_raw().unwrap().number_of_points_by_return);
+        assert_eq!(
+            [0; 5],
+            header.into_raw().unwrap().number_of_points_by_return
+        );
     }
 
     #[test]
@@ -665,7 +668,10 @@ mod tests {
         for i in 1..6 {
             header.number_of_points_by_return.insert(i, 42);
         }
-        assert_eq!([42; 5], header.to_raw().unwrap().number_of_points_by_return);
+        assert_eq!(
+            [42; 5],
+            header.into_raw().unwrap().number_of_points_by_return
+        );
     }
 
     #[test]
@@ -673,7 +679,7 @@ mod tests {
         let mut header = Header::default();
         header.version = (1, 2).into();
         header.number_of_points_by_return.insert(6, 1);
-        assert!(header.to_raw().is_err());
+        assert!(header.into_raw().is_err());
     }
 
     #[test]
@@ -684,7 +690,7 @@ mod tests {
             version: (1, 2).into(),
             ..Default::default()
         };
-        assert!(header.to_raw().is_err());
+        assert!(header.into_raw().is_err());
     }
 
     #[test]
@@ -695,7 +701,7 @@ mod tests {
             version: (1, 2).into(),
             ..Default::default()
         };
-        assert!(header.to_raw().is_err());
+        assert!(header.into_raw().is_err());
     }
 
     #[test]
@@ -706,7 +712,7 @@ mod tests {
             ..Default::default()
         };
         header.number_of_points_by_return.insert(2, 42);
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(42, raw_header.number_of_point_records);
         assert_eq!([0, 42, 0, 0, 0], raw_header.number_of_points_by_return);
         assert_eq!(42, raw_header.large_file.unwrap().number_of_point_records);
@@ -726,7 +732,7 @@ mod tests {
             ..Default::default()
         };
         header.number_of_points_by_return.insert(6, 42);
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_point_records);
         assert_eq!(
             u32::MAX as u64 + 1,
@@ -761,9 +767,9 @@ mod tests {
         let mut header = Header::default();
         header.version = (1, 2).into();
         header.number_of_points = u32::MAX as u64 + 1;
-        assert!(header.to_raw().is_err());
+        assert!(header.clone().into_raw().is_err());
         header.version = (1, 4).into();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_point_records);
         assert_eq!(
             u32::MAX as u64 + 1,
@@ -781,9 +787,9 @@ mod tests {
             1,
             u32::MAX as u64 + 1,
         );
-        assert!(header.to_raw().is_err());
+        assert!(header.clone().into_raw().is_err());
         header.version = (1, 4).into();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_points_by_return[0]);
         assert_eq!(
             u32::MAX as u64 + 1,
@@ -795,10 +801,10 @@ mod tests {
     fn wkt_bit() {
         let mut header = Header::default();
         header.version = (1, 4).into();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.clone().into_raw().unwrap();
         assert_eq!(0, raw_header.global_encoding);
         header.point_format = Format::new(6).unwrap();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0b10000, raw_header.global_encoding);
     }
 

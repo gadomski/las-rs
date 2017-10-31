@@ -74,11 +74,11 @@ impl Vlr {
     ///
     /// ```
     /// use las::Vlr;
-    /// let raw_vlr =  Vlr::default().to_raw(false).unwrap();
-    /// let raw_evlr =  Vlr::default().to_raw(true).unwrap();
-    /// let raw_vlr2 =  Vlr::default().to_raw(None).unwrap();
+    /// let raw_vlr =  Vlr::default().into_raw(false).unwrap();
+    /// let raw_evlr =  Vlr::default().into_raw(true).unwrap();
+    /// let raw_vlr2 =  Vlr::default().into_raw(None).unwrap();
     /// ```
-    pub fn to_raw<T>(&self, force_extended: T) -> Result<raw::Vlr>
+    pub fn into_raw<T>(self, force_extended: T) -> Result<raw::Vlr>
     where
         T: Into<Option<bool>>,
     {
@@ -95,7 +95,7 @@ impl Vlr {
             record_id: self.record_id,
             record_length_after_header: self.record_length_after_header(extended)?,
             description: description,
-            data: self.data.clone(),
+            data: self.data,
         })
     }
 
@@ -171,6 +171,6 @@ mod tests {
             data: data,
             ..Default::default()
         };
-        assert!(vlr.to_raw(false).is_err());
+        assert!(vlr.into_raw(false).is_err());
     }
 }

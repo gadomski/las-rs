@@ -84,13 +84,13 @@ impl<W: Seek + Write> Writer<W> {
             // TODO we shouldn't overwrite the old vlr padding
             header.vlr_padding = ::raw::POINT_DATA_START_SIGNATURE.to_vec();
         }
-        header.to_raw().and_then(
-            |raw_header| raw_header.write_to(&mut write),
-        )?;
+        header.clone().into_raw().and_then(|raw_header| {
+            raw_header.write_to(&mut write)
+        })?;
         for vlr in header.vlrs().iter() {
-            vlr.to_raw(false).and_then(
-                |raw_vlr| raw_vlr.write_to(&mut write),
-            )?;
+            (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
+                raw_vlr.write_to(&mut write)
+            })?;
         }
         if !header.vlr_padding.is_empty() {
             write.write_all(&header.vlr_padding)?;
@@ -171,14 +171,14 @@ impl<W: Seek + Write> Writer<W> {
     ///
     pub fn close(&mut self) -> Result<()> {
         if !self.closed {
-            for raw_evlr in self.header.evlrs().into_iter().map(
-                |evlr| evlr.to_raw(true),
-            )
+            for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
+                evlr.clone().into_raw(true)
+            })
             {
                 raw_evlr?.write_to(&mut self.write)?;
             }
             self.write.seek(SeekFrom::Start(0))?;
-            self.header.to_raw().and_then(|raw_header| {
+            self.header.clone().into_raw().and_then(|raw_header| {
                 raw_header.write_to(&mut self.write)
             })?;
             self.closed = true;
