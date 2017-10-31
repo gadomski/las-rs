@@ -1,4 +1,16 @@
-//! Three-dimensional points with additional attributes.
+//! Attributed three-dimensional points.
+//!
+//! Points are simple structures with public attributes, some optional.
+//!
+//! ```
+//! use las::Point;
+//! let point = Point::default();
+//! assert_eq!(0., point.x);
+//! assert_eq!(None, point.color);
+//! ```
+//!
+//! Point coordinates (x, y, and z) are stored as f64, and are the final coordinates after the
+//! scale and offset from the header are applied.
 
 mod classification;
 mod format;

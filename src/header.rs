@@ -1,10 +1,43 @@
 //! Metadata and configuration for las files.
+//!
+//! Use a `Header` to configure your writer:
+//!
+//! ```
+//! use std::io::Cursor;
+//! use las::{Header, Writer};
+//! use las::point::Format;
+//!
+//! let mut header = Header::default();
+//! header.version = (1, 4).into();
+//! header.point_format = Format::new(6).unwrap();
+//! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
+//! ```
+//!
+//! It's not a perfect [builder pattern](https://aturon.github.io/ownership/builders.html), since
+//! it uses public members instead of getters/setters, but you can treat it like a builder. Because
+//! there's various combinations of options that may or may not be legal, the legality of the
+//! options aren't checked until the header is converted into a `raw::Header`, i.e. we have to
+//! commit to the bytes themselves:
+//!
+//! ```
+//! use std::u32;
+//! use las::Header;
+//! let mut header = Header::default();
+//! assert!(header.clone().into_raw().is_ok()); // the default header is legal
+//! header.version = (1, 2).into();
+//! header.number_of_points = u32::MAX as u64 + 1;
+//! assert!(header.clone().into_raw().is_err()); // las 1.2 files can't have this many points
+//! header.version = (1, 4).into();
+//! assert!(header.into_raw().is_ok()); // but las 1.4 files can
+//! ```
 
 use {Bounds, GpsTimeType, Result, Transform, Vector, Version, Vlr, raw};
-use chrono::{Date, Utc};
+use chrono::{Date, Datelike, TimeZone, Utc};
+use feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers};
 use point::Format;
 use std::collections::HashMap;
 use utils::{AsLasStr, FromLasStr};
+use uuid::Uuid;
 
 quick_error! {
     /// Header-specific errors.
@@ -14,6 +47,11 @@ quick_error! {
         FileSignature(b: [u8; 4]) {
             description("the file signature was not LASF")
             display("the file signature was not LASF: {:?}", b)
+        }
+        /// The point format is not supported by version.
+        Format(version: Version, format: Format) {
+            description("format is not supported by version")
+            display("format {} is not supported by version {}", format, version)
         }
         /// The offset to point data is too large.
         OffsetToPointDataTooLarge(offset: usize) {
@@ -59,6 +97,8 @@ quick_error! {
 }
 
 /// Metadata describing the layout, source, and interpretation of the points.
+///
+/// Headers include *all* las metadata, including (extended) variable length records.
 #[derive(Clone, Debug)]
 pub struct Header {
     /// A project-wide unique ID for the file.
@@ -75,7 +115,7 @@ pub struct Header {
     pub has_synthetic_return_numbers: bool,
 
     /// Optional globally-unique identifier.
-    pub guid: [u8; 16],
+    pub guid: Uuid,
 
     /// The LAS version of this file.
     pub version: Version,
@@ -117,11 +157,10 @@ pub struct Header {
     /// The number of points of each return number.
     pub number_of_points_by_return: HashMap<u8, u64>,
 
-    /// Variable length records.
-    pub vlrs: Vec<Vlr>,
-
     /// Padding at the end of the points.
     pub end_of_points_padding: Vec<u8>,
+
+    vlrs: Vec<Vlr>,
 }
 
 impl Header {
@@ -135,8 +174,6 @@ impl Header {
     /// let header = Header::new(raw_header).unwrap();
     /// ```
     pub fn new(raw_header: raw::Header) -> Result<Header> {
-        use chrono::TimeZone;
-
         let mut point_format = Format::new(raw_header.point_data_format_id)?;
         if raw_header.point_data_record_length > point_format.len() {
             point_format.extra_bytes = raw_header.point_data_record_length - point_format.len();
@@ -181,7 +218,7 @@ impl Header {
                 .as_ref()
                 .as_las_str()?
                 .to_string(),
-            guid: raw_header.guid,
+            guid: Uuid::from_bytes(&raw_header.guid).unwrap(),
             padding: raw_header.padding,
             vlr_padding: vec![],
             point_format: point_format,
@@ -224,10 +261,26 @@ impl Header {
         })
     }
 
+    /// Adds a variable length record to this header.
+    ///
+    /// Both extended and regular vlrs are added this way.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Header, Vlr};
+    /// let mut header = Header::default();
+    /// header.push_vlr(Vlr::default());
+    /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
+    /// ```
+    pub fn push_vlr(&mut self, vlr: Vlr) {
+        self.vlrs.push(vlr);
+    }
+
     /// Returns this header's variable length records.
     ///
-    /// This checks through all of the variable length records, and only includes those that (a)
-    /// are small enough to fit in as a vlr and (b) aren't marked as extended.
+    /// If this header's version does not support extended variable length records, all evlrs will
+    /// be converted to vlrs *unless* their data are too long.
     ///
     /// # Examples
     ///
@@ -236,11 +289,9 @@ impl Header {
     /// use las::{Header, Vlr};
     /// let mut header = Header::default();
     /// header.version = (1, 4).into();
-    /// header.vlrs = vec![
-    ///     Vlr::default(),
-    ///     Vlr { is_extended: true, ..Default::default() },
-    ///     Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() },
-    /// ];
+    /// header.push_vlr(Vlr::default());
+    /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
+    /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
     /// assert_eq!(1, header.vlrs().len());
     ///
     /// header.version = (1, 2).into();
@@ -252,12 +303,11 @@ impl Header {
 
     /// Returns this header's extended variable length records.
     ///
-    /// If this header supports evlrs, this checks through all of the variable length records, and
-    /// only includes those that (a) are marked as extended or (b) are too large to fit into a vlr.
+    /// If this header's version supports extended variable length records, all too-long regular
+    /// vlrs will be converted to extended.
     ///
-    /// If this header doesn't support evlrs, this will instead return all *forced* evlrs, i.e. all
-    /// vlrs that can't be downgraded to a vlr. The idea is that an upstream will then reject the
-    /// header.
+    /// If this header's version does not support extended variable length records, this will only
+    /// return too-long vlrs.
     ///
     /// # Examples
     ///
@@ -266,11 +316,9 @@ impl Header {
     /// use las::{Header, Vlr};
     /// let mut header = Header::default();
     /// header.version = (1, 4).into();
-    /// header.vlrs = vec![
-    ///     Vlr::default(),
-    ///     Vlr { is_extended: true, ..Default::default() },
-    ///     Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() },
-    /// ];
+    /// header.push_vlr(Vlr::default());
+    /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
+    /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
     /// assert_eq!(2, header.evlrs().len());
     ///
     /// header.version = (1, 2).into();
@@ -301,21 +349,32 @@ impl Header {
 
     /// Converts this header into a raw header.
     ///
-    /// This method does some rules-checking.
+    /// This does all the necessary version support checking to verify that we are following The
+    /// Rules.
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::Header;
-    /// let raw_header = Header::default().to_raw().unwrap();
+    /// use las::{Header, GpsTimeType};
+    /// let mut header = Header::default();
+    /// let raw_header = header.clone().into_raw().unwrap();
+    /// header.gps_time_type = GpsTimeType::Standard;
+    /// header.version = (1, 0).into();
+    /// assert!(header.into_raw().is_err());
     /// ```
-    pub fn to_raw(&self) -> Result<raw::Header> {
-        use chrono::Datelike;
+    pub fn into_raw(self) -> Result<raw::Header> {
+        if self.file_source_id != 0 {
+            self.version.verify_support_for::<FileSourceId>()?;
+        }
+        if !self.version.supports_point_format(self.point_format) {
+            return Err(Error::Format(self.version, self.point_format).into());
+        }
+        // TODO check waveforms
         Ok(raw::Header {
             file_signature: raw::LASF,
             file_source_id: self.file_source_id,
             global_encoding: self.global_encoding()?,
-            guid: self.guid,
+            guid: *self.guid.as_bytes(),
             version: self.version,
             system_identifier: self.system_identifier()?,
             generating_software: self.generating_software()?,
@@ -343,13 +402,14 @@ impl Header {
             start_of_waveform_data_packet_record: None,
             evlr: self.evlr()?,
             large_file: self.large_file()?,
-            padding: self.padding.clone(),
+            padding: self.padding,
         })
     }
 
     fn global_encoding(&self) -> Result<u16> {
-        use feature::SyntheticReturnNumbers;
-
+        if self.gps_time_type.is_standard() {
+            self.version.verify_support_for::<GpsStandardTime>()?;
+        }
         let mut bits = self.gps_time_type.into();
         if self.has_synthetic_return_numbers {
             self.version.verify_support_for::<SyntheticReturnNumbers>()?;
@@ -455,6 +515,9 @@ impl Header {
         use std::u32;
 
         let n = self.evlrs().len();
+        if n > 0 {
+            self.version.verify_support_for::<Evlrs>()?;
+        }
         if n == 0 {
             Ok(None)
         } else if n > u32::MAX as usize {
@@ -592,7 +655,10 @@ mod tests {
     fn number_of_points_by_return_zero_return_number() {
         let mut header = Header::default();
         header.number_of_points_by_return.insert(0, 1);
-        assert_eq!([0; 5], header.to_raw().unwrap().number_of_points_by_return);
+        assert_eq!(
+            [0; 5],
+            header.into_raw().unwrap().number_of_points_by_return
+        );
     }
 
     #[test]
@@ -602,7 +668,10 @@ mod tests {
         for i in 1..6 {
             header.number_of_points_by_return.insert(i, 42);
         }
-        assert_eq!([42; 5], header.to_raw().unwrap().number_of_points_by_return);
+        assert_eq!(
+            [42; 5],
+            header.into_raw().unwrap().number_of_points_by_return
+        );
     }
 
     #[test]
@@ -610,7 +679,7 @@ mod tests {
         let mut header = Header::default();
         header.version = (1, 2).into();
         header.number_of_points_by_return.insert(6, 1);
-        assert!(header.to_raw().is_err());
+        assert!(header.into_raw().is_err());
     }
 
     #[test]
@@ -621,7 +690,7 @@ mod tests {
             version: (1, 2).into(),
             ..Default::default()
         };
-        assert!(header.to_raw().is_err());
+        assert!(header.into_raw().is_err());
     }
 
     #[test]
@@ -632,7 +701,7 @@ mod tests {
             version: (1, 2).into(),
             ..Default::default()
         };
-        assert!(header.to_raw().is_err());
+        assert!(header.into_raw().is_err());
     }
 
     #[test]
@@ -643,7 +712,7 @@ mod tests {
             ..Default::default()
         };
         header.number_of_points_by_return.insert(2, 42);
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(42, raw_header.number_of_point_records);
         assert_eq!([0, 42, 0, 0, 0], raw_header.number_of_points_by_return);
         assert_eq!(42, raw_header.large_file.unwrap().number_of_point_records);
@@ -663,7 +732,7 @@ mod tests {
             ..Default::default()
         };
         header.number_of_points_by_return.insert(6, 42);
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_point_records);
         assert_eq!(
             u32::MAX as u64 + 1,
@@ -698,9 +767,9 @@ mod tests {
         let mut header = Header::default();
         header.version = (1, 2).into();
         header.number_of_points = u32::MAX as u64 + 1;
-        assert!(header.to_raw().is_err());
+        assert!(header.clone().into_raw().is_err());
         header.version = (1, 4).into();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_point_records);
         assert_eq!(
             u32::MAX as u64 + 1,
@@ -718,9 +787,9 @@ mod tests {
             1,
             u32::MAX as u64 + 1,
         );
-        assert!(header.to_raw().is_err());
+        assert!(header.clone().into_raw().is_err());
         header.version = (1, 4).into();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_points_by_return[0]);
         assert_eq!(
             u32::MAX as u64 + 1,
@@ -732,10 +801,10 @@ mod tests {
     fn wkt_bit() {
         let mut header = Header::default();
         header.version = (1, 4).into();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.clone().into_raw().unwrap();
         assert_eq!(0, raw_header.global_encoding);
         header.point_format = Format::new(6).unwrap();
-        let raw_header = header.to_raw().unwrap();
+        let raw_header = header.into_raw().unwrap();
         assert_eq!(0b10000, raw_header.global_encoding);
     }
 

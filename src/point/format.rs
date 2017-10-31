@@ -7,7 +7,40 @@ const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
 const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
 const NIR_FORMATS: &'static [u8] = &[8, 10];
 
-/// A point format describes the attributes associated with the point.
+/// Point formats are defined by the las spec.
+///
+/// As of las 1.4, there are eleven point formats (0-10). A new `Format` can be created from its
+/// code and converted back into it:
+///
+/// ```
+/// use las::point::Format;
+///
+/// let format_1 = Format::new(1).unwrap();
+/// assert!(format_1.has_gps_time);
+/// assert_eq!(1, format_1.to_u8().unwrap());
+///
+/// assert!(Format::new(11).is_err());
+/// ```
+///
+/// Point formats can have extra bytes, which are user-defined attributes. Extra bytes were
+/// introduced in las 1.4.
+///
+/// ```
+/// use las::point::Format;
+/// let mut format = Format::new(0).unwrap();
+/// format.extra_bytes = 1;
+/// assert_eq!(21, format.len());
+/// ```
+///
+/// Certain combinations of attributes in a point format are illegal, e.g. gps time is required for
+/// all formats >= 6:
+///
+/// ```
+/// use las::point::Format;
+/// let mut format = Format::new(6).unwrap();
+/// format.has_gps_time = false;
+/// assert!(format.to_u8().is_err());
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Format {
     /// Does this point format include gps time?

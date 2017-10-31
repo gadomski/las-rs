@@ -2,6 +2,7 @@
 
 extern crate chrono;
 extern crate las;
+extern crate uuid;
 
 use las::{Header, Point, Reader, Writer};
 use std::io::Cursor;
@@ -63,7 +64,8 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
     if point.return_number > 0 {
         assert_eq!(1, other.number_of_points_by_return[&point.return_number]);
     }
-    assert_eq!(header.vlrs, other.vlrs);
+    assert_eq!(header.vlrs(), other.vlrs());
+    assert_eq!(header.evlrs(), other.evlrs());
 }
 
 macro_rules! roundtrip_point {
@@ -85,7 +87,9 @@ macro_rules! roundtrip_point {
             $modify_point_format(&mut point_format);
             let mut point = Point::default();
             $modify_point(&mut point);
-            let header = Header { version: version, point_format: point_format, ..Default::default() };
+            let mut header = Header::default();
+            header.version = version;
+            header.point_format = point_format;
             ::roundtrip(header, point, should_succeed);
         }
     };
@@ -102,7 +106,8 @@ macro_rules! roundtrip_header {
 
             let version = super::version();
             let should_succeed = version >= Version::new(1, $min_version_minor);
-            let mut header = Header { version: version, ..Default::default() };
+            let mut header = Header::default();
+            header.version = version;
             $modify_header(&mut header);
             ::roundtrip(header, Point::default(), should_succeed);
         }
@@ -160,11 +165,12 @@ mod $name {
     mod header {
         use chrono::{Utc, TimeZone};
         use las::GpsTimeType;
+        use uuid::Uuid;
 
         roundtrip_header!(file_source_id, |h: &mut Header| h.file_source_id = 42, 1);
         roundtrip_header!(gps_time_type, |h: &mut Header| h.gps_time_type = GpsTimeType::Standard, 2);
         roundtrip_header!(has_synthetic_return_numbers, |h: &mut Header| h.has_synthetic_return_numbers = true, 3);
-        roundtrip_header!(guid, |h: &mut Header| h.guid = [42; 16]);
+        roundtrip_header!(guid, |h: &mut Header| h.guid = Uuid::from_bytes(&[42; 16]).unwrap());
         roundtrip_header!(system_identifier, |h: &mut Header| h.system_identifier = "roundtrip test".to_string());
         roundtrip_header!(generating_software, |h: &mut Header| h.generating_software = "roundtrip test".to_string());
         roundtrip_header!(date, |h: &mut Header| h.date = Some(Utc.ymd(2017, 10, 30)));
@@ -180,7 +186,7 @@ mod $name {
                 z: transform,
             };
         });
-        roundtrip_header!(vlrs, |h: &mut Header| h.vlrs = vec![Default::default()]);
+        roundtrip_header!(vlrs, |h: &mut Header| h.push_vlr(Default::default()));
         roundtrip_header!(evlrs, |h: &mut Header| {
             use std::u16;
             use las::Vlr;
@@ -188,7 +194,7 @@ mod $name {
             let mut vlr = Vlr::default();
             vlr.is_extended = true;
             vlr.data = vec![42; u16::MAX as usize + 1];
-            h.vlrs = vec![vlr];
+            h.push_vlr(vlr);
         }, 4);
         roundtrip_header!(end_of_points_padding, |h: &mut Header| h.end_of_points_padding = vec![42]);
     }

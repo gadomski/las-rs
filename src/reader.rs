@@ -1,4 +1,40 @@
 //! Read las points.
+//!
+//! If you're reading any significant number of points, you'll want to make sure you're using a
+//! `BufRead` instead of just a `Read`:
+//!
+//! ```
+//! use std::fs::File;
+//! use std::io::BufReader;
+//! use las::Reader;
+//!
+//! let read = BufReader::new(File::open("tests/data/autzen.las").unwrap());
+//! let reader = Reader::new(read).unwrap();
+//! ```
+//!
+//! `Reader::from_path` does this for you:
+//!
+//! ```
+//! use las::Reader;
+//! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+//! ```
+//!
+//! For now, compressed files are not supported:
+//!
+//! ```
+//! use las::Reader;
+//! assert!(Reader::from_path("tests/data/autzen.laz").is_err());
+//! ```
+//!
+//! Use `Reader::read` to read one point, and `Reader::points` to get an iterator over
+//! `Result<Point>`:
+//!
+//! ```
+//! use las::Reader;
+//! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+//! let first_point = reader.read().unwrap().unwrap();
+//! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
+//! ```
 
 use {Header, Point, Result, Vlr};
 use raw;
@@ -25,7 +61,7 @@ quick_error! {
 
 /// Reads LAS data.
 #[derive(Debug)]
-pub struct Reader<R> {
+pub struct Reader<R: Read + Seek> {
     header: Header,
     read: R,
     number_of_points: u64,
@@ -58,11 +94,10 @@ impl<R: Read + Seek> Reader<R> {
         let evlr = raw_header.evlr;
         let mut header = Header::new(raw_header)?;
 
-        let mut vlrs = Vec::new();
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
             position += vlr.len() as u64;
-            vlrs.push(vlr);
+            header.push_vlr(vlr);
         }
         if position > offset_to_point_data {
             return Err(
@@ -86,11 +121,10 @@ impl<R: Read + Seek> Reader<R> {
                 )?;
             }
             read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
-            vlrs.push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
+            header.push_vlr(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
         } else {
             read.read_to_end(&mut header.end_of_points_padding)?;
         }
-        header.vlrs = vlrs;
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
 
@@ -101,9 +135,7 @@ impl<R: Read + Seek> Reader<R> {
             number_read: 0,
         })
     }
-}
 
-impl<R: Read> Reader<R> {
     /// Returns a reference to this reader's header.
     ///
     /// # Examples
@@ -118,6 +150,8 @@ impl<R: Read> Reader<R> {
     }
 
     /// Reads a point.
+    ///
+    /// Returns `Ok(None)` if we have already read the last point.
     ///
     /// # Examples
     ///
@@ -175,11 +209,11 @@ impl Reader<BufReader<File>> {
 ///
 /// This struct is generally created by calling `points()` on `Reader`.
 #[derive(Debug)]
-pub struct Points<'a, R: 'a + Read> {
+pub struct Points<'a, R: 'a + Read + Seek> {
     reader: &'a mut Reader<R>,
 }
 
-impl<'a, R: Read> Iterator for Points<'a, R> {
+impl<'a, R: Read + Seek> Iterator for Points<'a, R> {
     type Item = Result<Point>;
     fn next(&mut self) -> Option<Result<Point>> {
         match self.reader.read() {

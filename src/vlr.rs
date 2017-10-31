@@ -1,6 +1,39 @@
-//! Variable length records.
+//! Variable length records are used to store additional metadata not defined in the header.
 //!
-//! This includes regular and extended.
+//! Variable length records (VLRs) can be "regular" or "extended". "Regular" vlrs are stored right
+//! after the header, before the point records. "Extended" vlrs (EVLRs) are stored at the end of
+//! the file, after the point records.
+//!
+//! Vlrs contain arbitrary data:
+//!
+//! ```
+//! use las::Vlr;
+//! let vlr = Vlr {
+//!     user_id: "gadomski".to_string(),
+//!     record_id: 42,
+//!     description: "Some really important data".to_string(),
+//!     data: vec![1, 2, 3],
+//!     is_extended: false,
+//! };
+//! ```
+//!
+//! Use the `is_extended` flag to indicate that this vlr should be stored as an extended variable
+//! length record. Note that a header may choose to ignore this flag if the version doesn't support
+//! evlrs and the evlr can be safely converted to a vlr.
+//!
+//! ```
+//! use las::{Vlr, Header};
+//! let mut header = Header::default();
+//! header.version = (1, 4).into();
+//!
+//! let evlr = Vlr { is_extended: true, ..Default::default() };
+//! header.push_vlr(evlr);
+//! assert_eq!(1, header.evlrs().len());
+//!
+//! header.version = (1, 2).into(); // las 1.2 doesn't support evlrs
+//! assert_eq!(0, header.evlrs().len());
+//! assert_eq!(1, header.vlrs().len());
+//! ```
 
 use {Result, raw};
 
@@ -74,11 +107,11 @@ impl Vlr {
     ///
     /// ```
     /// use las::Vlr;
-    /// let raw_vlr =  Vlr::default().to_raw(false).unwrap();
-    /// let raw_evlr =  Vlr::default().to_raw(true).unwrap();
-    /// let raw_vlr2 =  Vlr::default().to_raw(None).unwrap();
+    /// let raw_vlr =  Vlr::default().into_raw(false).unwrap();
+    /// let raw_evlr =  Vlr::default().into_raw(true).unwrap();
+    /// let raw_vlr2 =  Vlr::default().into_raw(None).unwrap();
     /// ```
-    pub fn to_raw<T>(&self, force_extended: T) -> Result<raw::Vlr>
+    pub fn into_raw<T>(self, force_extended: T) -> Result<raw::Vlr>
     where
         T: Into<Option<bool>>,
     {
@@ -95,7 +128,7 @@ impl Vlr {
             record_id: self.record_id,
             record_length_after_header: self.record_length_after_header(extended)?,
             description: description,
-            data: self.data.clone(),
+            data: self.data,
         })
     }
 
@@ -171,6 +204,6 @@ mod tests {
             data: data,
             ..Default::default()
         };
-        assert!(vlr.to_raw(false).is_err());
+        assert!(vlr.into_raw(false).is_err());
     }
 }
