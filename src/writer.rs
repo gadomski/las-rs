@@ -47,30 +47,10 @@ quick_error! {
         Closed {
             description("the writer is closed")
         }
-        /// The point format has color, but the point doesn't.
-        MissingColor(format: Format, point: Point) {
-            description("the point format has color, but the point doesn't")
-            display("point format {} has color, but point {:?} doesn't", format, point)
-        }
-        /// The point format has extra bytes, but the point doesn't.
-        MissingExtraBytes(format: Format, point: Point) {
-            description("the point format has extra bytes, but the point doesn't")
-            display("point format {} has {} extra bytes, but point {:?} has {}", format, format.extra_bytes, point, point.extra_bytes.len())
-        }
-        /// The point format has gps time, but the point doesn't.
-        MissingGpsTime(format: Format, point: Point) {
-            description("the point format has gps time, but the point doesn't")
-            display("point format {} has gps time, but point {:?} doesn't", format, point)
-        }
-        /// The point format has nir, but the point doesn't.
-        MissingNir(format: Format, point: Point) {
-            description("the point format has nir, but the point doesn't")
-            display("point format {} has nir, but point {:?} doesn't", format, point)
-        }
-        /// The point format has waveform, but the point doesn't.
-        MissingWaveform(format: Format, point: Point) {
-            description("the point format has waveform, but the point doesn't")
-            display("point format {} has waveform, but point {:?} doesn't", format, point)
+        /// The attributes of the point format and point do not match.
+        PointAttributes(format: Format, point: Point) {
+            description("the attributes of the point format and point do not match")
+            display("the attributes of point format {:?} does not match point {:?}", format, point)
         }
     }
 }
@@ -148,29 +128,12 @@ impl<W: Seek + Write> Writer<W> {
     /// writer.write(Default::default()).unwrap();
     /// ```
     pub fn write(&mut self, point: Point) -> Result<()> {
-        // TODO check if point has color but format doesn't
         if self.closed {
             return Err(Error::Closed.into());
         }
-        if self.header.point_format.has_gps_time && point.gps_time.is_none() {
+        if !point.matches(self.header.point_format) {
             return Err(
-                Error::MissingGpsTime(self.header.point_format, point).into(),
-            );
-        }
-        if self.header.point_format.has_color && point.color.is_none() {
-            return Err(Error::MissingColor(self.header.point_format, point).into());
-        }
-        if self.header.point_format.has_nir && point.nir.is_none() {
-            return Err(Error::MissingNir(self.header.point_format, point).into());
-        }
-        if self.header.point_format.has_waveform && point.waveform.is_none() {
-            return Err(
-                Error::MissingWaveform(self.header.point_format, point).into(),
-            );
-        }
-        if self.header.point_format.extra_bytes as usize != point.extra_bytes.len() {
-            return Err(
-                Error::MissingExtraBytes(self.header.point_format, point).into(),
+                Error::PointAttributes(self.header.point_format, point).into(),
             );
         }
         self.header.number_of_points += 1;

@@ -1,5 +1,5 @@
 use {Color, Result, Transform, Vector, raw};
-use point::{Classification, Error, ScanDirection};
+use point::{Classification, Error, Format, ScanDirection};
 
 /// A three dimensional point.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -194,6 +194,34 @@ impl Point {
                 self.classification.into(),
             ))
         }
+    }
+
+    /// Returns true if this point matches the point format.
+    ///
+    /// "Matches" means that the set of optional attributes is exactly the same.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::point::Format;
+    /// use las::Point;
+    ///
+    /// let mut format = Format::new(0).unwrap();
+    /// let mut point = Point::default();
+    /// assert!(point.matches(format));
+    ///
+    /// format.has_gps_time = true;
+    /// assert!(!point.matches(format));
+    ///
+    /// point.gps_time = Some(42.);
+    /// assert!(point.matches(format));
+    /// ```
+    pub fn matches(&self, format: Format) -> bool {
+        self.gps_time.is_some() == format.has_gps_time &&
+            self.color.is_some() == format.has_color &&
+            self.waveform.is_some() == format.has_waveform &&
+            self.nir.is_some() == format.has_nir &&
+            self.extra_bytes.len() == format.extra_bytes as usize
     }
 }
 
