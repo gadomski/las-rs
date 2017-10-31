@@ -1,17 +1,34 @@
 use Result;
 use point::Error;
 
-/// ASPRS classification table.
+/// The ASPRS classification table.
 ///
-/// We make one modification to this table from the reference by removing `OverlapPoints`, code 12.
-/// In later versions (e.g. 1.4) extended point formats were added, where each point can have an
-/// `is_overlap` bit set. To handle both of these schemes:
+/// Classifications can be created from u8s and converted back into them:
+///
+/// ```
+/// use las::point::Classification;
+/// let classification = Classification::new(2).unwrap();
+/// assert_eq!(Classification::Ground, classification);
+/// assert_eq!(2, u8::from(classification));
+/// ```
+///
+/// We make one modification to this table: we remove `OverlapPoints`, code 12. Las 1.4 added the
+/// extended point formats, which include an overlap bit. The overlap bit is intended to allow a
+/// point to both be an overlap point and contain some other classification.
+///
+/// Here's how we deal with that change:
 ///
 /// - If the point format doesn't support the overlap bit, the classification is overwritten with
 /// the code for overlap points (12). On ingest, points with an overlap classification are given
-/// the `Unclassified` code and are flagged as `is_overlap.
+/// the `Unclassified` code and `Point::is_overlap` is set to `true`.
 /// - If the point format does support the overlap bit, that is preferred.
 ///
+/// Because of this change, trying to create a classification with code 12 is an error:
+///
+/// ```
+/// use las::point::Classification;
+/// assert!(Classification::new(12).is_err());
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Classification {

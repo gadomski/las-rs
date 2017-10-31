@@ -1,7 +1,7 @@
 use {Color, Result, Transform, Vector, raw};
 use point::{Classification, Error, ScanDirection};
 
-/// A point is the basic unit of information in LAS data.
+/// A three dimensional point.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Point {
     /// The x coordinate, as a float.
