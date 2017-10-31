@@ -58,11 +58,10 @@ impl<R: Read + Seek> Reader<R> {
         let evlr = raw_header.evlr;
         let mut header = Header::new(raw_header)?;
 
-        let mut vlrs = Vec::new();
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
             position += vlr.len() as u64;
-            vlrs.push(vlr);
+            header.push_vlr(vlr);
         }
         if position > offset_to_point_data {
             return Err(
@@ -86,11 +85,10 @@ impl<R: Read + Seek> Reader<R> {
                 )?;
             }
             read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
-            vlrs.push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
+            header.push_vlr(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
         } else {
             read.read_to_end(&mut header.end_of_points_padding)?;
         }
-        header.vlrs = vlrs;
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
 

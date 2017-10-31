@@ -73,11 +73,9 @@
 //! use las::{Writer, Header};
 //! use las::point::Format;
 //! let write = Cursor::new(Vec::new());
-//! let header = Header {
-//!     version: (1, 3).into(),
-//!     point_format: Format::new(2).unwrap(),
-//!     ..Default::default()
-//! };
+//! let mut header = Header::default();
+//! header.version = (1, 3).into();
+//! header.point_format = Format::new(2).unwrap();
 //! let writer = Writer::new(write, header).unwrap();
 //! ```
 //!
@@ -118,6 +116,7 @@ extern crate chrono;
 extern crate num;
 #[macro_use]
 extern crate quick_error;
+extern crate uuid;
 
 pub mod feature;
 pub mod header;

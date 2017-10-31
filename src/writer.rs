@@ -1,4 +1,4 @@
-use {Header, Point, Result, Version};
+use {Header, Point, Result};
 use point::Format;
 use std::collections::HashMap;
 use std::fs::File;
@@ -12,11 +12,6 @@ quick_error! {
         /// The writer is closed.
         Closed {
             description("the writer is closed")
-        }
-        /// Format is not supported by version.
-        Format(version: Version, format: Format) {
-            description("format is not supported by version")
-            display("format {} is not supported by version {}", format, version)
         }
         /// The point format has color, but the point doesn't.
         MissingColor(format: Format, point: Point) {
@@ -82,26 +77,11 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        use feature::{Evlrs, FileSourceId, GpsStandardTime};
-
-        if header.file_source_id != 0 {
-            header.version.verify_support_for::<FileSourceId>()?;
-        }
-        if header.gps_time_type.is_standard() {
-            header.version.verify_support_for::<GpsStandardTime>()?;
-        }
-        if !header.version.supports_point_format(header.point_format) {
-            return Err(Error::Format(header.version, header.point_format).into());
-        }
-        // TODO check waveforms
-        if header.evlrs().len() > 0 {
-            header.version.verify_support_for::<Evlrs>()?;
-        }
-
         header.bounds = Default::default();
         header.number_of_points = 0;
         header.number_of_points_by_return = HashMap::new();
         if header.version.requires_point_data_start_signature() {
+            // TODO we shouldn't overwrite the old vlr padding
             header.vlr_padding = ::raw::POINT_DATA_START_SIGNATURE.to_vec();
         }
         header.to_raw().and_then(
@@ -134,6 +114,7 @@ impl<W: Seek + Write> Writer<W> {
     /// writer.write(Default::default()).unwrap();
     /// ```
     pub fn write(&mut self, point: Point) -> Result<()> {
+        // TODO check if point has color but format doesn't
         if self.closed {
             return Err(Error::Closed.into());
         }
@@ -233,31 +214,25 @@ impl<W: Seek + Write> Drop for Writer<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Header;
+    use {Header, Version};
     use byteorder::{LittleEndian, ReadBytesExt};
     use point::Format;
     use std::io::Cursor;
 
     fn writer(format: Format, version: Version) -> Writer<Cursor<Vec<u8>>> {
-        Writer::new(
-            Cursor::new(Vec::new()),
-            Header {
-                point_format: format,
-                version: version,
-                ..Default::default()
-            },
-        ).unwrap()
+        let mut header = Header::default();
+        header.point_format = format;
+        header.version = version;
+        Writer::new(Cursor::new(Vec::new()), header).unwrap()
     }
 
     #[test]
     fn las_1_0_point_data_start_signature() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let header = Header {
-                version: (1, 0).into(),
-                vlrs: vec![Default::default()],
-                ..Default::default()
-            };
+            let mut header = Header::default();
+            header.version = (1, 0).into();
+            header.push_vlr(Default::default());
             let mut writer = Writer::new(&mut cursor, header).unwrap();
             writer.write(Default::default()).unwrap();
         }
