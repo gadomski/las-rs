@@ -1,4 +1,36 @@
 //! Write las points.
+//!
+//! A `Writer` uses a `Header` for its configuration:
+//!
+//! ```
+//! use std::io::Cursor;
+//! use las::{Writer, Header};
+//! let mut header = Header::default();
+//! header.version = (1, 4).into();
+//! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
+//! ```
+//!
+//! The set of optional fields on the point format and the points must match exactly:
+//!
+//! ```
+//! use std::io::Cursor;
+//! use las::{Writer, Header, Point};
+//! use las::point::Format;
+//! use las::Color;
+//!
+//! let mut header = Header::default();
+//! header.point_format = Format::new(1).unwrap();
+//! let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
+//!
+//! let mut point = Point::default(); // default points don't have any optional attributes
+//! assert!(writer.write(point.clone()).is_err());
+//!
+//! point.gps_time = Some(42.); // point format 1 requires gps time
+//! writer.write(point.clone()).unwrap();
+//!
+//! point.color = Some(Color::new(1, 2, 3));
+//! assert!(writer.write(point).is_err()); // the point's color would be lost
+//! ```
 
 use {Header, Point, Result};
 use point::Format;
