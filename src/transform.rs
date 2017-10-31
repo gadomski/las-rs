@@ -26,7 +26,7 @@ impl Transform {
 
     /// Applies the inverse transform, and rounds the result.
     ///
-    /// Returns an error if the resultant value can't be representaed as an i32.
+    /// Returns an error if the resultant value can't be represented as an i32.
     ///
     /// # Examples
     ///
