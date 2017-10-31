@@ -1,4 +1,20 @@
-//! Structures that represent file-level features.
+//! Programatically determine whether a las version supports a feature.
+//!
+//! Features are structures that implement the `Feature` trait. The most common way to use features
+//! is via `Version::supports` or `Version::verify_support_for`:
+//!
+//! ```
+//! use las::feature::Waveforms;
+//! use las::{Version, Error};
+//!
+//! let las_1_2 = Version::new(1, 2);
+//! assert!(!las_1_2.supports::<Waveforms>());
+//! assert!(las_1_2.verify_support_for::<Waveforms>().is_err());
+//!
+//! let las_1_4 = Version::new(1, 4);
+//! assert!(las_1_4.supports::<Waveforms>());
+//! assert!(las_1_4.verify_support_for::<Waveforms>().is_ok());
+//! ```
 
 use Version;
 
@@ -29,30 +45,44 @@ pub trait Feature {
     fn name() -> &'static str;
 }
 
-macro_rules! feature {
-    ($name:ident, $($versions:expr),+) => {
-        #[derive(Clone, Copy, Debug)]
-        #[allow(missing_docs)]
-        pub struct $name {}
+macro_rules! features {
+    (   $(
+            $(#[$meta:meta])*
+            $name:ident ($($versions:expr),+);
+        )+
+    ) => {
+        $(
+            $(#[$meta])*
+            #[derive(Clone, Copy, Debug)]
+            pub struct $name {}
 
-        impl Feature for $name {
-            fn is_supported_by(version: Version) -> bool {
-                vec![$($versions),+]
-                    .into_iter()
-                    .map(|minor| Version::new(MAJOR, minor))
-                    .any(|v| version == v)
-            }
+            impl Feature for $name {
+                fn is_supported_by(version: Version) -> bool {
+                    vec![$($versions),+]
+                        .into_iter()
+                        .map(|minor| Version::new(MAJOR, minor))
+                        .any(|v| version == v)
+                }
 
-            fn name() -> &'static str {
-                stringify!($name)
+                fn name() -> &'static str {
+                    stringify!($name)
+                }
             }
-        }
+        )+
     }
 }
 
-feature!(FileSourceId, 1, 2, 3, 4);
-feature!(GpsStandardTime, 2, 3, 4);
-feature!(Waveforms, 3, 4);
-feature!(SyntheticReturnNumbers, 3, 4);
-feature!(LargeFiles, 4);
-feature!(Evlrs, 4);
+features! {
+    /// Does the header allow a file source id, or is that field reserved?
+    FileSourceId(1, 2, 3, 4);
+    /// Is there a bit flag to set the type of time value in each point?
+    GpsStandardTime(2, 3, 4);
+    /// Does this file support waveforms?
+    Waveforms(3, 4);
+    /// Is there a bit flag to indicate synthetic return numbers?
+    SyntheticReturnNumbers(3, 4);
+    /// Does this file support 64-bit point counts?
+    LargeFiles(4);
+    /// Does this file support extended variable length records?
+    Evlrs(4);
+}
