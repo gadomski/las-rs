@@ -1,3 +1,5 @@
+//! Write las points.
+
 use {Header, Point, Result};
 use point::Format;
 use std::collections::HashMap;
