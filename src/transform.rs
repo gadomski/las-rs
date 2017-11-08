@@ -16,7 +16,7 @@ impl Transform {
     /// # Examples
     ///
     /// ```
-    /// # use las::Transform;
+    /// use las::Transform;
     /// let transform = Transform { scale: 2., offset: 1. };
     /// assert_eq!(3., transform.direct(1));
     /// ```
@@ -31,7 +31,7 @@ impl Transform {
     /// # Examples
     ///
     /// ```
-    /// # use las::Transform;
+    /// use las::Transform;
     /// let transform = Transform { scale: 2., offset: 1. };
     /// assert_eq!(1, transform.inverse(2.9).unwrap());
     /// ```
@@ -40,7 +40,7 @@ impl Transform {
         use std::i32;
 
         let n = ((n - self.offset) / self.scale).round();
-        if n > i32::MAX as f64 {
+        if n > i32::MAX as f64 || n < i32::MIN as f64 {
             Err(Error::InverseTransform(n, *self))
         } else {
             Ok(n as i32)
@@ -60,5 +60,25 @@ impl Default for Transform {
 impl fmt::Display for Transform {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "`{} * x + {}`", self.scale, self.offset)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::i32;
+
+    #[test]
+    fn too_large() {
+        let transform = Transform::default();
+        let n = i32::MAX as f64 * transform.scale + 1.;
+        assert!(transform.inverse(n).is_err());
+    }
+
+    #[test]
+    fn too_small() {
+        let transform = Transform::default();
+        let n = i32::MIN as f64 * transform.scale - 1.;
+        assert!(transform.inverse(n).is_err());
     }
 }
