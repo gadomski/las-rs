@@ -357,28 +357,29 @@ impl Point {
         use byteorder::{LittleEndian, ReadBytesExt};
         use utils;
 
-        let x = read.read_i32::<LittleEndian>()?;
-        let y = read.read_i32::<LittleEndian>()?;
-        let z = read.read_i32::<LittleEndian>()?;
-        let intensity = read.read_u16::<LittleEndian>()?;
-        let flags = if format.is_extended {
+        let mut point = Point::default();
+        point.x = read.read_i32::<LittleEndian>()?;
+        point.y = read.read_i32::<LittleEndian>()?;
+        point.z = read.read_i32::<LittleEndian>()?;
+        point.intensity = read.read_u16::<LittleEndian>()?;
+        point.flags = if format.is_extended {
             Flags::ThreeByte(read.read_u8()?, read.read_u8()?, read.read_u8()?)
         } else {
             Flags::TwoByte(read.read_u8()?, read.read_u8()?)
         };
-        let scan_angle = if format.is_extended {
+        point.scan_angle = if format.is_extended {
             ScanAngle::Scaled(read.read_i16::<LittleEndian>()?)
         } else {
             ScanAngle::Rank(read.read_i8()?)
         };
-        let user_data = read.read_u8()?;
-        let point_source_id = read.read_u16::<LittleEndian>()?;
-        let gps_time = if format.has_gps_time {
+        point.user_data = read.read_u8()?;
+        point.point_source_id = read.read_u16::<LittleEndian>()?;
+        point.gps_time = if format.has_gps_time {
             utils::some_or_none_if_zero(read.read_f64::<LittleEndian>()?)
         } else {
             None
         };
-        let color = if format.has_color {
+        point.color = if format.has_color {
             let red = read.read_u16::<LittleEndian>()?;
             let green = read.read_u16::<LittleEndian>()?;
             let blue = read.read_u16::<LittleEndian>()?;
@@ -386,33 +387,19 @@ impl Point {
         } else {
             None
         };
-        let waveform = if format.has_waveform {
+        point.waveform = if format.has_waveform {
             Some(Waveform::read_from(&mut read)?)
         } else {
             None
         };
-        let nir = if format.has_nir {
+        point.nir = if format.has_nir {
             utils::some_or_none_if_zero(read.read_u16::<LittleEndian>()?)
         } else {
             None
         };
-        let mut extra_bytes = vec![0; format.extra_bytes as usize];
-        read.read_exact(&mut extra_bytes)?;
-        Ok(Point {
-            x: x,
-            y: y,
-            z: z,
-            intensity: intensity,
-            flags: flags,
-            scan_angle: scan_angle,
-            user_data: user_data,
-            point_source_id: point_source_id,
-            gps_time: gps_time,
-            color: color,
-            waveform: waveform,
-            nir: nir,
-            extra_bytes: extra_bytes,
-        })
+        point.extra_bytes.resize(format.extra_bytes as usize, 0);
+        read.read_exact(&mut point.extra_bytes)?;
+        Ok(point)
     }
 
     /// Writes a raw pont.

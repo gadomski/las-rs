@@ -70,28 +70,23 @@ impl Vlr {
     /// ```
     pub fn read_from<R: Read>(mut read: R, extended: bool) -> Result<Vlr> {
         use byteorder::{LittleEndian, ReadBytesExt};
-        let reserved = read.read_u16::<LittleEndian>()?;
-        let mut user_id = [0; 16];
-        read.read_exact(&mut user_id)?;
-        let record_id = read.read_u16::<LittleEndian>()?;
-        let record_length_after_header = if extended {
+
+        let mut vlr = Vlr::default();
+        vlr.reserved = read.read_u16::<LittleEndian>()?;
+        read.read_exact(&mut vlr.user_id)?;
+        vlr.record_id = read.read_u16::<LittleEndian>()?;
+        vlr.record_length_after_header = if extended {
             RecordLength::Evlr(read.read_u64::<LittleEndian>()?)
         } else {
             RecordLength::Vlr(read.read_u16::<LittleEndian>()?)
         };
-        let mut description = [0; 32];
-        read.read_exact(&mut description)?;
-        let mut data = Vec::with_capacity(usize::from(record_length_after_header));
-        read.take(u64::from(record_length_after_header))
-            .read_to_end(&mut data)?;
-        Ok(Vlr {
-            reserved: reserved,
-            user_id: user_id,
-            record_id: record_id,
-            record_length_after_header: record_length_after_header,
-            description: description,
-            data: data,
-        })
+        read.read_exact(&mut vlr.description)?;
+        vlr.data.resize(
+            usize::from(vlr.record_length_after_header),
+            0,
+        );
+        read.read_exact(&mut vlr.data)?;
+        Ok(vlr)
     }
 
     /// Is this vlr extended?

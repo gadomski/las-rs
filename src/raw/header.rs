@@ -245,102 +245,65 @@ impl Header {
         use utils;
         use header::Error;
 
-        let mut file_signature = [0; 4];
-        read.read_exact(&mut file_signature)?;
-        if file_signature != LASF {
-            return Err(Error::FileSignature(file_signature).into());
+        let mut header = Header::default();
+        read.read_exact(&mut header.file_signature)?;
+        if header.file_signature != LASF {
+            return Err(Error::FileSignature(header.file_signature).into());
         }
-        let file_source_id = read.read_u16::<LittleEndian>()?;
-        let global_encoding = read.read_u16::<LittleEndian>()?;
-        let mut guid = [0; 16];
-        read.read_exact(&mut guid)?;
+        header.file_source_id = read.read_u16::<LittleEndian>()?;
+        header.global_encoding = read.read_u16::<LittleEndian>()?;
+        read.read_exact(&mut header.guid)?;
         let version_major = read.read_u8()?;
         let version_minor = read.read_u8()?;
-        let version = Version::new(version_major, version_minor);
-        let mut system_identifier = [0; 32];
-        read.read_exact(&mut system_identifier)?;
-        let mut generating_software = [0; 32];
-        read.read_exact(&mut generating_software)?;
-        let file_creation_day_of_year = read.read_u16::<LittleEndian>()?;
-        let file_creation_year = read.read_u16::<LittleEndian>()?;
-        let header_size = read.read_u16::<LittleEndian>()?;
-        let offset_to_point_data = read.read_u32::<LittleEndian>()?;
-        let number_of_variable_length_records = read.read_u32::<LittleEndian>()?;
-        let point_data_format_id = read.read_u8()?;
-        let point_data_record_length = read.read_u16::<LittleEndian>()?;
-        let number_of_point_records = read.read_u32::<LittleEndian>()?;
-        let mut number_of_points_by_return = [0; 5];
-        for n in &mut number_of_points_by_return {
+        header.version = Version::new(version_major, version_minor);
+        read.read_exact(&mut header.system_identifier)?;
+        read.read_exact(&mut header.generating_software)?;
+        header.file_creation_day_of_year = read.read_u16::<LittleEndian>()?;
+        header.file_creation_year = read.read_u16::<LittleEndian>()?;
+        header.header_size = read.read_u16::<LittleEndian>()?;
+        header.offset_to_point_data = read.read_u32::<LittleEndian>()?;
+        header.number_of_variable_length_records = read.read_u32::<LittleEndian>()?;
+        header.point_data_format_id = read.read_u8()?;
+        header.point_data_record_length = read.read_u16::<LittleEndian>()?;
+        header.number_of_point_records = read.read_u32::<LittleEndian>()?;
+        for n in &mut header.number_of_points_by_return {
             *n = read.read_u32::<LittleEndian>()?;
         }
-        let x_scale_factor = read.read_f64::<LittleEndian>()?;
-        let y_scale_factor = read.read_f64::<LittleEndian>()?;
-        let z_scale_factor = read.read_f64::<LittleEndian>()?;
-        let x_offset = read.read_f64::<LittleEndian>()?;
-        let y_offset = read.read_f64::<LittleEndian>()?;
-        let z_offset = read.read_f64::<LittleEndian>()?;
-        let max_x = read.read_f64::<LittleEndian>()?;
-        let min_x = read.read_f64::<LittleEndian>()?;
-        let max_y = read.read_f64::<LittleEndian>()?;
-        let min_y = read.read_f64::<LittleEndian>()?;
-        let max_z = read.read_f64::<LittleEndian>()?;
-        let min_z = read.read_f64::<LittleEndian>()?;
-        let start_of_waveform_data_packet_record = if version.supports::<Waveforms>() {
+        header.x_scale_factor = read.read_f64::<LittleEndian>()?;
+        header.y_scale_factor = read.read_f64::<LittleEndian>()?;
+        header.z_scale_factor = read.read_f64::<LittleEndian>()?;
+        header.x_offset = read.read_f64::<LittleEndian>()?;
+        header.y_offset = read.read_f64::<LittleEndian>()?;
+        header.z_offset = read.read_f64::<LittleEndian>()?;
+        header.max_x = read.read_f64::<LittleEndian>()?;
+        header.min_x = read.read_f64::<LittleEndian>()?;
+        header.max_y = read.read_f64::<LittleEndian>()?;
+        header.min_y = read.read_f64::<LittleEndian>()?;
+        header.max_z = read.read_f64::<LittleEndian>()?;
+        header.min_z = read.read_f64::<LittleEndian>()?;
+        header.start_of_waveform_data_packet_record = if header.version.supports::<Waveforms>() {
             utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?)
         } else {
             None
         };
-        let evlr = if version.supports::<Evlrs>() {
+        header.evlr = if header.version.supports::<Evlrs>() {
             Evlr::read_from(&mut read)?.into_option()
         } else {
             None
         };
-        let large_file = if version.supports::<LargeFiles>() {
+        header.large_file = if header.version.supports::<LargeFiles>() {
             Some(LargeFile::read_from(&mut read)?)
         } else {
             None
         };
-        let padding = if header_size > version.header_size() {
-            let mut bytes = vec![0; (header_size - version.header_size()) as usize];
+        header.padding = if header.header_size > header.version.header_size() {
+            let mut bytes = vec![0; (header.header_size - header.version.header_size()) as usize];
             read.read_exact(&mut bytes)?;
             bytes
         } else {
             Vec::new()
         };
-        Ok(Header {
-            file_signature: file_signature,
-            file_source_id: file_source_id,
-            global_encoding: global_encoding,
-            guid: guid,
-            version: version,
-            system_identifier: system_identifier,
-            generating_software: generating_software,
-            file_creation_day_of_year: file_creation_day_of_year,
-            file_creation_year: file_creation_year,
-            header_size: header_size,
-            offset_to_point_data: offset_to_point_data,
-            number_of_variable_length_records: number_of_variable_length_records,
-            point_data_format_id: point_data_format_id,
-            point_data_record_length: point_data_record_length,
-            number_of_point_records: number_of_point_records,
-            number_of_points_by_return: number_of_points_by_return,
-            x_scale_factor: x_scale_factor,
-            y_scale_factor: y_scale_factor,
-            z_scale_factor: z_scale_factor,
-            x_offset: x_offset,
-            y_offset: y_offset,
-            z_offset: z_offset,
-            max_x: max_x,
-            min_x: min_x,
-            max_y: max_y,
-            min_y: min_y,
-            max_z: max_z,
-            min_z: min_z,
-            start_of_waveform_data_packet_record: start_of_waveform_data_packet_record,
-            evlr: evlr,
-            large_file: large_file,
-            padding: padding,
-        })
+        Ok(header)
     }
 
     /// Returns true if this raw header is for compressed las data.
