@@ -1,5 +1,7 @@
 //! Roundtrip (write-read) tests for supported LAS versions and attributes.
 
+#[macro_use]
+extern crate approx;
 extern crate chrono;
 extern crate las;
 extern crate uuid;
@@ -54,12 +56,12 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
     assert_eq!(header.padding, other.padding);
     assert_eq!(header.point_format, other.point_format);
     assert_eq!(header.transforms, other.transforms);
-    assert_eq!(point.x, other.bounds.min.x);
-    assert_eq!(point.x, other.bounds.max.x);
-    assert_eq!(point.y, other.bounds.min.y);
-    assert_eq!(point.y, other.bounds.max.y);
-    assert_eq!(point.z, other.bounds.min.z);
-    assert_eq!(point.z, other.bounds.max.z);
+    assert_relative_eq!(point.x, other.bounds.min.x);
+    assert_relative_eq!(point.x, other.bounds.max.x);
+    assert_relative_eq!(point.y, other.bounds.min.y);
+    assert_relative_eq!(point.y, other.bounds.max.y);
+    assert_relative_eq!(point.z, other.bounds.min.z);
+    assert_relative_eq!(point.z, other.bounds.max.z);
     assert_eq!(1, other.number_of_points);
     if point.return_number > 0 {
         assert_eq!(1, other.number_of_points_by_return[&point.return_number]);
