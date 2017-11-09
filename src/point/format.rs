@@ -158,39 +158,35 @@ impl Format {
                 if self.has_color {
                     if self.has_nir {
                         if self.has_waveform { Ok(10) } else { Ok(8) }
-                    } else {
-                        if self.has_waveform {
-                            Err(Error::Format(*self).into())
-                        } else {
-                            Ok(7)
-                        }
-                    }
-                } else {
-                    if self.has_nir {
+                    } else if self.has_waveform {
                         Err(Error::Format(*self).into())
                     } else {
-                        if self.has_waveform { Ok(9) } else { Ok(6) }
+                        Ok(7)
                     }
+                } else if self.has_nir {
+                    Err(Error::Format(*self).into())
+                } else if self.has_waveform {
+                    Ok(9)
+                } else {
+                    Ok(6)
                 }
             } else {
                 Err(Error::Format(*self).into())
             }
         } else if self.has_nir {
             Err(Error::Format(*self).into())
-        } else {
-            if self.has_waveform {
-                if self.has_gps_time {
-                    if self.has_color { Ok(5) } else { Ok(4) }
-                } else {
-                    Err(Error::Format(*self).into())
-                }
+        } else if self.has_waveform {
+            if self.has_gps_time {
+                if self.has_color { Ok(5) } else { Ok(4) }
             } else {
-                let mut n = if self.has_gps_time { 1 } else { 0 };
-                if self.has_color {
-                    n += 2;
-                }
-                Ok(n)
+                Err(Error::Format(*self).into())
             }
+        } else {
+            let mut n = if self.has_gps_time { 1 } else { 0 };
+            if self.has_color {
+                n += 2;
+            }
+            Ok(n)
         }
     }
 }
