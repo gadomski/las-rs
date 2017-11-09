@@ -9,7 +9,7 @@ extern crate uuid;
 use las::{Header, Point, Reader, Writer};
 use std::io::Cursor;
 
-pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
+pub fn roundtrip(header: &Header, point: &Point, should_succeed: bool) {
     let mut cursor = Cursor::new(Vec::new());
     {
         match Writer::new(&mut cursor, header.clone()).and_then(
@@ -35,7 +35,7 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
         .read()
         .expect("Error when reading the ont point")
         .unwrap();
-    assert_eq!(point, other);
+    assert_eq!(point, &other);
     assert_eq!(
         None,
         reader.read().expect("Error when reading past last point")
@@ -98,7 +98,7 @@ macro_rules! roundtrip_point {
             let mut header = Header::default();
             header.version = version;
             header.point_format = point_format;
-            ::roundtrip(header, point, should_succeed);
+            ::roundtrip(&header, &point, should_succeed);
         }
     };
 }
@@ -117,7 +117,7 @@ macro_rules! roundtrip_header {
             let mut header = Header::default();
             header.version = version;
             $modify_header(&mut header);
-            ::roundtrip(header, Point::default(), should_succeed);
+            ::roundtrip(&header, &Point::default(), should_succeed);
         }
     };
 }
