@@ -1,9 +1,9 @@
 //! Raw structures that map directly to their definitions in the las format specifications.
 //!
 //! In general, these structures are "dumb", meaning that they do the least amount of validity
-//! checking possible without losing information. In general, users should prefer to use the
-//! non-raw versions, e.g. `las::Header` over `las::raw::Header`, in order to ensure that they are
-//! following The Rules. `into_raw` can be used to create the raw versions:
+//! checking possible without losing information. Users should prefer to use the non-raw versions,
+//! e.g. `las::Header` over `las::raw::Header`, in order to ensure that they are following The
+//! Rules. `into_raw` can be used to create the raw versions:
 //!
 //! ```
 //! use las::{Vlr, Header, Point};

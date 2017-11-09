@@ -101,9 +101,9 @@ impl Vlr {
     ///
     /// The second argument works like this:
     ///
-    /// - If `Some(false)`, create a normal vlr.
-    /// - If `Some(true)`, create an extended vlr.
-    /// - If `None`, fall back to the default as defined by the `extended` flag on this vlr.
+    /// - If `Some(false)`, creates a normal vlr.
+    /// - If `Some(true)`, creates an extended vlr.
+    /// - If `None`, falls back to the default as defined by the `extended` flag on this vlr.
     ///
     /// Note that you can just pass `true` or `false` and it will be converted to the option type.
     ///
@@ -149,7 +149,7 @@ impl Vlr {
         self.data.len() + HEADER_SIZE
     }
 
-    /// Returns true if the data of this vlr are empty.
+    /// Returns true if the data of this vlr is empty.
     ///
     /// # Examples
     ///

@@ -155,8 +155,6 @@ impl<W: Seek + Write> Writer<W> {
 
     /// Close this writer.
     ///
-    /// A second call to close is a no-op.
-    ///
     /// # Examples
     ///
     /// ```

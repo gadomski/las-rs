@@ -350,8 +350,9 @@ impl Header {
     /// use las::{Header, Vlr};
     /// use std::u16;
     /// let mut header = Header::default();
+    /// header.version = (1, 2).into();
     /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
-    /// assert_eq!(0, header.vlrs().count());
+    /// assert_eq!(1, header.evlrs().count());
     /// ```
     pub fn evlrs(&self) -> Vlrs {
         Vlrs::new(self, true)
@@ -386,8 +387,11 @@ impl Header {
     /// ```
     /// use las::{Header, GpsTimeType};
     /// let mut header = Header::default();
-    /// let raw_header = header.clone().into_raw().unwrap();
     /// header.gps_time_type = GpsTimeType::Standard;
+    ///
+    /// header.version = (1, 2).into();
+    /// let raw_header = header.clone().into_raw().unwrap();
+    ///
     /// header.version = (1, 0).into();
     /// assert!(header.into_raw().is_err());
     /// ```
