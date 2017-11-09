@@ -951,6 +951,7 @@ mod tests {
         assert_eq!(0, Flags::ThreeByte(0, 0, 0).scanner_channel());
         assert_eq!(1, Flags::ThreeByte(0, 0b0001_0000, 0).scanner_channel());
         assert_eq!(3, Flags::ThreeByte(0, 0b0011_0000, 0).scanner_channel());
+        assert!(Flags::ThreeByte(0, 0b1_0000, 0).to_two_bytes().is_err());
     }
 
     #[test]
