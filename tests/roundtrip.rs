@@ -6,35 +6,29 @@ extern crate chrono;
 extern crate las;
 extern crate uuid;
 
-use las::{Header, Point, Reader, Writer};
+use las::{Builder, Point, Reader, Writer};
 use std::io::Cursor;
 
 #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
-pub fn roundtrip(header: &Header, point: &Point, should_succeed: bool) {
+pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
+    let header = if should_succeed {
+        builder.into_header().unwrap()
+    } else {
+        assert!(builder.into_header().is_err());
+        return;
+    };
     let mut cursor = Cursor::new(Vec::new());
     {
-        match Writer::new(&mut cursor, header.clone()).and_then(
-            |mut writer| {
-                writer.write(point.clone())
-            },
-        ) {
-            Ok(()) => if !should_succeed {
-                panic!("Expected write to fail, but it succeeded");
-            },
-            Err(err) => {
-                if should_succeed {
-                    panic!("Write error: {}", err)
-                } else {
-                    return;
-                }
-            }
-        }
+        Writer::new(&mut cursor, header.clone())
+            .unwrap()
+            .write(point.clone())
+            .unwrap();
+        cursor.set_position(0);
     }
-    cursor.set_position(0);
     let mut reader = Reader::new(cursor).unwrap();
     let other = reader
         .read()
-        .expect("Error when reading the ont point")
+        .expect("Error when reading the other point")
         .unwrap();
     assert_eq!(point, &other);
     assert_eq!(
@@ -43,38 +37,45 @@ pub fn roundtrip(header: &Header, point: &Point, should_succeed: bool) {
     );
 
     let other = reader.header();
-    assert_eq!(header.file_source_id, other.file_source_id);
-    assert_eq!(header.gps_time_type, other.gps_time_type);
+    assert_eq!(header.file_source_id(), other.file_source_id());
+    assert_eq!(header.gps_time_type(), other.gps_time_type());
     assert_eq!(
-        header.has_synthetic_return_numbers,
-        other.has_synthetic_return_numbers
+        header.has_synthetic_return_numbers(),
+        other.has_synthetic_return_numbers()
     );
-    assert_eq!(header.guid, other.guid);
-    assert_eq!(header.version, other.version);
-    assert_eq!(header.system_identifier, other.system_identifier);
-    assert_eq!(header.generating_software, other.generating_software);
-    assert_eq!(header.date, other.date);
-    assert_eq!(header.padding, other.padding);
-    assert_eq!(header.point_format, other.point_format);
-    assert_eq!(header.transforms, other.transforms);
-    assert_relative_eq!(point.x, other.bounds.min.x);
-    assert_relative_eq!(point.x, other.bounds.max.x);
-    assert_relative_eq!(point.y, other.bounds.min.y);
-    assert_relative_eq!(point.y, other.bounds.max.y);
-    assert_relative_eq!(point.z, other.bounds.min.z);
-    assert_relative_eq!(point.z, other.bounds.max.z);
-    assert_eq!(1, other.number_of_points);
+    assert_eq!(header.guid(), other.guid());
+    assert_eq!(header.version(), other.version());
+    assert_eq!(header.system_identifier(), other.system_identifier());
+    assert_eq!(header.generating_software(), other.generating_software());
+    assert_eq!(header.date(), other.date());
+    assert_eq!(header.padding(), other.padding());
+    assert_eq!(header.point_format(), other.point_format());
+    assert_eq!(header.transforms(), other.transforms());
+    assert_relative_eq!(point.x, other.bounds().min.x);
+    assert_relative_eq!(point.x, other.bounds().max.x);
+    assert_relative_eq!(point.y, other.bounds().min.y);
+    assert_relative_eq!(point.y, other.bounds().max.y);
+    assert_relative_eq!(point.z, other.bounds().min.z);
+    assert_relative_eq!(point.z, other.bounds().max.z);
+    assert_eq!(1, other.number_of_points());
     if point.return_number > 0 {
-        assert_eq!(1, other.number_of_points_by_return[&point.return_number]);
+        assert_eq!(
+            1,
+            other
+                .number_of_points_by_return(point.return_number)
+                .unwrap()
+        );
     }
     assert_eq!(
         header.vlrs().collect::<Vec<_>>(),
         other.vlrs().collect::<Vec<_>>()
     );
+    // TODO test vlr padding
     assert_eq!(
         header.evlrs().collect::<Vec<_>>(),
         other.evlrs().collect::<Vec<_>>()
     );
+    // TODO test end of points padding
 }
 
 macro_rules! roundtrip_point {
@@ -87,7 +88,7 @@ macro_rules! roundtrip_point {
     ($name:ident, $modify_point:expr, $min_version_minor:expr, $modify_point_format:expr) => {
         #[test]
         fn $name() {
-            use las::{Header, Point, Version};
+            use las::{Builder, Point, Version};
             use las::point::Format;
 
             let version = super::version();
@@ -96,29 +97,27 @@ macro_rules! roundtrip_point {
             $modify_point_format(&mut point_format);
             let mut point = Point::default();
             $modify_point(&mut point);
-            let mut header = Header::default();
-            header.version = version;
-            header.point_format = point_format;
-            ::roundtrip(&header, &point, should_succeed);
+            let mut builder = Builder::from(version);
+            builder.point_format = point_format;
+            ::roundtrip(builder, &point, should_succeed);
         }
     };
 }
 
-macro_rules! roundtrip_header {
-    ($name:ident, $modify_header:expr) => {
-        roundtrip_header!($name, $modify_header, 0);
+macro_rules! roundtrip_builder {
+    ($name:ident, $modify_builder:expr) => {
+        roundtrip_builder!($name, $modify_builder, 0);
     };
-    ($name:ident, $modify_header:expr, $min_version_minor:expr) => {
+    ($name:ident, $modify_builder:expr, $min_version_minor:expr) => {
         #[test]
         fn $name() {
-            use las::{Version, Header, Point};
+            use las::{Builder, Version, Point};
 
             let version = super::version();
             let should_succeed = version >= Version::new(1, $min_version_minor);
-            let mut header = Header::default();
-            header.version = version;
-            $modify_header(&mut header);
-            ::roundtrip(&header, &Point::default(), should_succeed);
+            let mut builder = Builder::from(version);
+            $modify_builder(&mut builder);
+            ::roundtrip(builder, &Point::default(), should_succeed);
         }
     };
 }
@@ -171,41 +170,41 @@ mod $name {
         roundtrip_point!(extra_bytes, |p: &mut Point| p.extra_bytes = vec![42], 0, |f: &mut Format| f.extra_bytes = 1);
     }
 
-    mod header {
+    mod builder {
         use chrono::{Utc, TimeZone};
         use las::GpsTimeType;
         use uuid::Uuid;
 
-        roundtrip_header!(file_source_id, |h: &mut Header| h.file_source_id = 42, 1);
-        roundtrip_header!(gps_time_type, |h: &mut Header| h.gps_time_type = GpsTimeType::Standard, 2);
-        roundtrip_header!(has_synthetic_return_numbers, |h: &mut Header| h.has_synthetic_return_numbers = true, 3);
-        roundtrip_header!(guid, |h: &mut Header| h.guid = Uuid::from_bytes(&[42; 16]).unwrap());
-        roundtrip_header!(system_identifier, |h: &mut Header| h.system_identifier = "roundtrip test".to_string());
-        roundtrip_header!(generating_software, |h: &mut Header| h.generating_software = "roundtrip test".to_string());
-        roundtrip_header!(date, |h: &mut Header| h.date = Some(Utc.ymd(2017, 10, 30)));
-        roundtrip_header!(padding, |h: &mut Header| h.padding = b"You probably shouldn't do this".to_vec());
-        roundtrip_header!(vlr_padding, |h: &mut Header| h.vlr_padding = b"You probably shouldn't do this either".to_vec());
-        roundtrip_header!(transforms, |h: &mut Header| {
+        roundtrip_builder!(file_source_id, |b: &mut Builder| b.file_source_id = 42, 1);
+        roundtrip_builder!(gps_time_type, |b: &mut Builder| b.gps_time_type = GpsTimeType::Standard, 2);
+        roundtrip_builder!(has_synthetic_return_numbers, |b: &mut Builder| b.has_synthetic_return_numbers = true, 3);
+        roundtrip_builder!(guid, |b: &mut Builder| b.guid = Uuid::from_bytes(&[42; 16]).unwrap());
+        roundtrip_builder!(system_identifier, |b: &mut Builder| b.system_identifier = "roundtrip test".to_string());
+        roundtrip_builder!(generating_software, |b: &mut Builder| b.generating_software = "roundtrip test".to_string());
+        roundtrip_builder!(date, |b: &mut Builder| b.date = Some(Utc.ymd(2017, 10, 30)));
+        roundtrip_builder!(padding, |b: &mut Builder| b.padding = b"You probably shouldn't do this".to_vec());
+        roundtrip_builder!(vlr_padding, |b: &mut Builder| b.vlr_padding = b"You probably shouldn't do this either".to_vec());
+        roundtrip_builder!(transforms, |b: &mut Builder| {
             use las::{Transform, Vector};
 
             let transform = Transform { scale: 0.1, offset: -1. };
-            h.transforms = Vector {
+            b.transforms = Vector {
                 x: transform,
                 y: transform,
                 z: transform,
             };
         });
-        roundtrip_header!(vlrs, |h: &mut Header| h.push_vlr(Default::default()));
-        roundtrip_header!(evlrs, |h: &mut Header| {
+        roundtrip_builder!(vlrs, |b: &mut Builder| b.vlrs.push(Default::default()));
+        roundtrip_builder!(evlrs, |b: &mut Builder| {
             use std::u16;
             use las::Vlr;
 
             let mut vlr = Vlr::default();
             vlr.is_extended = true;
             vlr.data = vec![42; u16::MAX as usize + 1];
-            h.push_vlr(vlr);
+            b.vlrs.push(vlr);
         }, 4);
-        roundtrip_header!(end_of_points_padding, |h: &mut Header| h.end_of_points_padding = vec![42]);
+        roundtrip_builder!(end_of_points_padding, |b: &mut Builder| b.end_of_points_padding = vec![42]);
     }
 }
 }}

@@ -22,15 +22,16 @@
 //! evlrs and the evlr can be safely converted to a vlr.
 //!
 //! ```
-//! use las::{Vlr, Header};
-//! let mut header = Header::default();
-//! header.version = (1, 4).into();
+//! use las::{Vlr, Builder};
+//! let mut builder = Builder::from((1, 4));
 //!
 //! let evlr = Vlr { is_extended: true, ..Default::default() };
-//! header.push_vlr(evlr);
+//! builder.vlrs.push(evlr);
+//! let header = builder.clone().into_header().unwrap();
 //! assert_eq!(1, header.evlrs().count());
 //!
-//! header.version = (1, 2).into(); // las 1.2 doesn't support evlrs
+//! builder.version = (1, 2).into(); // las 1.2 doesn't support evlrs
+//! let header = builder.into_header().unwrap();
 //! assert_eq!(0, header.evlrs().count());
 //! assert_eq!(1, header.vlrs().count());
 //! ```

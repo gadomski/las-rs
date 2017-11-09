@@ -65,24 +65,26 @@
 //! let writer = Writer::new(write, header).unwrap();
 //! ```
 //!
-//! Use the `Header` to customize the output data formats:
-//!
-//! ```
-//! use std::io::Cursor;
-//! use las::{Writer, Header};
-//! use las::point::Format;
-//! let write = Cursor::new(Vec::new());
-//! let mut header = Header::default();
-//! header.version = (1, 3).into();
-//! header.point_format = Format::new(2).unwrap();
-//! let writer = Writer::new(write, header).unwrap();
-//! ```
-//!
 //! You can also write out to a path (automatically buffered with `BufWriter`):
 //!
 //! ```
 //! use las::Writer;
 //! let writer = Writer::from_path("/dev/null", Default::default());
+//! ```
+//!
+//! Use a `Builder` to customize the las data:
+//!
+//! ```
+//! use std::io::Cursor;
+//! use las::{Writer, Builder};
+//! use las::point::Format;
+//!
+//! let mut builder = Builder::from((1, 4));
+//! builder.point_format = Format::new(2).unwrap();
+//! let header = builder.into_header().unwrap();
+//!
+//! let write = Cursor::new(Vec::new());
+//! let writer = Writer::new(write, header).unwrap();
 //! ```
 //!
 //! ## Prefer `BufWrite`
@@ -139,7 +141,7 @@ pub use color::Color;
 pub use error::Error;
 pub use feature::Feature;
 pub use gps_time_type::GpsTimeType;
-pub use header::Header;
+pub use header::{Header, Builder};
 pub use point::Point;
 pub use reader::Reader;
 pub use transform::Transform;

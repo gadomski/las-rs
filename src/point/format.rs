@@ -6,6 +6,7 @@ const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
 const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
 const NIR_FORMATS: &'static [u8] = &[8, 10];
+const IS_COMPRESSED_MASK: u8 = 0x80;
 
 /// Point formats are defined by the las spec.
 ///
@@ -55,6 +56,8 @@ pub struct Format {
     pub has_nir: bool,
     /// The number of extra bytes on each point.
     pub extra_bytes: u16,
+    /// Is this point format compressed?
+    pub is_compressed: bool,
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
@@ -85,7 +88,8 @@ impl Format {
                 has_waveform: WAVEFORM_FORMATS.contains(&n),
                 has_nir: NIR_FORMATS.contains(&n),
                 is_extended: n >= 6,
-                ..Default::default()
+                extra_bytes: 0,
+                is_compressed: n & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK,
             })
         }
     }
@@ -153,7 +157,9 @@ impl Format {
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
-        if self.is_extended {
+        if self.is_compressed {
+            Err(Error::Format(*self).into())
+        } else if self.is_extended {
             if self.has_gps_time {
                 if self.has_color {
                     if self.has_nir {
@@ -380,5 +386,14 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(21, format.len());
+    }
+
+    #[test]
+    fn is_compressed() {
+        let format = Format {
+            is_compressed: true,
+            ..Default::default()
+        };
+        assert!(format.to_u8().is_err());
     }
 }

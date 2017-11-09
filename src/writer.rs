@@ -5,8 +5,7 @@
 //! ```
 //! use std::io::Cursor;
 //! use las::{Writer, Header};
-//! let mut header = Header::default();
-//! header.version = (1, 4).into();
+//! let mut header = Header::from((1, 4));
 //! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
 //! ```
 //!
@@ -14,13 +13,13 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Header, Point};
+//! use las::{Builder, Writer, Point};
 //! use las::point::Format;
 //! use las::Color;
 //!
-//! let mut header = Header::default();
-//! header.point_format = Format::new(1).unwrap();
-//! let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
+//! let mut builder = Builder::default();
+//! builder.point_format = Format::new(1).unwrap();
+//! let mut writer = Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap();
 //!
 //! let mut point = Point::default(); // default points don't have any optional attributes
 //! assert!(writer.write(point.clone()).is_err());
@@ -34,7 +33,6 @@
 
 use {Header, Point, Result};
 use point::Format;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -91,13 +89,7 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        header.bounds = Default::default();
-        header.number_of_points = 0;
-        header.number_of_points_by_return = HashMap::new();
-        if header.version.requires_point_data_start_signature() {
-            // TODO we shouldn't overwrite the old vlr padding
-            header.vlr_padding = ::raw::POINT_DATA_START_SIGNATURE.to_vec();
-        }
+        header.clear();
         header.clone().into_raw().and_then(|raw_header| {
             raw_header.write_to(&mut write)
         })?;
@@ -106,8 +98,8 @@ impl<W: Seek + Write> Writer<W> {
                 raw_vlr.write_to(&mut write)
             })?;
         }
-        if !header.vlr_padding.is_empty() {
-            write.write_all(&header.vlr_padding)?;
+        if !header.vlr_padding().is_empty() {
+            write.write_all(&header.vlr_padding())?;
         }
         Ok(Writer {
             closed: false,
@@ -131,23 +123,15 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::Closed.into());
         }
-        if !point.matches(self.header.point_format) {
+        if !point.matches(self.header.point_format()) {
             return Err(
-                Error::PointAttributes(self.header.point_format, point).into(),
+                Error::PointAttributes(self.header.point_format(), point).into(),
             );
         }
-        self.header.number_of_points += 1;
-        {
-            let entry = self.header
-                .number_of_points_by_return
-                .entry(point.return_number)
-                .or_insert(0);
-            *entry += 1;
-        }
-        self.header.bounds.grow(&point);
-        point.into_raw(self.header.transforms).and_then(
+        self.header.add_point(&point);
+        point.into_raw(self.header.transforms()).and_then(
             |raw_point| {
-                raw_point.write_to(&mut self.write, self.header.point_format)
+                raw_point.write_to(&mut self.write, self.header.point_format())
             },
         )?;
         Ok(())
@@ -210,26 +194,27 @@ impl<W: Seek + Write> Drop for Writer<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {Header, Version};
+    use Version;
     use byteorder::{LittleEndian, ReadBytesExt};
+    use header::Builder;
     use point::Format;
     use std::io::Cursor;
 
     fn writer(format: Format, version: Version) -> Writer<Cursor<Vec<u8>>> {
-        let mut header = Header::default();
-        header.point_format = format;
-        header.version = version;
-        Writer::new(Cursor::new(Vec::new()), header).unwrap()
+        let mut builder = Builder::default();
+        builder.point_format = format;
+        builder.version = version;
+        Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap()
     }
 
     #[test]
     fn las_1_0_point_data_start_signature() {
         let mut cursor = Cursor::new(Vec::new());
         {
-            let mut header = Header::default();
-            header.version = (1, 0).into();
-            header.push_vlr(Default::default());
-            let mut writer = Writer::new(&mut cursor, header).unwrap();
+            let mut builder = Builder::default();
+            builder.version = (1, 0).into();
+            builder.vlrs.push(Default::default());
+            let mut writer = Writer::new(&mut cursor, builder.into_header().unwrap()).unwrap();
             writer.write(Default::default()).unwrap();
         }
         cursor.set_position(281);

@@ -3,10 +3,9 @@
 use {Result, Version};
 use byteorder::{LittleEndian, ReadBytesExt};
 use feature::{Evlrs, LargeFiles, Waveforms};
+use point::Format;
 use raw::LASF;
 use std::io::{Read, Write};
-
-const IS_COMPRESSED_MASK: u8 = 0x80;
 
 /// A las header.
 ///
@@ -123,10 +122,7 @@ pub struct Header {
     /// The point data format ID corresponds to the point data record format type.
     ///
     /// LAS 1.2 defines types 0, 1, 2 and 3. LAS 1.4 defines types 0 through 10.
-    pub point_data_format_id: u8,
-
-    /// The size, in bytes, of the Point Data Record.
-    pub point_data_record_length: u16,
+    pub point_format: Format,
 
     /// This field contains the total number of point records within the file.
     pub number_of_point_records: u32,
@@ -233,6 +229,13 @@ pub struct LargeFile {
 impl Header {
     /// Reads a raw header from a `Read`.
     ///
+    /// Generally very permissive, but will throw an error if a couple of things are true:
+    ///
+    /// - The file signature is not exactly "LASF".
+    /// - The point data format is not recognized. Note that version mismatches *are* allowed (e.g.
+    /// color points for las 1.1).
+    /// - The point data record length is less than the minimum length of the point data format.
+    ///
     /// # Examples
     ///
     /// ```
@@ -263,8 +266,18 @@ impl Header {
         header.header_size = read.read_u16::<LittleEndian>()?;
         header.offset_to_point_data = read.read_u32::<LittleEndian>()?;
         header.number_of_variable_length_records = read.read_u32::<LittleEndian>()?;
-        header.point_data_format_id = read.read_u8()?;
-        header.point_data_record_length = read.read_u16::<LittleEndian>()?;
+        header.point_format = read.read_u8().map_err(::Error::from).and_then(
+            |n| Format::new(n),
+        )?;
+        let point_data_record_length = read.read_u16::<LittleEndian>()?;
+        if point_data_record_length < header.point_format.len() {
+            return Err(
+                Error::PointDataRecordLength(header.point_format, point_data_record_length)
+                    .into(),
+            );
+        } else if header.point_format.len() < point_data_record_length {
+            header.point_format.extra_bytes = point_data_record_length - header.point_format.len();
+        }
         header.number_of_point_records = read.read_u32::<LittleEndian>()?;
         for n in &mut header.number_of_points_by_return {
             *n = read.read_u32::<LittleEndian>()?;
@@ -306,22 +319,17 @@ impl Header {
         Ok(header)
     }
 
-    /// Returns true if this raw header is for compressed las data.
-    ///
-    /// Though this isn't part of the las spec, the two high bits of the point data format id have
-    /// been used to indicate compressed data, though only the high bit is currently used.
+    /// Returns the total file offset to the first byte *after* all of the points.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::raw::Header;
-    /// let mut header = Header::default();
-    /// assert!(!header.is_compressed());
-    /// header.point_data_format_id = 131;
-    /// assert!(header.is_compressed());
+    /// assert_eq!(227, Header::default().offset_to_end_of_points());
     /// ```
-    pub fn is_compressed(&self) -> bool {
-        (self.point_data_format_id & IS_COMPRESSED_MASK) == IS_COMPRESSED_MASK
+    pub fn offset_to_end_of_points(&self) -> u64 {
+        u64::from(self.offset_to_point_data) +
+            u64::from(self.number_of_point_records) * u64::from(self.point_format.len())
     }
 
     /// Writes a raw header to a `Write`.
@@ -355,10 +363,10 @@ impl Header {
         write.write_u32::<LittleEndian>(
             self.number_of_variable_length_records,
         )?;
-        write.write_u8(self.point_data_format_id)?;
-        write.write_u16::<LittleEndian>(
-            self.point_data_record_length,
-        )?;
+        self.point_format.to_u8().and_then(|n| {
+            write.write_u8(n).map_err(::Error::from)
+        })?;
+        write.write_u16::<LittleEndian>(self.point_format.len())?;
         write.write_u32::<LittleEndian>(
             self.number_of_point_records,
         )?;
@@ -406,6 +414,7 @@ impl Header {
 impl Default for Header {
     fn default() -> Header {
         let version = Version::new(1, 2);
+        let point_format = Format::new(0).unwrap();
         Header {
             file_signature: LASF,
             file_source_id: 0,
@@ -419,8 +428,7 @@ impl Default for Header {
             header_size: version.header_size(),
             offset_to_point_data: u32::from(version.header_size()),
             number_of_variable_length_records: 0,
-            point_data_format_id: 0,
-            point_data_record_length: ::point::Format::new(0).unwrap().len(),
+            point_format: point_format,
             number_of_point_records: 0,
             number_of_points_by_return: [0; 5],
             x_scale_factor: 0.,
@@ -479,27 +487,21 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
-    #[test]
-    fn file_signature() {
-        let raw_header = Header {
-            file_signature: *b"ABCD",
-            ..Default::default()
-        };
+    fn write_read(header: Header) -> Result<()> {
         let mut cursor = Cursor::new(Vec::new());
-        raw_header.write_to(&mut cursor).unwrap();
+        header.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        assert!(Header::read_from(cursor).is_err());
+        Header::read_from(cursor)?;
+        Ok(())
     }
 
     #[test]
-    fn is_compressed() {
-        let mut header = Header {
-            point_data_format_id: 0,
+    fn invalid_file_signature() {
+        let header = Header {
+            file_signature: *b"ABCD",
             ..Default::default()
         };
-        assert!(!header.is_compressed());
-        header.point_data_format_id = 131;
-        assert!(header.is_compressed());
+        assert!(write_read(header).is_err());
     }
 
     macro_rules! roundtrip {

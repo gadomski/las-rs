@@ -36,8 +36,7 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
-use {Header, Point, Result, Vlr};
-use raw;
+use {Builder, Header, Point, Result, Vlr, raw};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
@@ -85,19 +84,20 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let raw_header = raw::Header::read_from(&mut read)?;
-        if raw_header.is_compressed() {
+        if raw_header.point_format.is_compressed {
             return Err(::Error::Laszip);
         }
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
         let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
+        let offset_to_end_of_points = raw_header.offset_to_end_of_points();
         let evlr = raw_header.evlr;
-        let mut header = Header::new(raw_header)?;
 
+        let mut builder = Builder::new(raw_header)?;
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
             position += vlr.len() as u64;
-            header.push_vlr(vlr);
+            builder.vlrs.push(vlr);
         }
         if position > offset_to_point_data {
             return Err(
@@ -106,9 +106,8 @@ impl<R: Read + Seek> Reader<R> {
         } else if position < offset_to_point_data {
             read.by_ref()
                 .take(offset_to_point_data - position)
-                .read_to_end(&mut header.vlr_padding)?;
+                .read_to_end(&mut builder.vlr_padding)?;
         }
-        let offset_to_end_of_points = header.offset_to_end_of_points()?;
         if let Some(evlr) = evlr {
             if evlr.start_of_first_evlr < offset_to_end_of_points {
                 return Err(
@@ -117,19 +116,24 @@ impl<R: Read + Seek> Reader<R> {
             } else if evlr.start_of_first_evlr > offset_to_end_of_points {
                 let n = evlr.start_of_first_evlr - offset_to_end_of_points;
                 read.by_ref().take(n).read_to_end(
-                    &mut header.end_of_points_padding,
+                    &mut builder.end_of_points_padding,
                 )?;
             }
             read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
-            header.push_vlr(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
+            builder.vlrs.push(
+                raw::Vlr::read_from(&mut read, true).and_then(
+                    Vlr::new,
+                )?,
+            );
         } else {
-            read.read_to_end(&mut header.end_of_points_padding)?;
+            read.read_to_end(&mut builder.end_of_points_padding)?;
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
+        let header = builder.into_header()?;
 
         Ok(Reader {
-            number_of_points: header.number_of_points,
+            number_of_points: header.number_of_points(),
             header: header,
             read: read,
             number_read: 0,
@@ -164,9 +168,9 @@ impl<R: Read + Seek> Reader<R> {
         if self.number_read >= self.number_of_points {
             Ok(None)
         } else {
-            let point = raw::Point::read_from(&mut self.read, self.header.point_format)
+            let point = raw::Point::read_from(&mut self.read, self.header.point_format())
                 .map(|raw_point| {
-                    Some(Point::new(raw_point, self.header.transforms))
+                    Some(Point::new(raw_point, self.header.transforms()))
                 });
             self.number_read += 1;
             point
