@@ -164,22 +164,23 @@ impl<W: Seek + Write> Writer<W> {
     /// use las::Writer;
     /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
     /// writer.close().unwrap();
-    /// writer.close().unwrap(); // <- no-op
-    ///
+    /// assert!(writer.close().is_err());
+    /// ```
     pub fn close(&mut self) -> Result<()> {
-        if !self.closed {
-            for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
-                evlr.clone().into_raw(true)
-            })
-            {
-                raw_evlr?.write_to(&mut self.write)?;
-            }
-            self.write.seek(SeekFrom::Start(0))?;
-            self.header.clone().into_raw().and_then(|raw_header| {
-                raw_header.write_to(&mut self.write)
-            })?;
-            self.closed = true;
+        if self.closed {
+            return Err(Error::Closed.into());
         }
+        for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
+            evlr.clone().into_raw(true)
+        })
+        {
+            raw_evlr?.write_to(&mut self.write)?;
+        }
+        self.write.seek(SeekFrom::Start(0))?;
+        self.header.clone().into_raw().and_then(|raw_header| {
+            raw_header.write_to(&mut self.write)
+        })?;
+        self.closed = true;
         Ok(())
     }
 }
@@ -241,6 +242,7 @@ mod tests {
     fn already_closed() {
         let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
         writer.close().unwrap();
+        assert!(writer.close().is_err());
         assert!(writer.write(Default::default()).is_err());
     }
 
