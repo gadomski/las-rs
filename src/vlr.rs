@@ -59,12 +59,16 @@ pub struct Vlr {
     /// This value is often an official, "registered" user_id, such as "LASF_Spec" or
     /// "LASF_Projection".
     pub user_id: String,
+
     /// This value specifies the type of record, and depends on the user id.
     pub record_id: u16,
+
     /// Textual description of these data.
     pub description: String,
+
     /// The data themselves.
     pub data: Vec<u8>,
+
     /// Should this vlr be written "extended", i.e. at the end of the file.
     ///
     /// Note that not all las versions support extended vlrs, and extra-long vlrs might be written
