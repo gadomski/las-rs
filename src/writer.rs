@@ -64,7 +64,7 @@ quick_error! {
 ///
 /// ```
 /// use std::io::Cursor;
-/// # use las::Writer;
+/// use las::Writer;
 /// {
 ///     let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
 ///     writer.close().unwrap();
@@ -87,7 +87,7 @@ impl<W: Seek + Write> Writer<W> {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// # use las::Writer;
+    /// use las::Writer;
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
@@ -122,7 +122,7 @@ impl<W: Seek + Write> Writer<W> {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// # use las::Writer;
+    /// use las::Writer;
     ///
     /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
     /// writer.write(Default::default()).unwrap();
@@ -161,7 +161,7 @@ impl<W: Seek + Write> Writer<W> {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// # use las::Writer;
+    /// use las::Writer;
     /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
     /// writer.close().unwrap();
     /// writer.close().unwrap(); // <- no-op
@@ -190,7 +190,7 @@ impl Writer<BufWriter<File>> {
     /// # Examples
     ///
     /// ```
-    /// # use las::Writer;
+    /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null", Default::default());
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P, header: Header) -> Result<Writer<BufWriter<File>>> {
