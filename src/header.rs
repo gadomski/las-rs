@@ -810,6 +810,9 @@ mod tests {
             u32::MAX as u64 + 1,
             raw_header.large_file.unwrap().number_of_point_records
         );
+
+        let header = Header::new(raw_header).unwrap();
+        assert_eq!(u32::MAX as u64 + 1, header.number_of_points);
     }
 
     #[test]
