@@ -577,7 +577,7 @@ impl Header {
     }
 
     fn point_data_len(&self) -> u64 {
-        u64::from(self.number_of_points) * u64::from(self.point_format.len())
+        self.number_of_points * u64::from(self.point_format.len())
     }
 }
 
