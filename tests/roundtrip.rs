@@ -64,8 +64,14 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
     if point.return_number > 0 {
         assert_eq!(1, other.number_of_points_by_return[&point.return_number]);
     }
-    assert_eq!(header.vlrs(), other.vlrs());
-    assert_eq!(header.evlrs(), other.evlrs());
+    assert_eq!(
+        header.vlrs().collect::<Vec<_>>(),
+        other.vlrs().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        header.evlrs().collect::<Vec<_>>(),
+        other.evlrs().collect::<Vec<_>>()
+    );
 }
 
 macro_rules! roundtrip_point {

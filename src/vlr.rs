@@ -28,11 +28,11 @@
 //!
 //! let evlr = Vlr { is_extended: true, ..Default::default() };
 //! header.push_vlr(evlr);
-//! assert_eq!(1, header.evlrs().len());
+//! assert_eq!(1, header.evlrs().count());
 //!
 //! header.version = (1, 2).into(); // las 1.2 doesn't support evlrs
-//! assert_eq!(0, header.evlrs().len());
-//! assert_eq!(1, header.vlrs().len());
+//! assert_eq!(0, header.evlrs().count());
+//! assert_eq!(1, header.vlrs().count());
 //! ```
 
 use {Result, raw};

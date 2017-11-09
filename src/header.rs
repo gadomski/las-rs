@@ -163,6 +163,14 @@ pub struct Header {
     vlrs: Vec<Vlr>,
 }
 
+/// An iterator over a header's variable length records.
+///
+/// The variable length records can be regular or extended.
+#[allow(missing_debug_implementations)]
+pub struct Vlrs<'a> {
+    iter: Box<Iterator<Item = &'a Vlr> + 'a>,
+}
+
 impl Header {
     /// Creates a new header from a raw header.
     ///
@@ -277,55 +285,76 @@ impl Header {
         self.vlrs.push(vlr);
     }
 
-    /// Returns this header's variable length records.
-    ///
-    /// If this header's version does not support extended variable length records, all evlrs will
-    /// be converted to vlrs *unless* their data are too long.
+    /// Returns an iterator over this header's variable length records.
     ///
     /// # Examples
     ///
     /// ```
-    /// use std::u16;
     /// use las::{Header, Vlr};
     /// let mut header = Header::default();
-    /// header.version = (1, 4).into();
     /// header.push_vlr(Vlr::default());
-    /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
-    /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
-    /// assert_eq!(1, header.vlrs().len());
-    ///
-    /// header.version = (1, 2).into();
-    /// assert_eq!(2, header.vlrs().len());
+    /// assert_eq!(1, header.vlrs().count());
     /// ```
-    pub fn vlrs(&self) -> Vec<&Vlr> {
-        self.filter_vlrs(false)
+    ///
+    /// Extended VLRs will be downcasted to regular VLRs if the version does not support EVLRs.
+    ///
+    /// ```
+    /// use las::{Header, Vlr};
+    /// let mut header = Header::default();
+    /// header.version = (1, 2).into();
+    /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
+    /// assert_eq!(1, header.vlrs().count());
+    ///
+    /// header.version = (1, 4).into();
+    /// assert_eq!(0, header.vlrs().count());
+    /// ```
+    ///
+    /// Too-large VLRs will always be upcasted to EVLRs, regardless of version support.
+    ///
+    /// ```
+    /// use las::{Header, Vlr};
+    /// use std::u16;
+    /// let mut header = Header::default();
+    /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
+    /// assert_eq!(0, header.vlrs().count());
+    /// ```
+    pub fn vlrs(&self) -> Vlrs {
+        Vlrs::new(self, false)
     }
 
-    /// Returns this header's extended variable length records.
-    ///
-    /// If this header's version supports extended variable length records, all too-long regular
-    /// vlrs will be converted to extended.
-    ///
-    /// If this header's version does not support extended variable length records, this will only
-    /// return too-long vlrs.
+    /// Returns an iterator over this header's extended variable length records.
     ///
     /// # Examples
     ///
     /// ```
-    /// use std::u16;
     /// use las::{Header, Vlr};
     /// let mut header = Header::default();
     /// header.version = (1, 4).into();
-    /// header.push_vlr(Vlr::default());
     /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
-    /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
-    /// assert_eq!(2, header.evlrs().len());
-    ///
-    /// header.version = (1, 2).into();
-    /// assert_eq!(1, header.evlrs().len());
+    /// assert_eq!(1, header.evlrs().count());
     /// ```
-    pub fn evlrs(&self) -> Vec<&Vlr> {
-        self.filter_vlrs(true)
+    ///
+    /// Extended VLRs will be downcasted to regular VLRs if the version does not support EVLRs.
+    ///
+    /// ```
+    /// use las::{Header, Vlr};
+    /// let mut header = Header::default();
+    /// header.version = (1, 2).into();
+    /// header.push_vlr(Vlr { is_extended: true, ..Default::default() });
+    /// assert_eq!(0, header.evlrs().count());
+    /// ```
+    ///
+    /// Too-large VLRs will always be upcasted to EVLRs, regardless of version support.
+    ///
+    /// ```
+    /// use las::{Header, Vlr};
+    /// use std::u16;
+    /// let mut header = Header::default();
+    /// header.push_vlr(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
+    /// assert_eq!(0, header.vlrs().count());
+    /// ```
+    pub fn evlrs(&self) -> Vlrs {
+        Vlrs::new(self, true)
     }
 
     /// Returns the position of the first byte after the point records end.
@@ -451,7 +480,7 @@ impl Header {
     fn offset_to_point_data(&self) -> Result<u32> {
         use std::u32;
 
-        let vlr_len = self.vlrs().iter().fold(0, |acc, vlr| acc + vlr.len());
+        let vlr_len = self.vlrs().fold(0, |acc, vlr| acc + vlr.len());
         let offset = self.header_size()? as usize + vlr_len + self.vlr_padding.len();
         if offset > u32::MAX as usize {
             Err(Error::OffsetToPointDataTooLarge(offset).into())
@@ -463,7 +492,7 @@ impl Header {
     fn number_of_variable_length_records(&self) -> Result<u32> {
         use std::u32;
 
-        let n = self.vlrs().len();
+        let n = self.vlrs().count();
         if n > u32::MAX as usize {
             Err(Error::TooManyVlrs(n).into())
         } else {
@@ -514,7 +543,7 @@ impl Header {
     fn evlr(&self) -> Result<Option<raw::header::Evlr>> {
         use std::u32;
 
-        let n = self.evlrs().len();
+        let n = self.evlrs().count();
         if n > 0 {
             self.version.verify_support_for::<Evlrs>()?;
         }
@@ -550,20 +579,6 @@ impl Header {
     fn point_data_len(&self) -> u64 {
         u64::from(self.number_of_points) * u64::from(self.point_format.len())
     }
-
-    fn filter_vlrs(&self, extended: bool) -> Vec<&Vlr> {
-        use std::u16;
-        use feature::Evlrs;
-
-        self.vlrs
-            .iter()
-            .filter(|vlr| {
-                (vlr.len() > u16::MAX as usize ||
-                     (self.version.supports::<Evlrs>() && vlr.is_extended)) ==
-                    extended
-            })
-            .collect()
-    }
 }
 
 impl Default for Header {
@@ -587,6 +602,26 @@ impl Default for Header {
             vlrs: Vec::new(),
             end_of_points_padding: Vec::new(),
         }
+    }
+}
+
+impl<'a> Vlrs<'a> {
+    fn new(header: &Header, return_extended: bool) -> Vlrs {
+        use std::u16;
+        let version_supports_evlrs = header.version.supports::<Evlrs>();
+        Vlrs {
+            iter: Box::new(header.vlrs.iter().filter(move |vlr| {
+                (vlr.len() > u16::MAX as usize || (version_supports_evlrs && vlr.is_extended)) ==
+                    return_extended
+            })),
+        }
+    }
+}
+
+impl<'a> Iterator for Vlrs<'a> {
+    type Item = &'a Vlr;
+    fn next(&mut self) -> Option<&'a Vlr> {
+        self.iter.next()
     }
 }
 

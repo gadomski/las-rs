@@ -101,7 +101,7 @@ impl<W: Seek + Write> Writer<W> {
         header.clone().into_raw().and_then(|raw_header| {
             raw_header.write_to(&mut write)
         })?;
-        for vlr in header.vlrs().iter() {
+        for vlr in header.vlrs() {
             (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
                 raw_vlr.write_to(&mut write)
             })?;
