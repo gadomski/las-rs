@@ -811,7 +811,7 @@ impl From<ScanAngle> for i8 {
 impl From<ScanAngle> for i16 {
     fn from(scan_angle: ScanAngle) -> i16 {
         match scan_angle {
-            ScanAngle::Rank(n) => ScanAngle::from(n as f32).into(),
+            ScanAngle::Rank(n) => ScanAngle::from(f32::from(n)).into(),
             ScanAngle::Scaled(n) => n,
         }
     }
@@ -820,8 +820,8 @@ impl From<ScanAngle> for i16 {
 impl From<ScanAngle> for f32 {
     fn from(scan_angle: ScanAngle) -> f32 {
         match scan_angle {
-            ScanAngle::Rank(n) => n as f32,
-            ScanAngle::Scaled(n) => n as f32 * SCAN_ANGLE_SCALE_FACTOR,
+            ScanAngle::Rank(n) => f32::from(n),
+            ScanAngle::Scaled(n) => f32::from(n) * SCAN_ANGLE_SCALE_FACTOR,
         }
     }
 }

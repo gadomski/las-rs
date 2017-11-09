@@ -21,7 +21,7 @@ impl Transform {
     /// assert_eq!(3., transform.direct(1));
     /// ```
     pub fn direct(&self, n: i32) -> f64 {
-        self.scale * n as f64 + self.offset
+        self.scale * f64::from(n) + self.offset
     }
 
     /// Applies the inverse transform, and rounds the result.
@@ -40,7 +40,7 @@ impl Transform {
         use std::i32;
 
         let n = ((n - self.offset) / self.scale).round();
-        if n > i32::MAX as f64 || n < i32::MIN as f64 {
+        if n > f64::from(i32::MAX) || n < f64::from(i32::MIN) {
             Err(Error::InverseTransform(n, *self))
         } else {
             Ok(n as i32)

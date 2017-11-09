@@ -454,7 +454,7 @@ impl Default for Header {
             file_creation_day_of_year: 0,
             file_creation_year: 0,
             header_size: version.header_size(),
-            offset_to_point_data: version.header_size() as u32,
+            offset_to_point_data: u32::from(version.header_size()),
             number_of_variable_length_records: 0,
             point_data_format_id: 0,
             point_data_record_length: ::point::Format::new(0).unwrap().len(),

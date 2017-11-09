@@ -196,7 +196,7 @@ impl Header {
         }
 
         let number_of_points = if raw_header.number_of_point_records > 0 {
-            raw_header.number_of_point_records as u64
+            u64::from(raw_header.number_of_point_records)
         } else {
             raw_header
                 .large_file
@@ -218,8 +218,8 @@ impl Header {
             gps_time_type: raw_header.global_encoding.into(),
             has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
             date: Utc.yo_opt(
-                raw_header.file_creation_year as i32,
-                raw_header.file_creation_day_of_year as u32,
+                i32::from(raw_header.file_creation_year),
+                u32::from(raw_header.file_creation_day_of_year),
             ).single(),
             generating_software: raw_header
                 .generating_software
@@ -504,7 +504,7 @@ impl Header {
         use std::u32;
         use feature::LargeFiles;
 
-        if self.number_of_points > u32::MAX as u64 {
+        if self.number_of_points > u64::from(u32::MAX) {
             if self.version.supports::<LargeFiles>() {
                 Ok(0)
             } else {
@@ -528,7 +528,7 @@ impl Header {
                     return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
                 }
             } else if i > 0 {
-                if n > u32::MAX as u64 {
+                if n > u64::from(u32::MAX) {
                     if !self.version.supports::<LargeFiles>() {
                         return Err(Error::TooManyPoints(n, self.version).into());
                     }
