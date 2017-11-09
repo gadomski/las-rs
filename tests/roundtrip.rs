@@ -1,5 +1,7 @@
 //! Roundtrip (write-read) tests for supported LAS versions and attributes.
 
+#[macro_use]
+extern crate approx;
 extern crate chrono;
 extern crate las;
 extern crate uuid;
@@ -7,7 +9,8 @@ extern crate uuid;
 use las::{Header, Point, Reader, Writer};
 use std::io::Cursor;
 
-pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
+pub fn roundtrip(header: &Header, point: &Point, should_succeed: bool) {
     let mut cursor = Cursor::new(Vec::new());
     {
         match Writer::new(&mut cursor, header.clone()).and_then(
@@ -33,7 +36,7 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
         .read()
         .expect("Error when reading the ont point")
         .unwrap();
-    assert_eq!(point, other);
+    assert_eq!(point, &other);
     assert_eq!(
         None,
         reader.read().expect("Error when reading past last point")
@@ -54,12 +57,12 @@ pub fn roundtrip(header: Header, point: Point, should_succeed: bool) {
     assert_eq!(header.padding, other.padding);
     assert_eq!(header.point_format, other.point_format);
     assert_eq!(header.transforms, other.transforms);
-    assert_eq!(point.x, other.bounds.min.x);
-    assert_eq!(point.x, other.bounds.max.x);
-    assert_eq!(point.y, other.bounds.min.y);
-    assert_eq!(point.y, other.bounds.max.y);
-    assert_eq!(point.z, other.bounds.min.z);
-    assert_eq!(point.z, other.bounds.max.z);
+    assert_relative_eq!(point.x, other.bounds.min.x);
+    assert_relative_eq!(point.x, other.bounds.max.x);
+    assert_relative_eq!(point.y, other.bounds.min.y);
+    assert_relative_eq!(point.y, other.bounds.max.y);
+    assert_relative_eq!(point.z, other.bounds.min.z);
+    assert_relative_eq!(point.z, other.bounds.max.z);
     assert_eq!(1, other.number_of_points);
     if point.return_number > 0 {
         assert_eq!(1, other.number_of_points_by_return[&point.return_number]);
@@ -96,7 +99,7 @@ macro_rules! roundtrip_point {
             let mut header = Header::default();
             header.version = version;
             header.point_format = point_format;
-            ::roundtrip(header, point, should_succeed);
+            ::roundtrip(&header, &point, should_succeed);
         }
     };
 }
@@ -115,7 +118,7 @@ macro_rules! roundtrip_header {
             let mut header = Header::default();
             header.version = version;
             $modify_header(&mut header);
-            ::roundtrip(header, Point::default(), should_succeed);
+            ::roundtrip(&header, &Point::default(), should_succeed);
         }
     };
 }

@@ -733,7 +733,7 @@ impl Flags {
     /// ```
     pub fn to_classification(&self) -> Result<Classification> {
         match *self {
-            Flags::TwoByte(_, b) => Classification::new(b & 0b00011111),
+            Flags::TwoByte(_, b) => Classification::new(b & 0b0001_1111),
             Flags::ThreeByte(_, _, c) => Classification::new(c),
         }
     }
@@ -755,8 +755,8 @@ impl Flags {
     /// ```
     pub fn clear_overlap_class(&mut self) {
         match *self {
-            Flags::TwoByte(_, ref mut b) => if *b & 0b11111 == OVERLAP_CLASSIFICATION_CODE {
-                *b = (*b & 0b11100000) + u8::from(Classification::Unclassified);
+            Flags::TwoByte(_, ref mut b) => if *b & 0b1_1111 == OVERLAP_CLASSIFICATION_CODE {
+                *b = (*b & 0b1110_0000) + u8::from(Classification::Unclassified);
             }
             Flags::ThreeByte(_, ref mut b, ref mut c) => if *c == OVERLAP_CLASSIFICATION_CODE {
                 *b |= 8;
@@ -811,7 +811,7 @@ impl From<ScanAngle> for i8 {
 impl From<ScanAngle> for i16 {
     fn from(scan_angle: ScanAngle) -> i16 {
         match scan_angle {
-            ScanAngle::Rank(n) => ScanAngle::from(n as f32).into(),
+            ScanAngle::Rank(n) => ScanAngle::from(f32::from(n)).into(),
             ScanAngle::Scaled(n) => n,
         }
     }
@@ -820,8 +820,8 @@ impl From<ScanAngle> for i16 {
 impl From<ScanAngle> for f32 {
     fn from(scan_angle: ScanAngle) -> f32 {
         match scan_angle {
-            ScanAngle::Rank(n) => n as f32,
-            ScanAngle::Scaled(n) => n as f32 * SCAN_ANGLE_SCALE_FACTOR,
+            ScanAngle::Rank(n) => f32::from(n),
+            ScanAngle::Scaled(n) => f32::from(n) * SCAN_ANGLE_SCALE_FACTOR,
         }
     }
 }
@@ -897,18 +897,18 @@ mod tests {
     fn number_of_returns() {
         assert_eq!((0, 0, 0), Flags::TwoByte(0, 0).into());
         assert_eq!((16, 0, 0), Flags::TwoByte(8, 0).into());
-        assert_eq!((0b01110000, 0, 0), Flags::TwoByte(0b00111000, 0).into());
+        assert_eq!((0b0111_0000, 0, 0), Flags::TwoByte(0b0011_1000, 0).into());
         assert_eq!((0u8, 0), Flags::ThreeByte(0, 0, 0).to_two_bytes().unwrap());
         assert_eq!(
-            (0b00001000u8, 0),
-            Flags::ThreeByte(0b00010000, 0, 0).to_two_bytes().unwrap()
+            (0b0000_1000u8, 0),
+            Flags::ThreeByte(0b0001_0000, 0, 0).to_two_bytes().unwrap()
         );
         assert_eq!(
-            (0b00111000u8, 0),
-            Flags::ThreeByte(0b01110000, 0, 0).to_two_bytes().unwrap()
+            (0b0011_1000u8, 0),
+            Flags::ThreeByte(0b0111_0000, 0, 0).to_two_bytes().unwrap()
         );
-        assert!(Flags::ThreeByte(0b10000000, 0, 0).to_two_bytes().is_err());
-        assert!(Flags::ThreeByte(0b11110000, 0, 0).to_two_bytes().is_err());
+        assert!(Flags::ThreeByte(0b1000_0000, 0, 0).to_two_bytes().is_err());
+        assert!(Flags::ThreeByte(0b1111_0000, 0, 0).to_two_bytes().is_err());
     }
 
     #[test]
@@ -922,7 +922,7 @@ mod tests {
     #[test]
     fn is_synthetic() {
         assert!(!Flags::TwoByte(0, 0).is_synthetic());
-        assert!(Flags::TwoByte(0, 0b00100000).is_synthetic());
+        assert!(Flags::TwoByte(0, 0b0010_0000).is_synthetic());
         assert!(!Flags::ThreeByte(0, 0, 0).is_synthetic());
         assert!(Flags::ThreeByte(0, 1, 0).is_synthetic());
         assert_eq!((0, 32), Flags::ThreeByte(0, 1, 0).to_two_bytes().unwrap());
@@ -931,7 +931,7 @@ mod tests {
     #[test]
     fn is_key_point() {
         assert!(!Flags::TwoByte(0, 0).is_key_point());
-        assert!(Flags::TwoByte(0, 0b01000000).is_key_point());
+        assert!(Flags::TwoByte(0, 0b0100_0000).is_key_point());
         assert!(!Flags::ThreeByte(0, 0, 0).is_key_point());
         assert!(Flags::ThreeByte(0, 2, 0).is_key_point());
         assert_eq!((0, 64), Flags::ThreeByte(0, 2, 0).to_two_bytes().unwrap());
@@ -940,7 +940,7 @@ mod tests {
     #[test]
     fn is_withheld() {
         assert!(!Flags::TwoByte(0, 0).is_withheld());
-        assert!(Flags::TwoByte(0, 0b10000000).is_withheld());
+        assert!(Flags::TwoByte(0, 0b1000_0000).is_withheld());
         assert!(!Flags::ThreeByte(0, 0, 0).is_withheld());
         assert!(Flags::ThreeByte(0, 4, 0).is_withheld());
         assert_eq!((0, 128), Flags::ThreeByte(0, 4, 0).to_two_bytes().unwrap());
@@ -962,8 +962,8 @@ mod tests {
     fn scanner_channel() {
         assert_eq!(0, Flags::TwoByte(0, 0).scanner_channel());
         assert_eq!(0, Flags::ThreeByte(0, 0, 0).scanner_channel());
-        assert_eq!(1, Flags::ThreeByte(0, 0b00010000, 0).scanner_channel());
-        assert_eq!(3, Flags::ThreeByte(0, 0b00110000, 0).scanner_channel());
+        assert_eq!(1, Flags::ThreeByte(0, 0b0001_0000, 0).scanner_channel());
+        assert_eq!(3, Flags::ThreeByte(0, 0b0011_0000, 0).scanner_channel());
     }
 
     #[test]
@@ -974,7 +974,7 @@ mod tests {
         );
         assert_eq!(
             ScanDirection::LeftToRight,
-            Flags::TwoByte(0b01000000, 0).scan_direction()
+            Flags::TwoByte(0b0100_0000, 0).scan_direction()
         );
         assert_eq!(
             ScanDirection::RightToLeft,
@@ -982,16 +982,16 @@ mod tests {
         );
         assert_eq!(
             ScanDirection::LeftToRight,
-            Flags::ThreeByte(0, 0b01000000, 0).scan_direction()
+            Flags::ThreeByte(0, 0b0100_0000, 0).scan_direction()
         );
     }
 
     #[test]
     fn is_edge_of_flight_line() {
         assert!(!Flags::TwoByte(0, 0).is_edge_of_flight_line());
-        assert!(Flags::TwoByte(0b10000000, 0).is_edge_of_flight_line());
+        assert!(Flags::TwoByte(0b1000_0000, 0).is_edge_of_flight_line());
         assert!(!Flags::ThreeByte(0, 0, 0).is_edge_of_flight_line());
-        assert!(Flags::ThreeByte(0, 0b10000000, 0).is_edge_of_flight_line());
+        assert!(Flags::ThreeByte(0, 0b1000_0000, 0).is_edge_of_flight_line());
         assert_eq!(
             (128, 0),
             Flags::ThreeByte(0, 128, 0).to_two_bytes().unwrap()

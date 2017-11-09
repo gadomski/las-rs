@@ -149,6 +149,21 @@ impl Vlr {
         self.data.len() + HEADER_SIZE
     }
 
+    /// Returns true if the data of this vlr are empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// assert!(vlr.is_empty());
+    /// vlr.data = vec![42];
+    /// assert!(!vlr.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     /// Returns true if this vlr is extended.
     ///
     /// True either if the flag is set, or the data is too long for a normal vlr.

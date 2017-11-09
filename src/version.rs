@@ -119,8 +119,9 @@ impl Version {
             return false;
         }
         match self.minor {
-            0 => !(format.has_color || format.is_extended || format.has_waveform || format.has_nir),
-            1 => !(format.has_color || format.is_extended || format.has_waveform || format.has_nir),
+            0 | 1 => {
+                !(format.has_color || format.is_extended || format.has_waveform || format.has_nir)
+            }
             2 => !(format.is_extended || format.has_waveform || format.has_nir),
             3 => !(format.is_extended || format.has_nir),
             4 => true,

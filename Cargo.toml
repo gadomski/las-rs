@@ -19,5 +19,8 @@ num = "0.1"
 quick-error = "1.2"
 uuid = "0.4"
 
+[dev-dependencies]
+approx = "0.1"
+
 [badges]
 travis-ci = { repository = "gadomski/las-rs" }
