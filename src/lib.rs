@@ -1,6 +1,5 @@
-//! Read and write [ASPRS LAS]
-//! (https://www.asprs.org/committee-general/laser-las-file-format-exchange-activities.html) point
-//! cloud data.
+//! Read and write [ASPRS LAS](https://www.asprs.org/committee-general/laser-las-file-format-exchange-activities.html)
+//! point cloud data.
 //!
 //! # Reading
 //!
