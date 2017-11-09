@@ -270,7 +270,7 @@ impl Header {
         let point_data_record_length = read.read_u16::<LittleEndian>()?;
         let number_of_point_records = read.read_u32::<LittleEndian>()?;
         let mut number_of_points_by_return = [0; 5];
-        for n in number_of_points_by_return.iter_mut() {
+        for n in &mut number_of_points_by_return {
             *n = read.read_u32::<LittleEndian>()?;
         }
         let x_scale_factor = read.read_f64::<LittleEndian>()?;
@@ -399,7 +399,7 @@ impl Header {
         write.write_u32::<LittleEndian>(
             self.number_of_point_records,
         )?;
-        for n in self.number_of_points_by_return.iter() {
+        for n in &self.number_of_points_by_return {
             write.write_u32::<LittleEndian>(*n)?;
         }
         write.write_f64::<LittleEndian>(self.x_scale_factor)?;
