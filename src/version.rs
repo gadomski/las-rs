@@ -180,8 +180,8 @@ mod tests {
                 #[test]
                 fn point_formats() {
                     let version = Version::new($major, $minor);
-                    for n in 0..11 {
-                        let format = Format::new(n).unwrap();
+                    for n in 0i8..11 {
+                        let format = Format::new(n as u8).unwrap();
                         if n <= $max_point_format {
                             assert!(version.supports_point_format(format));
                         } else {
@@ -198,4 +198,6 @@ mod tests {
     version!(las_1_2, 1, 2, [true, true, false, false, false], 3);
     version!(las_1_3, 1, 3, [true, true, true, false, false], 5);
     version!(las_1_4, 1, 4, [true; 5], 10);
+    version!(las_1_5, 1, 5, [false; 5], -1);
+    version!(las_2_0, 2, 0, [false; 5], -1);
 }
