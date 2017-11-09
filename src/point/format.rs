@@ -57,6 +57,7 @@ pub struct Format {
     pub extra_bytes: u16,
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
 impl Format {
     /// Creates a new point format from a u8.
     ///
