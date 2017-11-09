@@ -9,6 +9,7 @@ extern crate uuid;
 use las::{Header, Point, Reader, Writer};
 use std::io::Cursor;
 
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
 pub fn roundtrip(header: &Header, point: &Point, should_succeed: bool) {
     let mut cursor = Cursor::new(Vec::new());
     {
