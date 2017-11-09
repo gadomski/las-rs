@@ -115,7 +115,7 @@ impl From<Classification> for u8 {
             Classification::WireStructureConnector => 16,
             Classification::BridgeDeck => 17,
             Classification::HighNoise => 18,
-            Classification::Reserved(n) => n,
+            Classification::Reserved(n) |
             Classification::UserDefinable(n) => n,
         }
     }
