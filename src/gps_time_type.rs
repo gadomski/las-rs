@@ -43,3 +43,9 @@ impl From<u16> for GpsTimeType {
         }
     }
 }
+
+impl Default for GpsTimeType {
+    fn default() -> GpsTimeType {
+        GpsTimeType::Week
+    }
+}
