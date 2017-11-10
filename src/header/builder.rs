@@ -10,11 +10,6 @@ pub struct Builder {
     /// The date of file creation.
     pub date: Option<Date<Utc>>,
 
-    /// The bytes after the points but before any vlrs.
-    ///
-    /// Discouraged.
-    pub end_of_points_padding: Vec<u8>,
-
     /// The file source id, sometimes the flight line.
     pub file_source_id: u16,
 
@@ -35,6 +30,11 @@ pub struct Builder {
 
     /// The format that the points will be written in.
     pub point_format: Format,
+
+    /// The bytes after the points but before any evlrs.
+    ///
+    /// Discouraged.
+    pub point_padding: Vec<u8>,
 
     /// The system that generated the points.
     pub system_identifier: String,
@@ -92,7 +92,7 @@ impl Builder {
                 i32::from(raw_header.file_creation_year),
                 u32::from(raw_header.file_creation_day_of_year),
             ).single(),
-            end_of_points_padding: Vec::new(),
+            point_padding: Vec::new(),
             file_source_id: raw_header.file_source_id,
             generating_software: raw_header
                 .generating_software
@@ -191,7 +191,6 @@ impl Builder {
         let header = Header {
             bounds: self.bounds,
             date: self.date,
-            end_of_points_padding: self.end_of_points_padding,
             evlrs: evlrs,
             file_source_id: self.file_source_id,
             generating_software: self.generating_software,
@@ -202,6 +201,7 @@ impl Builder {
             number_of_points_by_return: self.number_of_points_by_return,
             padding: self.padding,
             point_format: self.point_format,
+            point_padding: self.point_padding,
             system_identifier: self.system_identifier,
             transforms: self.transforms,
             version: self.version,
@@ -223,23 +223,23 @@ impl<V: Into<Version>> From<V> for Builder {
 impl From<Header> for Builder {
     fn from(header: Header) -> Builder {
         Builder {
+            bounds: header.bounds,
             date: header.date,
-            end_of_points_padding: header.end_of_points_padding,
             file_source_id: header.file_source_id,
             generating_software: header.generating_software,
             gps_time_type: header.gps_time_type,
             guid: header.guid,
             has_synthetic_return_numbers: header.has_synthetic_return_numbers,
+            number_of_points: header.number_of_points,
+            number_of_points_by_return: header.number_of_points_by_return,
             padding: header.padding,
             point_format: header.point_format,
+            point_padding: header.point_padding,
             system_identifier: header.system_identifier,
             transforms: header.transforms,
             version: header.version,
             vlr_padding: header.vlr_padding,
             vlrs: header.vlrs,
-            bounds: header.bounds,
-            number_of_points: header.number_of_points,
-            number_of_points_by_return: header.number_of_points_by_return,
         }
     }
 }

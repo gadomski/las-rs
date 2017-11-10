@@ -124,7 +124,6 @@ quick_error! {
 pub struct Header {
     bounds: Bounds,
     date: Option<Date<Utc>>,
-    end_of_points_padding: Vec<u8>,
     evlrs: Vec<Vlr>,
     file_source_id: u16,
     generating_software: String,
@@ -135,6 +134,7 @@ pub struct Header {
     number_of_points_by_return: HashMap<u8, u64>,
     padding: Vec<u8>,
     point_format: Format,
+    point_padding: Vec<u8>,
     system_identifier: String,
     transforms: Vector<Transform>,
     version: Version,
@@ -649,7 +649,6 @@ impl Default for Header {
         Header {
             bounds: Default::default(),
             date: Some(Utc::today()),
-            end_of_points_padding: Vec::new(),
             evlrs: Vec::new(),
             file_source_id: 0,
             generating_software: format!("las-rs {}", env!("CARGO_PKG_VERSION")),
@@ -660,6 +659,7 @@ impl Default for Header {
             number_of_points_by_return: HashMap::new(),
             padding: Vec::new(),
             point_format: Default::default(),
+            point_padding: Vec::new(),
             system_identifier: "las-rs".to_string(),
             transforms: Default::default(),
             version: Default::default(),

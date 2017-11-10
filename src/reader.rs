@@ -116,7 +116,7 @@ impl<R: Read + Seek> Reader<R> {
             } else if evlr.start_of_first_evlr > offset_to_end_of_points {
                 let n = evlr.start_of_first_evlr - offset_to_end_of_points;
                 read.by_ref().take(n).read_to_end(
-                    &mut builder.end_of_points_padding,
+                    &mut builder.point_padding,
                 )?;
             }
             read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
@@ -126,7 +126,7 @@ impl<R: Read + Seek> Reader<R> {
                 )?,
             );
         } else {
-            read.read_to_end(&mut builder.end_of_points_padding)?;
+            read.read_to_end(&mut builder.point_padding)?;
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;

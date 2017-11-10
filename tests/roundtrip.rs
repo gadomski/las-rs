@@ -176,8 +176,6 @@ mod $name {
         roundtrip_builder!(system_identifier, |b: &mut Builder| b.system_identifier = "roundtrip test".to_string());
         roundtrip_builder!(generating_software, |b: &mut Builder| b.generating_software = "roundtrip test".to_string());
         roundtrip_builder!(date, |b: &mut Builder| b.date = Some(Utc.ymd(2017, 10, 30)));
-        roundtrip_builder!(padding, |b: &mut Builder| b.padding = b"You probably shouldn't do this".to_vec());
-        roundtrip_builder!(vlr_padding, |b: &mut Builder| b.vlr_padding = b"You probably shouldn't do this either".to_vec());
         roundtrip_builder!(transforms, |b: &mut Builder| {
             use las::{Transform, Vector};
 
@@ -197,7 +195,9 @@ mod $name {
             vlr.data = vec![42; u16::MAX as usize + 1];
             b.vlrs.push(vlr);
         }, 4);
-        roundtrip_builder!(end_of_points_padding, |b: &mut Builder| b.end_of_points_padding = vec![42]);
+        roundtrip_builder!(padding, |b: &mut Builder| b.padding = b"You probably shouldn't do this".to_vec());
+        roundtrip_builder!(vlr_padding, |b: &mut Builder| b.vlr_padding = b"You probably shouldn't do this either".to_vec());
+        roundtrip_builder!(point_padding, |b: &mut Builder| b.point_padding = vec![42]);
     }
 }
 }}
