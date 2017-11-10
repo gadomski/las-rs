@@ -2,7 +2,7 @@ use {Point, Vector};
 use std::f64;
 
 /// Minimum and maximum bounds in three dimensions.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Bounds {
     /// The minimum values.
     pub min: Vector<f64>,
