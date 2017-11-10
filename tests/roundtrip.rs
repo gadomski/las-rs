@@ -66,15 +66,9 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
                 .unwrap()
         );
     }
-    assert_eq!(
-        header.vlrs().collect::<Vec<_>>(),
-        other.vlrs().collect::<Vec<_>>()
-    );
+    assert_eq!(header.vlrs(), other.vlrs());
     // TODO test vlr padding
-    assert_eq!(
-        header.evlrs().collect::<Vec<_>>(),
-        other.evlrs().collect::<Vec<_>>()
-    );
+    assert_eq!(header.evlrs(), other.evlrs());
     // TODO test end of points padding
 }
 
@@ -199,8 +193,7 @@ mod $name {
             use std::u16;
             use las::Vlr;
 
-            let mut vlr = Vlr::default();
-            vlr.is_extended = true;
+            let mut vlr = Vlr::extended();
             vlr.data = vec![42; u16::MAX as usize + 1];
             b.vlrs.push(vlr);
         }, 4);

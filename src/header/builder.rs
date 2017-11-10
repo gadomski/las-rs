@@ -175,10 +175,24 @@ impl Builder {
         if !self.version.supports_point_format(self.point_format) {
             return Err(Error::Format(self.version, self.point_format).into());
         }
+        let mut vlrs = Vec::new();
+        let mut evlrs = Vec::new();
+        for mut vlr in self.vlrs {
+            if vlr.has_large_data() || (vlr.is_extended() && self.version.supports::<Evlrs>()) {
+                vlr.extend();
+                evlrs.push(vlr);
+            } else {
+                vlrs.push(vlr);
+            }
+        }
+        if !evlrs.is_empty() {
+            self.version.verify_support_for::<Evlrs>()?;
+        }
         let header = Header {
             bounds: self.bounds,
             date: self.date,
             end_of_points_padding: self.end_of_points_padding,
+            evlrs: evlrs,
             file_source_id: self.file_source_id,
             generating_software: self.generating_software,
             gps_time_type: self.gps_time_type,
@@ -192,11 +206,8 @@ impl Builder {
             transforms: self.transforms,
             version: self.version,
             vlr_padding: self.vlr_padding,
-            vlrs: self.vlrs,
+            vlrs: vlrs,
         };
-        if header.evlrs().count() > 0 {
-            self.version.verify_support_for::<Evlrs>()?;
-        }
         Ok(header)
     }
 }

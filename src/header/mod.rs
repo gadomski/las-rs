@@ -54,6 +54,8 @@ use {Bounds, GpsTimeType, Point, Result, Transform, Vector, Version, Vlr, raw};
 use chrono::{Date, Datelike, Utc};
 use point::Format;
 use std::collections::HashMap;
+use std::iter::Chain;
+use std::slice::Iter;
 use utils::FromLasStr;
 use uuid::Uuid;
 
@@ -123,6 +125,7 @@ pub struct Header {
     bounds: Bounds,
     date: Option<Date<Utc>>,
     end_of_points_padding: Vec<u8>,
+    evlrs: Vec<Vlr>,
     file_source_id: u16,
     generating_software: String,
     gps_time_type: GpsTimeType,
@@ -143,10 +146,8 @@ pub struct Header {
 /// An iterator over a header's variable length records.
 ///
 /// Get this iterator via `vlrs` or `evlrs` methods on `Header`.
-#[allow(missing_debug_implementations)]
-pub struct Vlrs<'a> {
-    iter: Box<Iterator<Item = &'a Vlr> + 'a>,
-}
+#[derive(Debug)]
+pub struct Vlrs<'a>(Chain<Iter<'a, Vlr>, Iter<'a, Vlr>>);
 
 impl Header {
     /// Creates a new header from a raw header.
@@ -414,7 +415,7 @@ impl Header {
         &self.vlr_padding
     }
 
-    /// Returns an iterator over this header's variable length records.
+    /// Returns a reference to this header's vlrs.
     ///
     /// # Examples
     ///
@@ -423,64 +424,40 @@ impl Header {
     /// let mut builder = Builder::default();
     /// builder.vlrs.push(Vlr::default());
     /// let header = builder.into_header().unwrap();
-    /// assert_eq!(1, header.vlrs().count());
+    /// assert_eq!(1, header.vlrs().len());
     /// ```
-    ///
-    /// Extended VLRs will be downcasted to regular VLRs if the version does not support EVLRs.
-    ///
-    /// ```
-    /// use las::{Vlr, Builder};
-    /// let mut builder = Builder::from((1, 2));
-    /// builder.vlrs.push(Vlr { is_extended: true, ..Default::default() });
-    /// let header = builder.clone().into_header().unwrap();
-    /// assert_eq!(1, header.vlrs().count());
-    ///
-    /// builder.version = (1, 4).into();
-    /// let header = builder.into_header().unwrap();
-    /// assert_eq!(0, header.vlrs().count());
-    /// ```
-    ///
-    /// Too-large VLRs will cause the builder->header conversion to fail if the version does not
-    /// support evlrs.
-    ///
-    /// ```
-    /// use std::u16;
-    /// use las::{Vlr, Builder};
-    /// let mut builder = Builder::from((1, 2));
-    /// builder.vlrs.push(Vlr { data: vec![0; u16::MAX as usize + 1], ..Default::default() });
-    /// assert!(builder.into_header().is_err());
-    /// ```
-    pub fn vlrs(&self) -> Vlrs {
-        Vlrs::new(self, false)
+    pub fn vlrs(&self) -> &Vec<Vlr> {
+        &self.vlrs
     }
 
-    /// Returns an iterator over this header's extended variable length records.
+    /// Returns a reference to header's extended variable length records.
     ///
     /// # Examples
     ///
     /// ```
     /// use las::{Vlr, Builder};
     /// let mut builder = Builder::from((1, 4));
-    /// builder.vlrs.push(Vlr { is_extended: true, ..Default::default() });
+    /// builder.vlrs.push(Vlr::extended());
     /// let header = builder.into_header().unwrap();
-    /// assert_eq!(1, header.evlrs().count());
+    /// assert_eq!(1, header.evlrs().len());
     /// ```
+    pub fn evlrs(&self) -> &Vec<Vlr> {
+        &self.evlrs
+    }
+
+    /// Returns an iterator over all this header's vlrs, both extended and regular.
     ///
-    /// Extended VLRs will be downcasted to regular VLRs if the version does not support EVLRs.
+    /// # Examples
     ///
     /// ```
     /// use las::{Vlr, Builder};
-    /// let mut builder = Builder::from((1, 2));
-    /// builder.vlrs.push(Vlr { is_extended: true, ..Default::default() });
-    /// let header = builder.clone().into_header().unwrap();
-    /// assert_eq!(0, header.evlrs().count());
-    ///
-    /// builder.version = (1, 4).into();
+    /// let mut builder = Builder::from((1, 4));
+    /// builder.vlrs.push(Vlr::default());
+    /// builder.vlrs.push(Vlr::extended());
     /// let header = builder.into_header().unwrap();
-    /// assert_eq!(1, header.evlrs().count());
-    /// ```
-    pub fn evlrs(&self) -> Vlrs {
-        Vlrs::new(self, true)
+    /// assert_eq!(2, header.all_vlrs().count());
+    pub fn all_vlrs(&self) -> Vlrs {
+        Vlrs(self.vlrs.iter().chain(&self.evlrs))
     }
 
     /// Converts this header into a raw header.
@@ -569,7 +546,7 @@ impl Header {
     fn offset_to_point_data(&self) -> Result<u32> {
         use std::u32;
 
-        let vlr_len = self.vlrs().fold(0, |acc, vlr| acc + vlr.len());
+        let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
         let offset = self.header_size()? as usize + vlr_len + self.vlr_padding.len();
         if offset > u32::MAX as usize {
             Err(Error::OffsetToPointDataTooLarge(offset).into())
@@ -581,7 +558,7 @@ impl Header {
     fn number_of_variable_length_records(&self) -> Result<u32> {
         use std::u32;
 
-        let n = self.vlrs().count();
+        let n = self.vlrs().len();
         if n > u32::MAX as usize {
             Err(Error::TooManyVlrs(n).into())
         } else {
@@ -632,7 +609,7 @@ impl Header {
     fn evlr(&self) -> Result<Option<raw::header::Evlr>> {
         use std::u32;
 
-        let n = self.evlrs().count();
+        let n = self.evlrs.len();
         if n == 0 {
             Ok(None)
         } else if n > u32::MAX as usize {
@@ -670,23 +647,24 @@ impl Header {
 impl Default for Header {
     fn default() -> Header {
         Header {
-            file_source_id: 0,
-            gps_time_type: GpsTimeType::Week,
-            has_synthetic_return_numbers: false,
             bounds: Default::default(),
             date: Some(Utc::today()),
+            end_of_points_padding: Vec::new(),
+            evlrs: Vec::new(),
+            file_source_id: 0,
             generating_software: format!("las-rs {}", env!("CARGO_PKG_VERSION")),
+            gps_time_type: GpsTimeType::Week,
             guid: Default::default(),
+            has_synthetic_return_numbers: false,
             number_of_points: 0,
             number_of_points_by_return: HashMap::new(),
             padding: Vec::new(),
-            vlr_padding: Vec::new(),
             point_format: Default::default(),
             system_identifier: "las-rs".to_string(),
             transforms: Default::default(),
             version: Default::default(),
+            vlr_padding: Vec::new(),
             vlrs: Vec::new(),
-            end_of_points_padding: Vec::new(),
         }
     }
 }
@@ -699,24 +677,10 @@ impl<V: Into<Version>> From<V> for Header {
     }
 }
 
-impl<'a> Vlrs<'a> {
-    fn new(header: &Header, return_extended: bool) -> Vlrs {
-        use std::u16;
-        use feature::Evlrs;
-        let version_supports_evlrs = header.version.supports::<Evlrs>();
-        Vlrs {
-            iter: Box::new(header.vlrs.iter().filter(move |vlr| {
-                (vlr.len() > u16::MAX as usize || (version_supports_evlrs && vlr.is_extended)) ==
-                    return_extended
-            })),
-        }
-    }
-}
-
 impl<'a> Iterator for Vlrs<'a> {
     type Item = &'a Vlr;
     fn next(&mut self) -> Option<&'a Vlr> {
-        self.iter.next()
+        self.0.next()
     }
 }
 
