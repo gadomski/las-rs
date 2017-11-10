@@ -109,29 +109,16 @@ impl Vlr {
 
     /// Converts this vlr to a raw vlr.
     ///
-    /// The second argument works like this:
-    ///
-    /// - If `Some(false)`, creates a normal vlr.
-    /// - If `Some(true)`, creates an extended vlr.
-    /// - If `None`, falls back to the default as defined by the `extended` flag on this vlr.
-    ///
-    /// Note that you can just pass `true` or `false` and it will be converted to the option type.
-    ///
     /// # Examples
     ///
     /// ```
     /// use las::Vlr;
-    /// let raw_vlr =  Vlr::default().into_raw(false).unwrap();
-    /// let raw_evlr =  Vlr::default().into_raw(true).unwrap();
-    /// let raw_vlr2 =  Vlr::default().into_raw(None).unwrap();
+    /// let raw_vlr =  Vlr::default().into_raw().unwrap();
+    /// let raw_evlr =  Vlr::extended().into_raw().unwrap();
     /// ```
-    pub fn into_raw<T>(self, force_extended: T) -> Result<raw::Vlr>
-    where
-        T: Into<Option<bool>>,
-    {
+    pub fn into_raw(self) -> Result<raw::Vlr> {
         use utils::FromLasStr;
 
-        let extended = force_extended.into().unwrap_or(self.is_extended);
         let mut user_id = [0; 16];
         user_id.as_mut().from_las_str(&self.user_id)?;
         let mut description = [0; 32];
@@ -140,7 +127,7 @@ impl Vlr {
             reserved: 0,
             user_id: user_id,
             record_id: self.record_id,
-            record_length_after_header: self.record_length_after_header(extended)?,
+            record_length_after_header: self.record_length_after_header()?,
             description: description,
             data: self.data,
         })
@@ -227,8 +214,8 @@ impl Vlr {
         self.data.len() > u16::MAX as usize
     }
 
-    fn record_length_after_header(&self, extended: bool) -> Result<raw::vlr::RecordLength> {
-        if extended {
+    fn record_length_after_header(&self) -> Result<raw::vlr::RecordLength> {
+        if self.is_extended {
             Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))
         } else {
             use std::u16;
@@ -263,6 +250,6 @@ mod tests {
             data: data,
             ..Default::default()
         };
-        assert!(vlr.into_raw(false).is_err());
+        assert!(vlr.into_raw().is_err());
     }
 }

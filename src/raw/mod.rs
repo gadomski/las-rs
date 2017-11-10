@@ -8,7 +8,7 @@
 //! ```
 //! use las::{Vlr, Header, Point};
 //! let raw_header = Header::default().into_raw().unwrap();
-//! let raw_vlr = Vlr::default().into_raw(false).unwrap();
+//! let raw_vlr = Vlr::default().into_raw().unwrap();
 //! let raw_point = Point::default().into_raw(Default::default()).unwrap();
 //! ```
 //!

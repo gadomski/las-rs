@@ -94,7 +94,7 @@ impl<W: Seek + Write> Writer<W> {
             raw_header.write_to(&mut write)
         })?;
         for vlr in header.vlrs() {
-            (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
+            (*vlr).clone().into_raw().and_then(|raw_vlr| {
                 raw_vlr.write_to(&mut write)
             })?;
         }
@@ -153,11 +153,12 @@ impl<W: Seek + Write> Writer<W> {
             return Err(Error::Closed.into());
         }
         for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
-            evlr.clone().into_raw(true)
+            evlr.clone().into_raw()
         })
         {
             raw_evlr?.write_to(&mut self.write)?;
         }
+        // TODO support writers that aren't at the beginning of their write
         self.write.seek(SeekFrom::Start(0))?;
         self.header.clone().into_raw().and_then(|raw_header| {
             raw_header.write_to(&mut self.write)
