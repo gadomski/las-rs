@@ -34,7 +34,7 @@
 use {Header, Point, Result};
 use point::Format;
 use std::fs::File;
-use std::io::{BufWriter, Seek, SeekFrom, Write};
+use std::io::{BufWriter, Cursor, Seek, SeekFrom, Write};
 use std::path::Path;
 
 quick_error! {
@@ -72,6 +72,7 @@ quick_error! {
 pub struct Writer<W: Seek + Write> {
     closed: bool,
     header: Header,
+    start: u64,
     write: W,
 }
 
@@ -89,6 +90,7 @@ impl<W: Seek + Write> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
+        let start = write.seek(SeekFrom::Current(0))?;
         header.clear();
         header.clone().into_raw().and_then(|raw_header| {
             raw_header.write_to(&mut write)
@@ -104,6 +106,7 @@ impl<W: Seek + Write> Writer<W> {
         Ok(Writer {
             closed: false,
             header: header,
+            start: start,
             write: write,
         })
     }
@@ -158,11 +161,11 @@ impl<W: Seek + Write> Writer<W> {
         {
             raw_evlr?.write_to(&mut self.write)?;
         }
-        // TODO support writers that aren't at the beginning of their write
-        self.write.seek(SeekFrom::Start(0))?;
+        self.write.seek(SeekFrom::Start(self.start))?;
         self.header.clone().into_raw().and_then(|raw_header| {
             raw_header.write_to(&mut self.write)
         })?;
+        self.write.seek(SeekFrom::Start(self.start))?;
         self.closed = true;
         Ok(())
     }
@@ -182,10 +185,8 @@ impl<W: Write + Seek + Clone> Writer<W> {
         if !self.closed {
             self.close()?;
         }
-        let mut write = self.write.clone();
-        // TODO writers that aren't at the beginning of their write
-        write.seek(SeekFrom::Start(0))?;
-        Ok(write)
+        self.write.seek(SeekFrom::Start(self.start))?;
+        Ok(self.write.clone())
     }
 }
 
@@ -297,5 +298,19 @@ mod tests {
         let format = Format::new(4).unwrap();
         let mut writer = writer(format, Version::new(1, 4));
         assert!(writer.write(Default::default()).is_err());
+    }
+
+    #[test]
+    fn write_not_at_start() {
+        use Reader;
+        use byteorder::WriteBytesExt;
+
+        let mut cursor = Cursor::new(Vec::new());
+        cursor.write_u8(42).unwrap();
+        let mut writer = Writer::new(cursor, Default::default()).unwrap();
+        let point = Point::default();
+        writer.write(point.clone()).unwrap();
+        let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
+        assert_eq!(point, reader.read().unwrap().unwrap());
     }
 }
