@@ -17,15 +17,9 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
         assert!(builder.into_header().is_err());
         return;
     };
-    let mut cursor = Cursor::new(Vec::new());
-    {
-        Writer::new(&mut cursor, header.clone())
-            .unwrap()
-            .write(point.clone())
-            .unwrap();
-        cursor.set_position(0);
-    }
-    let mut reader = Reader::new(cursor).unwrap();
+    let mut writer = Writer::new(Cursor::new(Vec::new()), header.clone()).unwrap();
+    writer.write(point.clone()).unwrap();
+    let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
     let other = reader
         .read()
         .expect("Error when reading the other point")

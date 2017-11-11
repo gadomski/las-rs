@@ -168,6 +168,27 @@ impl<W: Seek + Write> Writer<W> {
     }
 }
 
+impl<W: Write + Seek + Clone> Writer<W> {
+    /// Closes this writer and returns its inner `Write`, seeked to the beginning of the las data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Writer;
+    /// let writer = Writer::default();
+    /// let cursor = writer.into_inner().unwrap();
+    /// ```
+    pub fn into_inner(mut self) -> Result<W> {
+        if !self.closed {
+            self.close()?;
+        }
+        let mut write = self.write.clone();
+        // TODO writers that aren't at the beginning of their write
+        write.seek(SeekFrom::Start(0))?;
+        Ok(write)
+    }
+}
+
 impl Writer<BufWriter<File>> {
     /// Creates a new writer for a path.
     ///
@@ -216,14 +237,13 @@ mod tests {
 
     #[test]
     fn las_1_0_point_data_start_signature() {
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut builder = Builder::default();
-            builder.version = (1, 0).into();
-            builder.vlrs.push(Default::default());
-            let mut writer = Writer::new(&mut cursor, builder.into_header().unwrap()).unwrap();
-            writer.write(Default::default()).unwrap();
-        }
+        let mut builder = Builder::default();
+        builder.version = (1, 0).into();
+        builder.vlrs.push(Default::default());
+        let mut writer = Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap())
+            .unwrap();
+        writer.write(Default::default()).unwrap();
+        let mut cursor = writer.into_inner().unwrap();
         cursor.set_position(281);
         assert_eq!(0xCCDD, cursor.read_u16::<LittleEndian>().unwrap());
     }
