@@ -126,8 +126,6 @@ impl<R: Read + Seek> Reader<R> {
                     Vlr::new,
                 )?,
             );
-        } else {
-            read.read_to_end(&mut builder.point_padding)?;
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;

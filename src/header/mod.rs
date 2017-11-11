@@ -83,6 +83,10 @@ quick_error! {
             description("the point data record length is too small for the format")
             display("the point data record length {} is too small for format {}", len, format)
         }
+        /// Point padding is only allowed when evlrs are present.
+        PointPadding {
+            description("point padding is only allowed when evlrs are present")
+        }
         /// The header size, as computed, is too large.
         TooLarge(len: usize) {
             description("the header is too large to convert to a raw header")
@@ -140,7 +144,6 @@ pub struct Header {
     version: Version,
     vlr_padding: Vec<u8>,
     vlrs: Vec<Vlr>,
-    // TODO add after-evlr padding
 }
 
 /// An iterator over a header's variable length records.

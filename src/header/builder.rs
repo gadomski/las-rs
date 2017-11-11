@@ -188,6 +188,8 @@ impl Builder {
         }
         if !evlrs.is_empty() {
             self.version.verify_support_for::<Evlrs>()?;
+        } else if !self.point_padding.is_empty() {
+            return Err(Error::PointPadding.into());
         }
         let header = Header {
             bounds: self.bounds,

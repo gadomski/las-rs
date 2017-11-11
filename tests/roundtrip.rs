@@ -197,11 +197,10 @@ mod $name {
         });
         roundtrip_builder!(padding, |b: &mut Builder| b.padding = b"You probably shouldn't do this".to_vec());
         roundtrip_builder!(vlr_padding, |b: &mut Builder| b.vlr_padding = b"You probably shouldn't do this either".to_vec());
-        roundtrip_builder!(point_padding, |b: &mut Builder| b.point_padding = vec![42]);
-        roundtrip_builder!(point_padding_and_evlr, |b: &mut Builder| {
+        roundtrip_builder!(point_padding, |b: &mut Builder| {
             b.point_padding = vec![42];
             b.vlrs.push(Vlr::extended());
-        });
+        }, 4);
     }
 }
 }}
