@@ -111,6 +111,19 @@ impl<W: Seek + Write> Writer<W> {
         })
     }
 
+    /// Returns a reference to this writer's header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Writer;
+    /// let writer = Writer::default();
+    /// let header = writer.header();
+    /// ```
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
     /// Writes a point.
     ///
     /// # Examples
