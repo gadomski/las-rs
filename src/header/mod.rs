@@ -199,7 +199,7 @@ impl Header {
     /// ```
     pub fn add_point(&mut self, point: &Point) {
         self.number_of_points += 1;
-        {
+        if point.return_number > 0 {
             let entry = self.number_of_points_by_return
                 .entry(point.return_number)
                 .or_insert(0);
