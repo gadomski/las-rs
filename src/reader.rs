@@ -85,9 +85,6 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let raw_header = raw::Header::read_from(&mut read)?;
-        if raw_header.point_format.is_compressed {
-            return Err(::Error::Laszip);
-        }
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
         let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
@@ -95,6 +92,9 @@ impl<R: Read + Seek> Reader<R> {
         let evlr = raw_header.evlr;
 
         let mut builder = Builder::new(raw_header)?;
+        if builder.point_format.is_compressed {
+            return Err(::Error::Laszip);
+        }
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
             position += vlr.len(false) as u64;

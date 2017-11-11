@@ -3,7 +3,6 @@
 use {Result, Version};
 use byteorder::{LittleEndian, ReadBytesExt};
 use feature::{Evlrs, LargeFiles, Waveforms};
-use point::Format;
 use raw::LASF;
 use std::io::{Read, Write};
 
@@ -122,7 +121,16 @@ pub struct Header {
     /// The point data format ID corresponds to the point data record format type.
     ///
     /// LAS 1.2 defines types 0, 1, 2 and 3. LAS 1.4 defines types 0 through 10.
-    pub point_format: Format,
+    pub point_data_record_format: u8,
+
+    /// The size, in bytes, of the Point Data Record.
+    ///
+    /// All Point Data Records within a single LAS file must be the same type and hence the same
+    /// length. If the specified size is larger than implied by the point format type (e.g. 32
+    /// bytes instead of 28 bytes for type 1) the remaining bytes are user-specific “extra bytes.
+    /// The format and meaning of such “extra bytes” can (optionally) be described with an Extra
+    /// Bytes VLR (see Table 24 and Table 25).
+    pub point_data_record_length: u16,
 
     /// This field contains the total number of point records within the file.
     pub number_of_point_records: u32,
@@ -266,18 +274,8 @@ impl Header {
         header.header_size = read.read_u16::<LittleEndian>()?;
         header.offset_to_point_data = read.read_u32::<LittleEndian>()?;
         header.number_of_variable_length_records = read.read_u32::<LittleEndian>()?;
-        header.point_format = read.read_u8().map_err(::Error::from).and_then(
-            |n| Format::new(n),
-        )?;
-        let point_data_record_length = read.read_u16::<LittleEndian>()?;
-        if point_data_record_length < header.point_format.len() {
-            return Err(
-                Error::PointDataRecordLength(header.point_format, point_data_record_length)
-                    .into(),
-            );
-        } else if header.point_format.len() < point_data_record_length {
-            header.point_format.extra_bytes = point_data_record_length - header.point_format.len();
-        }
+        header.point_data_record_format = read.read_u8()?;
+        header.point_data_record_length = read.read_u16::<LittleEndian>()?;
         header.number_of_point_records = read.read_u32::<LittleEndian>()?;
         for n in &mut header.number_of_points_by_return {
             *n = read.read_u32::<LittleEndian>()?;
@@ -329,7 +327,7 @@ impl Header {
     /// ```
     pub fn offset_to_end_of_points(&self) -> u64 {
         u64::from(self.offset_to_point_data) +
-            u64::from(self.number_of_point_records) * u64::from(self.point_format.len())
+            u64::from(self.number_of_point_records) * u64::from(self.point_data_record_length)
     }
 
     /// Writes a raw header to a `Write`.
@@ -363,10 +361,10 @@ impl Header {
         write.write_u32::<LittleEndian>(
             self.number_of_variable_length_records,
         )?;
-        self.point_format.to_u8().and_then(|n| {
-            write.write_u8(n).map_err(::Error::from)
-        })?;
-        write.write_u16::<LittleEndian>(self.point_format.len())?;
+        write.write_u8(self.point_data_record_format)?;
+        write.write_u16::<LittleEndian>(
+            self.point_data_record_length,
+        )?;
         write.write_u32::<LittleEndian>(
             self.number_of_point_records,
         )?;
@@ -413,6 +411,7 @@ impl Header {
 
 impl Default for Header {
     fn default() -> Header {
+        use point::Format;
         let version = Version::new(1, 2);
         let point_format = Format::new(0).unwrap();
         Header {
@@ -428,7 +427,8 @@ impl Default for Header {
             header_size: version.header_size(),
             offset_to_point_data: u32::from(version.header_size()),
             number_of_variable_length_records: 0,
-            point_format: point_format,
+            point_data_record_format: point_format.to_u8().unwrap(),
+            point_data_record_length: point_format.len(),
             number_of_point_records: 0,
             number_of_points_by_return: [0; 5],
             x_scale_factor: 0.,

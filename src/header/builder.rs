@@ -1,5 +1,6 @@
 use {Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr, raw};
 use chrono::{Date, Utc};
+use header::Error;
 use point::Format;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -90,6 +91,16 @@ impl Builder {
                     .map(|f| number_of_points_hash_map(&f.number_of_points_by_return))
                     .unwrap_or_else(HashMap::new)
             };
+        let mut point_format = Format::new(raw_header.point_data_record_format)?;
+        let n = point_format.len();
+        if raw_header.point_data_record_length < n {
+            return Err(
+                Error::PointDataRecordLength(point_format, raw_header.point_data_record_length)
+                    .into(),
+            );
+        } else if n < raw_header.point_data_record_length {
+            point_format.extra_bytes = raw_header.point_data_record_length - n;
+        }
         Ok(Builder {
             date: Utc.yo_opt(
                 i32::from(raw_header.file_creation_year),
@@ -107,7 +118,7 @@ impl Builder {
             guid: Uuid::from_bytes(&raw_header.guid).unwrap(),
             has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
             padding: raw_header.padding,
-            point_format: raw_header.point_format,
+            point_format: point_format,
             system_identifier: raw_header
                 .system_identifier
                 .as_ref()
