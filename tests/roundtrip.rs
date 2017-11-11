@@ -1,7 +1,5 @@
 //! Roundtrip (write-read) tests for supported LAS versions and attributes.
 
-#[macro_use]
-extern crate approx;
 extern crate chrono;
 extern crate las;
 extern crate uuid;
@@ -9,7 +7,6 @@ extern crate uuid;
 use las::{Builder, Point, Reader, Writer};
 use std::io::Cursor;
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
 pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
     let header = if should_succeed {
         builder.into_header().unwrap()
@@ -17,55 +14,13 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
         assert!(builder.into_header().is_err());
         return;
     };
-    let mut writer = Writer::new(Cursor::new(Vec::new()), header.clone()).unwrap();
+    let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
     writer.write(point.clone()).unwrap();
+    let header = writer.header().clone();
     let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
-    let other = reader
-        .read()
-        .expect("Error when reading the other point")
-        .unwrap();
-    assert_eq!(point, &other);
-    assert_eq!(
-        None,
-        reader.read().expect("Error when reading past last point")
-    );
-
-    let other = reader.header();
-    assert_eq!(header.file_source_id(), other.file_source_id());
-    assert_eq!(header.gps_time_type(), other.gps_time_type());
-    assert_eq!(
-        header.has_synthetic_return_numbers(),
-        other.has_synthetic_return_numbers()
-    );
-    assert_eq!(header.guid(), other.guid());
-    assert_eq!(header.version(), other.version());
-    assert_eq!(header.system_identifier(), other.system_identifier());
-    assert_eq!(header.generating_software(), other.generating_software());
-    assert_eq!(header.date(), other.date());
-    assert_eq!(header.point_format(), other.point_format());
-    assert_eq!(header.transforms(), other.transforms());
-    assert_relative_eq!(point.x, other.bounds().min.x);
-    assert_relative_eq!(point.x, other.bounds().max.x);
-    assert_relative_eq!(point.y, other.bounds().min.y);
-    assert_relative_eq!(point.y, other.bounds().max.y);
-    assert_relative_eq!(point.z, other.bounds().min.z);
-    assert_relative_eq!(point.z, other.bounds().max.z);
-    assert_eq!(1, other.number_of_points());
-    if point.return_number > 0 {
-        assert_eq!(
-            1,
-            other
-                .number_of_points_by_return(point.return_number)
-                .unwrap()
-        );
-    }
-
-    assert_eq!(header.vlrs(), other.vlrs());
-    assert_eq!(header.evlrs(), other.evlrs());
-
-    assert_eq!(header.padding(), other.padding());
-    assert_eq!(header.vlr_padding(), other.vlr_padding());
-    assert_eq!(header.point_padding(), other.point_padding());
+    assert_eq!(*point, reader.read().unwrap().unwrap());
+    assert_eq!(None, reader.read().unwrap());
+    assert_eq!(header, *reader.header());
 }
 
 macro_rules! roundtrip_point {
