@@ -96,7 +96,7 @@ impl<W: Seek + Write> Writer<W> {
             raw_header.write_to(&mut write)
         })?;
         for vlr in header.vlrs() {
-            (*vlr).clone().into_raw().and_then(|raw_vlr| {
+            (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
                 raw_vlr.write_to(&mut write)
             })?;
         }
@@ -157,7 +157,7 @@ impl<W: Seek + Write> Writer<W> {
         }
         self.write.write_all(self.header.point_padding())?;
         for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
-            evlr.clone().into_raw()
+            evlr.clone().into_raw(true)
         })
         {
             raw_evlr?.write_to(&mut self.write)?;

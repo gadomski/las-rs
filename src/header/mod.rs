@@ -454,7 +454,7 @@ impl Header {
     /// ```
     /// use las::{Vlr, Builder};
     /// let mut builder = Builder::from((1, 4));
-    /// builder.vlrs.push(Vlr::extended());
+    /// builder.evlrs.push(Vlr::default());
     /// let header = builder.into_header().unwrap();
     /// assert_eq!(1, header.evlrs().len());
     /// ```
@@ -470,7 +470,7 @@ impl Header {
     /// use las::{Vlr, Builder};
     /// let mut builder = Builder::from((1, 4));
     /// builder.vlrs.push(Vlr::default());
-    /// builder.vlrs.push(Vlr::extended());
+    /// builder.evlrs.push(Vlr::default());
     /// let header = builder.into_header().unwrap();
     /// assert_eq!(2, header.all_vlrs().count());
     pub fn all_vlrs(&self) -> Vlrs {
@@ -563,7 +563,7 @@ impl Header {
     fn offset_to_point_data(&self) -> Result<u32> {
         use std::u32;
 
-        let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len());
+        let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len(false));
         let offset = self.header_size()? as usize + vlr_len + self.vlr_padding.len();
         if offset > u32::MAX as usize {
             Err(Error::OffsetToPointDataTooLarge(offset).into())

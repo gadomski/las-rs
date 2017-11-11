@@ -89,27 +89,6 @@ impl Vlr {
         Ok(vlr)
     }
 
-    /// Is this vlr extended?
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::raw::Vlr;
-    /// assert!(!Vlr::default().is_extended());
-    ///
-    /// use las::raw::vlr::RecordLength;
-    /// assert!(Vlr {
-    ///     record_length_after_header: RecordLength::Evlr(0),
-    ///     ..Default::default()
-    /// }.is_extended());
-    /// ```
-    pub fn is_extended(&self) -> bool {
-        match self.record_length_after_header {
-            RecordLength::Vlr(_) => false,
-            RecordLength::Evlr(_) => true,
-        }
-    }
-
     /// Writes a raw VLR.
     ///
     /// # Examples

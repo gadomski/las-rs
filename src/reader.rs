@@ -96,7 +96,7 @@ impl<R: Read + Seek> Reader<R> {
         let mut builder = Builder::new(raw_header)?;
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
-            position += vlr.len() as u64;
+            position += vlr.len(false) as u64;
             builder.vlrs.push(vlr);
         }
         if position > offset_to_point_data {
@@ -121,7 +121,7 @@ impl<R: Read + Seek> Reader<R> {
                     &mut builder.point_padding,
                 )?;
             }
-            builder.vlrs.push(
+            builder.evlrs.push(
                 raw::Vlr::read_from(&mut read, true).and_then(
                     Vlr::new,
                 )?,

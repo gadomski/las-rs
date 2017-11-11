@@ -15,15 +15,11 @@
 //! vlr.data = vec![1, 2, 3];
 //! ```
 //!
-//! Extended variable length records can be created with the `extended` method. Note that, when
-//! possible, evlrs will be downcasted to vlrs when writing to versions that don't support evlrs.
-//!
 //! ```
 //! use las::{Vlr, Builder};
 //! let mut builder = Builder::from((1, 4));
 //!
-//! let evlr = Vlr::extended();
-//! builder.vlrs.push(evlr);
+//! builder.evlrs.push(Vlr::default());
 //! let header = builder.clone().into_header().unwrap();
 //! assert_eq!(1, header.evlrs().len());
 //!
@@ -67,27 +63,9 @@ pub struct Vlr {
 
     /// The data themselves.
     pub data: Vec<u8>,
-
-    is_extended: bool,
 }
 
 impl Vlr {
-    /// Creates a default extended vlr.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Vlr;
-    /// let vlr = Vlr::extended();
-    /// assert!(vlr.is_extended());
-    /// ```
-    pub fn extended() -> Vlr {
-        Vlr {
-            is_extended: true,
-            ..Default::default()
-        }
-    }
-
     /// Creates a vlr from a raw vlr.
     ///
     /// # Examples
@@ -103,7 +81,6 @@ impl Vlr {
             user_id: raw_vlr.user_id.as_ref().as_las_str()?.to_string(),
             record_id: raw_vlr.record_id,
             description: raw_vlr.description.as_ref().as_las_str()?.to_string(),
-            is_extended: raw_vlr.is_extended(),
             data: raw_vlr.data,
         })
     }
@@ -114,10 +91,10 @@ impl Vlr {
     ///
     /// ```
     /// use las::Vlr;
-    /// let raw_vlr =  Vlr::default().into_raw().unwrap();
-    /// let raw_evlr =  Vlr::extended().into_raw().unwrap();
+    /// let raw_vlr =  Vlr::default().into_raw(false).unwrap();
+    /// let raw_evlr =  Vlr::default().into_raw(true).unwrap();
     /// ```
-    pub fn into_raw(self) -> Result<raw::Vlr> {
+    pub fn into_raw(self, is_extended: bool) -> Result<raw::Vlr> {
         use utils::FromLasStr;
 
         let mut user_id = [0; 16];
@@ -128,7 +105,7 @@ impl Vlr {
             reserved: 0,
             user_id: user_id,
             record_id: self.record_id,
-            record_length_after_header: self.record_length_after_header()?,
+            record_length_after_header: self.record_length_after_header(is_extended)?,
             description: description,
             data: self.data,
         })
@@ -142,16 +119,14 @@ impl Vlr {
     /// use las::Vlr;
     ///
     /// let mut vlr = Vlr::default();
-    /// assert_eq!(54, vlr.len());
+    /// assert_eq!(54, vlr.len(false));
+    /// assert_eq!(60, vlr.len(true));
     /// vlr.data = vec![0];
-    /// assert_eq!(55, vlr.len());
-    ///
-    /// let evlr = Vlr::extended();
-    /// assert_eq!(60, evlr.len());
+    /// assert_eq!(55, vlr.len(false));
     /// ```
-    pub fn len(&self) -> usize {
+    pub fn len(&self, is_extended: bool) -> usize {
         self.data.len() +
-            if self.is_extended {
+            if is_extended {
                 EXTENDED_HEADER_SIZE
             } else {
                 REGULAR_HEADER_SIZE
@@ -173,58 +148,6 @@ impl Vlr {
         self.data.is_empty()
     }
 
-    /// Mark this vlr as not extended (regular).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Vlr;
-    /// let mut vlr = Vlr::extended();
-    /// assert!(vlr.is_extended());
-    /// vlr.unextend();
-    /// assert!(!vlr.is_extended());
-    /// ```
-    pub fn unextend(&mut self) {
-        self.is_extended = false;
-    }
-
-    /// Mark this vlr as extended.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Vlr;
-    /// let mut vlr = Vlr::default();
-    /// assert!(!vlr.is_extended());
-    /// vlr.extend();
-    /// assert!(vlr.is_extended());
-    /// ```
-    pub fn extend(&mut self) {
-        self.is_extended = true;
-    }
-
-    /// Returns true if this vlr is extended.
-    ///
-    /// True either if the flag is set, or the data is too long for a normal vlr.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::u16;
-    /// use las::Vlr;
-    /// let vlr = Vlr::default();
-    /// assert!(!vlr.is_extended());
-    /// let vlr = Vlr::extended();
-    /// assert!(vlr.is_extended());
-    ///
-    /// let mut vlr = Vlr::default();
-    /// vlr.data = vec![0; u16::MAX as usize + 1];
-    /// assert!(vlr.is_extended());
-    /// ```
-    pub fn is_extended(&self) -> bool {
-        self.is_extended || self.has_large_data()
-    }
-
     /// Returns true if this vlr *must* be extended due to large data size.
     ///
     /// # Examples
@@ -232,17 +155,17 @@ impl Vlr {
     /// ```
     /// use las::Vlr;
     /// use std::u16;
-    /// let mut evlr = Vlr::extended();
-    /// assert!(!evlr.has_large_data());
-    /// evlr.data = vec![0; u16::MAX as usize + 1 ];
-    /// assert!(evlr.has_large_data());
+    /// let mut vlr = Vlr::default();
+    /// assert!(!vlr.has_large_data());
+    /// vlr.data = vec![0; u16::MAX as usize + 1 ];
+    /// assert!(vlr.has_large_data());
     pub fn has_large_data(&self) -> bool {
         use std::u16;
         self.data.len() > u16::MAX as usize
     }
 
-    fn record_length_after_header(&self) -> Result<raw::vlr::RecordLength> {
-        if self.is_extended {
+    fn record_length_after_header(&self, is_extended: bool) -> Result<raw::vlr::RecordLength> {
+        if is_extended {
             Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))
         } else {
             use std::u16;
@@ -266,7 +189,8 @@ mod tests {
             data: data,
             ..Default::default()
         };
-        assert_eq!(55, vlr.len());
+        assert_eq!(55, vlr.len(false));
+        assert_eq!(61, vlr.len(true));
     }
 
     #[test]
@@ -277,6 +201,6 @@ mod tests {
             data: data,
             ..Default::default()
         };
-        assert!(vlr.into_raw().is_err());
+        assert!(vlr.into_raw(false).is_err());
     }
 }

@@ -52,6 +52,9 @@ pub struct Builder {
     /// The variable length records.
     pub vlrs: Vec<Vlr>,
 
+    /// The extended variable length records.
+    pub evlrs: Vec<Vlr>,
+
     number_of_points_by_return: HashMap<u8, u64>,
     number_of_points: u64,
     bounds: Bounds,
@@ -93,6 +96,7 @@ impl Builder {
                 u32::from(raw_header.file_creation_day_of_year),
             ).single(),
             point_padding: Vec::new(),
+            evlrs: Vec::new(),
             file_source_id: raw_header.file_source_id,
             generating_software: raw_header
                 .generating_software
@@ -177,12 +181,17 @@ impl Builder {
         }
         let mut vlrs = Vec::new();
         let mut evlrs = Vec::new();
-        for mut vlr in self.vlrs {
-            if vlr.has_large_data() || (vlr.is_extended() && self.version.supports::<Evlrs>()) {
-                vlr.extend();
+        for evlr in self.evlrs {
+            if self.version.supports::<Evlrs>() || evlr.has_large_data() {
+                evlrs.push(evlr);
+            } else {
+                vlrs.push(evlr);
+            }
+        }
+        for vlr in self.vlrs {
+            if vlr.has_large_data() {
                 evlrs.push(vlr);
             } else {
-                vlr.unextend();
                 vlrs.push(vlr);
             }
         }
@@ -228,6 +237,7 @@ impl From<Header> for Builder {
         Builder {
             bounds: header.bounds,
             date: header.date,
+            evlrs: header.evlrs,
             file_source_id: header.file_source_id,
             generating_software: header.generating_software,
             gps_time_type: header.gps_time_type,
