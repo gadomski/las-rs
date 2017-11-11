@@ -124,7 +124,7 @@ quick_error! {
 ///
 /// Headers include *all* las metadata, including regular and extended variable length records and
 /// any file padding (e.g. extra bytes after the header).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Header {
     bounds: Bounds,
     date: Option<Date<Utc>>,
