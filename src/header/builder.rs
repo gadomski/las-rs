@@ -182,6 +182,7 @@ impl Builder {
                 vlr.extend();
                 evlrs.push(vlr);
             } else {
+                vlr.unextend();
                 vlrs.push(vlr);
             }
         }

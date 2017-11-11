@@ -161,6 +161,21 @@ impl Vlr {
         self.data.is_empty()
     }
 
+    /// Mark this vlr as not extended (regular).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::extended();
+    /// assert!(vlr.is_extended());
+    /// vlr.unextend();
+    /// assert!(!vlr.is_extended());
+    /// ```
+    pub fn unextend(&mut self) {
+        self.is_extended = false;
+    }
+
     /// Mark this vlr as extended.
     ///
     /// # Examples
