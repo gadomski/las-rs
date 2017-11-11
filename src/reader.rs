@@ -108,6 +108,8 @@ impl<R: Read + Seek> Reader<R> {
                 .take(offset_to_point_data - position)
                 .read_to_end(&mut builder.vlr_padding)?;
         }
+
+        read.seek(SeekFrom::Start(offset_to_end_of_points))?;
         if let Some(evlr) = evlr {
             if evlr.start_of_first_evlr < offset_to_end_of_points {
                 return Err(
@@ -119,7 +121,6 @@ impl<R: Read + Seek> Reader<R> {
                     &mut builder.point_padding,
                 )?;
             }
-            read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
             builder.vlrs.push(
                 raw::Vlr::read_from(&mut read, true).and_then(
                     Vlr::new,

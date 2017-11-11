@@ -42,7 +42,6 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
     assert_eq!(header.system_identifier(), other.system_identifier());
     assert_eq!(header.generating_software(), other.generating_software());
     assert_eq!(header.date(), other.date());
-    assert_eq!(header.padding(), other.padding());
     assert_eq!(header.point_format(), other.point_format());
     assert_eq!(header.transforms(), other.transforms());
     assert_relative_eq!(point.x, other.bounds().min.x);
@@ -60,10 +59,13 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
                 .unwrap()
         );
     }
+
     assert_eq!(header.vlrs(), other.vlrs());
-    // TODO test vlr padding
     assert_eq!(header.evlrs(), other.evlrs());
-    // TODO test end of points padding
+
+    assert_eq!(header.padding(), other.padding());
+    assert_eq!(header.vlr_padding(), other.vlr_padding());
+    assert_eq!(header.point_padding(), other.point_padding());
 }
 
 macro_rules! roundtrip_point {
@@ -160,7 +162,7 @@ mod $name {
 
     mod builder {
         use chrono::{Utc, TimeZone};
-        use las::GpsTimeType;
+        use las::{GpsTimeType, Vlr};
         use uuid::Uuid;
 
         roundtrip_builder!(file_source_id, |b: &mut Builder| b.file_source_id = 42, 1);
@@ -190,13 +192,16 @@ mod $name {
             b.vlrs.push(vlr);
         }, 4);
         roundtrip_builder!(evlr_downgrade, |b: &mut Builder| {
-            use las::Vlr;
             let vlr = Vlr::extended();
             b.vlrs.push(vlr);
         });
         roundtrip_builder!(padding, |b: &mut Builder| b.padding = b"You probably shouldn't do this".to_vec());
         roundtrip_builder!(vlr_padding, |b: &mut Builder| b.vlr_padding = b"You probably shouldn't do this either".to_vec());
         roundtrip_builder!(point_padding, |b: &mut Builder| b.point_padding = vec![42]);
+        roundtrip_builder!(point_padding_and_evlr, |b: &mut Builder| {
+            b.point_padding = vec![42];
+            b.vlrs.push(Vlr::extended());
+        });
     }
 }
 }}

@@ -155,6 +155,7 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::Closed.into());
         }
+        self.write.write_all(self.header.point_padding())?;
         for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
             evlr.clone().into_raw()
         })

@@ -415,6 +415,20 @@ impl Header {
         &self.vlr_padding
     }
 
+    /// Returns a reference to this header's point padding.
+    ///
+    /// These are the bytes after the points but before eof/any evlrs. Not recommended.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    /// assert!(Header::default().point_padding().is_empty());
+    /// ```
+    pub fn point_padding(&self) -> &Vec<u8> {
+        &self.point_padding
+    }
+
     /// Returns a reference to this header's vlrs.
     ///
     /// # Examples
@@ -615,8 +629,8 @@ impl Header {
         } else if n > u32::MAX as usize {
             Err(Error::TooManyEvlrs(n).into())
         } else {
-            let start_of_first_evlr = u64::from(self.offset_to_point_data()?) +
-                self.point_data_len();
+            let start_of_first_evlr = self.point_data_len() + self.point_padding.len() as u64 +
+                u64::from(self.offset_to_point_data()?);
             Ok(Some(raw::header::Evlr {
                 start_of_first_evlr: start_of_first_evlr,
                 number_of_evlrs: n as u32,
