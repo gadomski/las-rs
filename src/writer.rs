@@ -64,7 +64,7 @@ quick_error! {
 /// use std::io::Cursor;
 /// use las::Writer;
 /// {
-///     let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
+///     let mut writer = Writer::default();
 ///     writer.close().unwrap();
 /// } // <- `close` is not called
 /// ```
@@ -116,7 +116,7 @@ impl<W: Seek + Write> Writer<W> {
     /// use std::io::Cursor;
     /// use las::Writer;
     ///
-    /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
+    /// let mut writer = Writer::default();
     /// writer.write(Default::default()).unwrap();
     /// ```
     pub fn write(&mut self, point: Point) -> Result<()> {
@@ -144,7 +144,7 @@ impl<W: Seek + Write> Writer<W> {
     /// ```
     /// use std::io::Cursor;
     /// use las::Writer;
-    /// let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
+    /// let mut writer = Writer::default();
     /// writer.close().unwrap();
     /// assert!(writer.close().is_err());
     /// ```
@@ -181,6 +181,12 @@ impl Writer<BufWriter<File>> {
         File::create(path).map_err(::Error::from).and_then(|file| {
             Writer::new(BufWriter::new(file), header)
         })
+    }
+}
+
+impl Default for Writer<Cursor<Vec<u8>>> {
+    fn default() -> Writer<Cursor<Vec<u8>>> {
+        Writer::new(Cursor::new(Vec::new()), Header::default()).unwrap()
     }
 }
 
@@ -224,7 +230,7 @@ mod tests {
 
     #[test]
     fn already_closed() {
-        let mut writer = Writer::new(Cursor::new(Vec::new()), Default::default()).unwrap();
+        let mut writer = Writer::default();
         writer.close().unwrap();
         assert!(writer.close().is_err());
         assert!(writer.write(Default::default()).is_err());

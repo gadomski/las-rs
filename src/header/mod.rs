@@ -24,8 +24,8 @@
 //! let header = Reader::from_path("tests/data/autzen.las").unwrap().header().clone();
 //! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
 //!
-//! // Use the default configuration.
-//! let writer = Writer::new(Cursor::new(Vec::new()), Header::default()).unwrap();
+//! // Use the default configuration, which writes to a `Cursor<Vec<u8>>`.
+//! let writer = Writer::default();
 //!
 //! // Set your own configuration with a `Builder`.
 //! let mut builder = Builder::from((1, 4));
