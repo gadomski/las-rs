@@ -35,7 +35,8 @@
 
 use {Result, raw};
 
-const HEADER_SIZE: usize = 54;
+const REGULAR_HEADER_SIZE: usize = 54;
+const EXTENDED_HEADER_SIZE: usize = 60;
 
 quick_error! {
     /// Vlr-specific errors.
@@ -139,11 +140,22 @@ impl Vlr {
     ///
     /// ```
     /// use las::Vlr;
-    /// let vlr = Vlr::default();
+    ///
+    /// let mut vlr = Vlr::default();
     /// assert_eq!(54, vlr.len());
+    /// vlr.data = vec![0];
+    /// assert_eq!(55, vlr.len());
+    ///
+    /// let evlr = Vlr::extended();
+    /// assert_eq!(60, evlr.len());
     /// ```
     pub fn len(&self) -> usize {
-        self.data.len() + HEADER_SIZE
+        self.data.len() +
+            if self.is_extended {
+                EXTENDED_HEADER_SIZE
+            } else {
+                REGULAR_HEADER_SIZE
+            }
     }
 
     /// Returns true if the data of this vlr is empty.
