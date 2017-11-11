@@ -62,9 +62,10 @@ quick_error! {
 #[derive(Debug)]
 pub struct Reader<R: Read + Seek> {
     header: Header,
-    read: R,
     number_of_points: u64,
     number_read: u64,
+    offset_to_point_data: u64,
+    read: R,
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -134,6 +135,7 @@ impl<R: Read + Seek> Reader<R> {
         Ok(Reader {
             number_of_points: header.number_of_points(),
             header: header,
+            offset_to_point_data: offset_to_point_data,
             read: read,
             number_read: 0,
         })
@@ -174,6 +176,25 @@ impl<R: Read + Seek> Reader<R> {
             self.number_read += 1;
             point
         }
+    }
+
+    /// Seeks to the given point number, zero-indexed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Reader;
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// reader.seek(1).unwrap(); // <- seeks to the second point
+    /// let the_second_point = reader.read().unwrap().unwrap();
+    /// ```
+    pub fn seek(&mut self, position: u64) -> Result<()> {
+        self.read.seek(SeekFrom::Start(
+            self.offset_to_point_data +
+                position *
+                    u64::from(self.header.point_format().len()),
+        ))?;
+        Ok(())
     }
 
     /// Returns an iterator over this reader's points.
@@ -224,5 +245,27 @@ impl<'a, R: Read + Seek> Iterator for Points<'a, R> {
             Ok(Some(point)) => Some(Ok(point)),
             Err(err) => Some(Err(err)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use Writer;
+
+    #[test]
+    fn seek() {
+        let mut writer = Writer::default();
+        writer.write(Default::default()).unwrap();
+        let point = Point {
+            x: 1.,
+            y: 2.,
+            z: 3.,
+            ..Default::default()
+        };
+        writer.write(point.clone()).unwrap();
+        let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
+        reader.seek(1).unwrap();
+        assert_eq!(point, reader.read().unwrap().unwrap());
     }
 }
