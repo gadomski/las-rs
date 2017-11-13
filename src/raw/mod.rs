@@ -47,4 +47,4 @@ pub use self::vlr::Vlr;
 pub const LASF: [u8; 4] = *b"LASF";
 
 /// The point data start signature required by las 1.0.
-pub const POINT_DATA_START_SIGNATURE: [u8; 2] = [0xDD, 0xCC];
+pub const POINT_DATA_START_SIGNATURE: [u8; 2] = [0xCC, 0xDD];
