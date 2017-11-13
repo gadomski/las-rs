@@ -143,15 +143,6 @@ mod $name {
             vlr.data = vec![42; ::std::u16::MAX as usize + 1];
             b.evlrs.push(vlr);
         }, 4);
-        roundtrip_builder!(evlr_downgrade, |b: &mut Builder| {
-            let vlr = Vlr::default();
-            b.evlrs.push(vlr);
-        });
-        roundtrip_builder!(evlr_upgrade, |b: &mut Builder| {
-            let mut vlr = Vlr::default();
-            vlr.data = vec![42; ::std::u16::MAX as usize + 1];
-            b.vlrs.push(vlr);
-        }, 4);
         roundtrip_builder!(padding, |b: &mut Builder| b.padding = b"You probably shouldn't do this".to_vec());
         roundtrip_builder!(vlr_padding, |b: &mut Builder| b.vlr_padding = b"You probably shouldn't do this either".to_vec());
         roundtrip_builder!(point_padding, |b: &mut Builder| {

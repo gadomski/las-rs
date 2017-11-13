@@ -307,4 +307,42 @@ mod tests {
     }
 
     // TODO assert wkt properties
+
+    #[test]
+    fn evlr_downgrade() {
+        let mut builder = Builder::from((1, 2));
+        builder.evlrs.push(Vlr::default());
+        let header = builder.into_header().unwrap();
+        assert_eq!(1, header.vlrs().len());
+        assert_eq!(0, header.evlrs().len());
+    }
+
+    #[test]
+    fn evlr_upgrade() {
+        let mut builder = Builder::from((1, 4));
+        let mut vlr = Vlr::default();
+        vlr.data = vec![0; ::std::u16::MAX as usize + 1];
+        builder.vlrs.push(vlr);
+        let header = builder.into_header().unwrap();
+        assert_eq!(0, header.vlrs().len());
+        assert_eq!(1, header.evlrs().len());
+    }
+
+    #[test]
+    fn point_padding_no_evlrs() {
+        let mut builder = Builder::from((1, 4));
+        builder.point_padding = vec![0];
+        assert!(builder.into_header().is_err());
+    }
+
+    #[test]
+    fn point_data_start_signature() {
+        let mut builder = Builder::from((1, 0));
+        builder.vlr_padding = vec![42];
+        let header = builder.into_header().unwrap();
+        assert_eq!(vec![42, 0xCC, 0xDD], *header.vlr_padding());
+
+        let builder = Builder::from((1, 2));
+        assert!(builder.into_header().unwrap().vlr_padding().is_empty());
+    }
 }

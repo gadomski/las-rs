@@ -238,7 +238,6 @@ impl<W: Seek + Write> Drop for Writer<W> {
 mod tests {
     use super::*;
     use Version;
-    use byteorder::{LittleEndian, ReadBytesExt};
     use header::Builder;
     use point::Format;
     use std::io::Cursor;
@@ -248,19 +247,6 @@ mod tests {
         builder.point_format = format;
         builder.version = version;
         Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap()
-    }
-
-    #[test]
-    fn las_1_0_point_data_start_signature() {
-        let mut builder = Builder::default();
-        builder.version = (1, 0).into();
-        builder.vlrs.push(Default::default());
-        let mut writer = Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap())
-            .unwrap();
-        writer.write(Default::default()).unwrap();
-        let mut cursor = writer.into_inner().unwrap();
-        cursor.set_position(281);
-        assert_eq!(0xCCDD, cursor.read_u16::<LittleEndian>().unwrap());
     }
 
     #[test]
