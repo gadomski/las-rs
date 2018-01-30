@@ -1,6 +1,5 @@
 use {Error, Result};
 use num::Zero;
-use std::ascii::AsciiExt;
 use std::str;
 
 pub trait AsLasStr {
