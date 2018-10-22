@@ -1,5 +1,5 @@
-use Result;
 use std::fmt;
+use Result;
 
 /// A scale and an offset that transforms xyz coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -36,8 +36,8 @@ impl Transform {
     /// assert_eq!(1, transform.inverse(2.9).unwrap());
     /// ```
     pub fn inverse(&self, n: f64) -> Result<i32> {
-        use Error;
         use std::i32;
+        use Error;
 
         let n = ((n - self.offset) / self.scale).round();
         if n > f64::from(i32::MAX) || n < f64::from(i32::MIN) {
@@ -69,6 +69,7 @@ mod tests {
     use std::i32;
 
     #[test]
+    #[allow(clippy::cast_lossless)]
     fn too_large() {
         let transform = Transform::default();
         let n = i32::MAX as f64 * transform.scale + 1.;
@@ -76,6 +77,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_lossless)]
     fn too_small() {
         let transform = Transform::default();
         let n = i32::MIN as f64 * transform.scale - 1.;

@@ -31,11 +31,11 @@
 //! assert!(writer.write(point).is_err()); // the point's color would be lost
 //! ```
 
-use {Header, Point, Result};
 use point::Format;
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Seek, SeekFrom, Write};
 use std::path::Path;
+use {Header, Point, Result};
 
 quick_error! {
     /// Writer errors.
@@ -89,16 +89,19 @@ impl<W: Seek + Write> Writer<W> {
     /// use las::Writer;
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
         let start = write.seek(SeekFrom::Current(0))?;
         header.clear();
-        header.clone().into_raw().and_then(|raw_header| {
-            raw_header.write_to(&mut write)
-        })?;
+        header
+            .clone()
+            .into_raw()
+            .and_then(|raw_header| raw_header.write_to(&mut write))?;
         for vlr in header.vlrs() {
-            (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
-                raw_vlr.write_to(&mut write)
-            })?;
+            (*vlr)
+                .clone()
+                .into_raw(false)
+                .and_then(|raw_vlr| raw_vlr.write_to(&mut write))?;
         }
         if !header.vlr_padding().is_empty() {
             write.write_all(&header.vlr_padding())?;
@@ -140,16 +143,14 @@ impl<W: Seek + Write> Writer<W> {
             return Err(Error::Closed.into());
         }
         if !point.matches(self.header.point_format()) {
-            return Err(
-                Error::PointAttributes(self.header.point_format(), point).into(),
-            );
+            return Err(Error::PointAttributes(self.header.point_format(), point).into());
         }
         self.header.add_point(&point);
-        point.into_raw(self.header.transforms()).and_then(
-            |raw_point| {
+        point
+            .into_raw(self.header.transforms())
+            .and_then(|raw_point| {
                 raw_point.write_to(&mut self.write, self.header.point_format())
-            },
-        )?;
+            })?;
         Ok(())
     }
 
@@ -169,16 +170,19 @@ impl<W: Seek + Write> Writer<W> {
             return Err(Error::Closed.into());
         }
         self.write.write_all(self.header.point_padding())?;
-        for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
-            evlr.clone().into_raw(true)
-        })
+        for raw_evlr in self
+            .header
+            .evlrs()
+            .into_iter()
+            .map(|evlr| evlr.clone().into_raw(true))
         {
             raw_evlr?.write_to(&mut self.write)?;
         }
         self.write.seek(SeekFrom::Start(self.start))?;
-        self.header.clone().into_raw().and_then(|raw_header| {
-            raw_header.write_to(&mut self.write)
-        })?;
+        self.header
+            .clone()
+            .into_raw()
+            .and_then(|raw_header| raw_header.write_to(&mut self.write))?;
         self.write.seek(SeekFrom::Start(self.start))?;
         self.closed = true;
         Ok(())
@@ -214,9 +218,9 @@ impl Writer<BufWriter<File>> {
     /// let writer = Writer::from_path("/dev/null", Default::default());
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P, header: Header) -> Result<Writer<BufWriter<File>>> {
-        File::create(path).map_err(::Error::from).and_then(|file| {
-            Writer::new(BufWriter::new(file), header)
-        })
+        File::create(path)
+            .map_err(::Error::from)
+            .and_then(|file| Writer::new(BufWriter::new(file), header))
     }
 }
 
@@ -237,10 +241,10 @@ impl<W: Seek + Write> Drop for Writer<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Version;
     use header::Builder;
     use point::Format;
     use std::io::Cursor;
+    use Version;
 
     fn writer(format: Format, version: Version) -> Writer<Cursor<Vec<u8>>> {
         let mut builder = Builder::default();
@@ -302,8 +306,8 @@ mod tests {
 
     #[test]
     fn write_not_at_start() {
-        use Reader;
         use byteorder::WriteBytesExt;
+        use Reader;
 
         let mut cursor = Cursor::new(Vec::new());
         cursor.write_u8(42).unwrap();

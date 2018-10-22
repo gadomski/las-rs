@@ -70,6 +70,7 @@ impl Builder {
     /// use las::Builder;
     /// let builder = Builder::new(Default::default()).unwrap();
     /// ```
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(raw_header: raw::Header) -> Result<Builder> {
         use chrono::TimeZone;
         use utils::AsLasStr;

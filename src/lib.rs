@@ -104,19 +104,25 @@
 //! writer.write(point).unwrap();
 //! ```
 
-#![deny(missing_docs,
-        missing_debug_implementations, missing_copy_implementations,
-        trivial_casts, trivial_numeric_casts,
+#![deny(
+        missing_docs,
+        missing_debug_implementations,
+        missing_copy_implementations,
+        trivial_casts,
+        trivial_numeric_casts,
         unsafe_code,
         unstable_features,
-        unused_import_braces, unused_qualifications)]
-#![recursion_limit="128"]
+        unused_import_braces,
+        unused_qualifications
+)]
+#![recursion_limit = "128"]
 
 extern crate byteorder;
 extern crate chrono;
 extern crate num;
 #[macro_use]
 extern crate quick_error;
+extern crate log;
 extern crate uuid;
 
 pub mod feature;
@@ -141,7 +147,7 @@ pub use color::Color;
 pub use error::Error;
 pub use feature::Feature;
 pub use gps_time_type::GpsTimeType;
-pub use header::{Header, Builder};
+pub use header::{Builder, Header};
 pub use point::Point;
 pub use reader::Reader;
 pub use transform::Transform;

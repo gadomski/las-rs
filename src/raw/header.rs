@@ -487,7 +487,7 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
-    fn write_read(header: Header) -> Result<()> {
+    fn write_read(header: &Header) -> Result<()> {
         let mut cursor = Cursor::new(Vec::new());
         header.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
@@ -501,7 +501,7 @@ mod tests {
             file_signature: *b"ABCD",
             ..Default::default()
         };
-        assert!(write_read(header).is_err());
+        assert!(write_read(&header).is_err());
     }
 
     macro_rules! roundtrip {

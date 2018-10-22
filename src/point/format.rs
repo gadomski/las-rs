@@ -78,6 +78,7 @@ impl Format {
     ///
     /// assert!(Format::new(11).is_err());
     /// ```
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(n: u8) -> Result<Format> {
         if n > 10 {
             Err(Error::FormatNumber(n).into())

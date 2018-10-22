@@ -45,8 +45,8 @@ impl Version {
     /// assert!(Version::new(1, 0).requires_point_data_start_signature());
     /// assert!(!Version::new(1, 1).requires_point_data_start_signature());
     /// ```
-    pub fn requires_point_data_start_signature(&self) -> bool {
-        self == &Version::new(1, 0)
+    pub fn requires_point_data_start_signature(self) -> bool {
+        self == Version::new(1, 0)
     }
 
     /// Returns this version's header size.
@@ -59,10 +59,10 @@ impl Version {
     /// assert_eq!(235, Version::new(1, 3).header_size());
     /// assert_eq!(375, Version::new(1, 4).header_size());
     /// ```
-    pub fn header_size(&self) -> u16 {
-        if self <= &Version::new(1, 2) {
+    pub fn header_size(self) -> u16 {
+        if self <= Version::new(1, 2) {
             227
-        } else if self == &Version::new(1, 3) {
+        } else if self == Version::new(1, 3) {
             235
         } else {
             375
@@ -79,11 +79,11 @@ impl Version {
     /// Version::new(1, 4).verify_support_for::<Waveforms>().unwrap();
     /// assert!(Version::new(1, 2).verify_support_for::<Waveforms>().is_err());
     /// ```
-    pub fn verify_support_for<F: Feature>(&self) -> Result<()> {
+    pub fn verify_support_for<F: Feature>(self) -> Result<()> {
         if self.supports::<F>() {
             Ok(())
         } else {
-            Err(Error::Feature(*self, F::name()))
+            Err(Error::Feature(self, F::name()))
         }
     }
 
@@ -97,8 +97,8 @@ impl Version {
     /// assert!(Version::new(1, 4).supports::<Waveforms>());
     /// assert!(!Version::new(1, 2).supports::<Waveforms>());
     /// ```
-    pub fn supports<F: Feature>(&self) -> bool {
-        F::is_supported_by(*self)
+    pub fn supports<F: Feature>(self) -> bool {
+        F::is_supported_by(self)
     }
 
     /// Checks whether this version supports the given point format.
@@ -114,7 +114,7 @@ impl Version {
     /// assert!(!las_1_2.supports_point_format(Format::new(4).unwrap()));
     /// assert!(las_1_4.supports_point_format(Format::new(4).unwrap()));
     /// ```
-    pub fn supports_point_format(&self, format: Format) -> bool {
+    pub fn supports_point_format(self, format: Format) -> bool {
         if self.major != 1 {
             return false;
         }

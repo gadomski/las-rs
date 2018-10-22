@@ -36,10 +36,10 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
-use {Builder, Header, Point, Result, Vlr, raw};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+use {raw, Builder, Header, Point, Result, Vlr};
 
 quick_error! {
     /// Error while reading.
@@ -83,6 +83,7 @@ impl<R: Read + Seek> Reader<R> {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(mut read: R) -> Result<Reader<R>> {
         let raw_header = raw::Header::read_from(&mut read)?;
         let mut position = u64::from(raw_header.header_size);
@@ -101,9 +102,7 @@ impl<R: Read + Seek> Reader<R> {
             builder.vlrs.push(vlr);
         }
         if position > offset_to_point_data {
-            return Err(
-                Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into(),
-            );
+            return Err(Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into());
         } else if position < offset_to_point_data {
             read.by_ref()
                 .take(offset_to_point_data - position)
@@ -113,20 +112,17 @@ impl<R: Read + Seek> Reader<R> {
         read.seek(SeekFrom::Start(offset_to_end_of_points))?;
         if let Some(evlr) = evlr {
             if evlr.start_of_first_evlr < offset_to_end_of_points {
-                return Err(
-                    Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into(),
-                );
+                return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into());
             } else if evlr.start_of_first_evlr > offset_to_end_of_points {
                 let n = evlr.start_of_first_evlr - offset_to_end_of_points;
-                read.by_ref().take(n).read_to_end(
-                    &mut builder.point_padding,
-                )?;
+
+                read.by_ref()
+                    .take(n)
+                    .read_to_end(&mut builder.point_padding)?;
             }
-            builder.evlrs.push(
-                raw::Vlr::read_from(&mut read, true).and_then(
-                    Vlr::new,
-                )?,
-            );
+            builder
+                .evlrs
+                .push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
@@ -170,9 +166,7 @@ impl<R: Read + Seek> Reader<R> {
             Ok(None)
         } else {
             let point = raw::Point::read_from(&mut self.read, self.header.point_format())
-                .map(|raw_point| {
-                    Some(Point::new(raw_point, self.header.transforms()))
-                });
+                .map(|raw_point| Some(Point::new(raw_point, self.header.transforms())));
             self.number_read += 1;
             point
         }
@@ -190,9 +184,7 @@ impl<R: Read + Seek> Reader<R> {
     /// ```
     pub fn seek(&mut self, position: u64) -> Result<()> {
         self.read.seek(SeekFrom::Start(
-            self.offset_to_point_data +
-                position *
-                    u64::from(self.header.point_format().len()),
+            self.offset_to_point_data + position * u64::from(self.header.point_format().len()),
         ))?;
         Ok(())
     }
@@ -223,9 +215,9 @@ impl Reader<BufReader<File>> {
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
-        File::open(path).map_err(::Error::from).and_then(|file| {
-            Reader::new(BufReader::new(file))
-        })
+        File::open(path)
+            .map_err(::Error::from)
+            .and_then(|file| Reader::new(BufReader::new(file)))
     }
 }
 

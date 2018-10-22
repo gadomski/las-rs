@@ -1,5 +1,5 @@
-use Result;
 use point::Error;
+use Result;
 
 /// The ASPRS classification table.
 ///
@@ -66,6 +66,7 @@ impl Classification {
     /// assert_eq!(Classification::Ground, Classification::new(2).unwrap());
     /// assert!(Classification::new(12).is_err());
     /// ```
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(n: u8) -> Result<Classification> {
         Ok(match n {
             0 => Classification::CreatedNeverClassified,
@@ -115,8 +116,7 @@ impl From<Classification> for u8 {
             Classification::WireStructureConnector => 16,
             Classification::BridgeDeck => 17,
             Classification::HighNoise => 18,
-            Classification::Reserved(n) |
-            Classification::UserDefinable(n) => n,
+            Classification::Reserved(n) | Classification::UserDefinable(n) => n,
         }
     }
 }

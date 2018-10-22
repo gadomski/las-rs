@@ -508,8 +508,8 @@ impl Flags {
     /// assert_eq!(1, Flags::TwoByte(1, 0).return_number());
     /// assert_eq!(1, Flags::ThreeByte(1, 0, 0).return_number());
     /// ```
-    pub fn return_number(&self) -> u8 {
-        match *self {
+    pub fn return_number(self) -> u8 {
+        match self {
             Flags::TwoByte(a, _) => a & 7,
             Flags::ThreeByte(a, _, _) => a & 15,
         }
@@ -524,8 +524,8 @@ impl Flags {
     /// assert_eq!(1, Flags::TwoByte(8, 0).number_of_returns());
     /// assert_eq!(1, Flags::ThreeByte(16, 0, 0).number_of_returns());
     /// ```
-    pub fn number_of_returns(&self) -> u8 {
-        match *self {
+    pub fn number_of_returns(self) -> u8 {
+        match self {
             Flags::TwoByte(a, _) => a >> 3 & 7,
             Flags::ThreeByte(a, _, _) => a >> 4 & 15,
         }
@@ -541,8 +541,8 @@ impl Flags {
     /// assert_eq!(ScanDirection::LeftToRight, Flags::TwoByte(0b01000000, 0).scan_direction());
     /// assert_eq!(ScanDirection::LeftToRight, Flags::ThreeByte(0, 0b01000000, 0).scan_direction());
     /// ```
-    pub fn scan_direction(&self) -> ScanDirection {
-        let n = match *self {
+    pub fn scan_direction(self) -> ScanDirection {
+        let n = match self {
             Flags::TwoByte(a, _) => a,
             Flags::ThreeByte(_, b, _) => b,
         };
@@ -562,8 +562,8 @@ impl Flags {
     /// assert!(Flags::TwoByte(0, 0b00100000).is_synthetic());
     /// assert!(Flags::ThreeByte(0, 1, 0).is_synthetic());
     /// ```
-    pub fn is_synthetic(&self) -> bool {
-        match *self {
+    pub fn is_synthetic(self) -> bool {
+        match self {
             Flags::TwoByte(_, b) => (b >> 5) & 1 == 1,
             Flags::ThreeByte(_, b, _) => b & 1 == 1,
         }
@@ -578,8 +578,8 @@ impl Flags {
     /// assert!(Flags::TwoByte(0, 0b01000000).is_key_point());
     /// assert!(Flags::ThreeByte(0, 2, 0).is_key_point());
     /// ```
-    pub fn is_key_point(&self) -> bool {
-        match *self {
+    pub fn is_key_point(self) -> bool {
+        match self {
             Flags::TwoByte(_, b) => (b >> 6) & 1 == 1,
             Flags::ThreeByte(_, b, _) => b & 2 == 2,
         }
@@ -594,8 +594,8 @@ impl Flags {
     /// assert!(Flags::TwoByte(0, 0b10000000).is_withheld());
     /// assert!(Flags::ThreeByte(0, 4, 0).is_withheld());
     /// ```
-    pub fn is_withheld(&self) -> bool {
-        match *self {
+    pub fn is_withheld(self) -> bool {
+        match self {
             Flags::TwoByte(_, b) => (b >> 7) & 1 == 1,
             Flags::ThreeByte(_, b, _) => b & 4 == 4,
         }
@@ -610,8 +610,8 @@ impl Flags {
     /// assert!(Flags::TwoByte(0, 12).is_overlap());
     /// assert!(Flags::ThreeByte(0, 8, 0).is_overlap());
     /// ```
-    pub fn is_overlap(&self) -> bool {
-        match *self {
+    pub fn is_overlap(self) -> bool {
+        match self {
             Flags::TwoByte(_, b) => b & 0b1111 == OVERLAP_CLASSIFICATION_CODE,
             Flags::ThreeByte(_, b, _) => b & 8 == 8,
         }
@@ -626,8 +626,8 @@ impl Flags {
     /// assert_eq!(0, Flags::TwoByte(0, 0).scanner_channel());
     /// assert_eq!(3, Flags::ThreeByte(0, 0b00110000, 0).scanner_channel());
     /// ```
-    pub fn scanner_channel(&self) -> u8 {
-        match *self {
+    pub fn scanner_channel(self) -> u8 {
+        match self {
             Flags::TwoByte(_, _) => 0,
             Flags::ThreeByte(_, b, _) => (b >> 4) & 3,
         }
@@ -642,8 +642,8 @@ impl Flags {
     /// assert!(Flags::TwoByte(128, 0).is_edge_of_flight_line());
     /// assert!(Flags::ThreeByte(0, 128, 0).is_edge_of_flight_line());
     /// ```
-    pub fn is_edge_of_flight_line(&self) -> bool {
-        let n = match *self {
+    pub fn is_edge_of_flight_line(self) -> bool {
+        let n = match self {
             Flags::TwoByte(a, _) => a,
             Flags::ThreeByte(_, b, _) => b,
         };
@@ -662,8 +662,8 @@ impl Flags {
     /// assert_eq!((1, 2), Flags::TwoByte(1, 2).to_two_bytes().unwrap());
     /// assert!(Flags::ThreeByte(0b00001000, 0, 0).to_two_bytes().is_err());
     /// ```
-    pub fn to_two_bytes(&self) -> Result<(u8, u8)> {
-        match *self {
+    pub fn to_two_bytes(self) -> Result<(u8, u8)> {
+        match self {
             Flags::TwoByte(a, b) => Ok((a, b)),
             Flags::ThreeByte(_, _, c) => {
                 if self.return_number() > 7 {
@@ -718,8 +718,8 @@ impl Flags {
     /// assert!(Flags::TwoByte(0, 12).to_classification().is_err());
     /// assert!(Flags::ThreeByte(0, 0, 12).to_classification().is_err());
     /// ```
-    pub fn to_classification(&self) -> Result<Classification> {
-        match *self {
+    pub fn to_classification(self) -> Result<Classification> {
+        match self {
             Flags::TwoByte(_, b) => Classification::new(b & 0b0001_1111),
             Flags::ThreeByte(_, _, c) => Classification::new(c),
         }
