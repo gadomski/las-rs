@@ -2,10 +2,10 @@ use Result;
 use point::Error;
 use std::fmt;
 
-const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
-const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
-const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
-const NIR_FORMATS: &'static [u8] = &[8, 10];
+const TIME_FORMATS: &[u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
+const COLOR_FORMATS: &[u8] = &[2, 3, 5, 7, 8, 10];
+const WAVEFORM_FORMATS: &[u8] = &[4, 5, 9, 10];
+const NIR_FORMATS: &[u8] = &[8, 10];
 const IS_COMPRESSED_MASK: u8 = 0x80;
 
 /// Point formats are defined by the las spec.
@@ -60,7 +60,7 @@ pub struct Format {
     pub is_compressed: bool,
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
+#[allow(clippy::len_without_is_empty)]
 impl Format {
     /// Creates a new point format from a u8.
     ///
@@ -124,7 +124,7 @@ impl Format {
     /// format.has_gps_time = true;
     /// assert_eq!(28, format.len());
     /// ```
-    pub fn len(&self) -> u16 {
+    pub fn len(self) -> u16 {
         let mut len = if self.is_extended { 22 } else { 20 } + self.extra_bytes;
         if self.has_gps_time {
             len += 8;
@@ -156,36 +156,36 @@ impl Format {
     /// format.has_gps_time = true;
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
-    pub fn to_u8(&self) -> Result<u8> {
+    pub fn to_u8(self) -> Result<u8> {
         if self.is_compressed {
-            Err(Error::Format(*self).into())
+            Err(Error::Format(self).into())
         } else if self.is_extended {
             if self.has_gps_time {
                 if self.has_color {
                     if self.has_nir {
                         if self.has_waveform { Ok(10) } else { Ok(8) }
                     } else if self.has_waveform {
-                        Err(Error::Format(*self).into())
+                        Err(Error::Format(self).into())
                     } else {
                         Ok(7)
                     }
                 } else if self.has_nir {
-                    Err(Error::Format(*self).into())
+                    Err(Error::Format(self).into())
                 } else if self.has_waveform {
                     Ok(9)
                 } else {
                     Ok(6)
                 }
             } else {
-                Err(Error::Format(*self).into())
+                Err(Error::Format(self).into())
             }
         } else if self.has_nir {
-            Err(Error::Format(*self).into())
+            Err(Error::Format(self).into())
         } else if self.has_waveform {
             if self.has_gps_time {
                 if self.has_color { Ok(5) } else { Ok(4) }
             } else {
-                Err(Error::Format(*self).into())
+                Err(Error::Format(self).into())
             }
         } else {
             let mut n = if self.has_gps_time { 1 } else { 0 };

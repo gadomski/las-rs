@@ -17,8 +17,8 @@ impl GpsTimeType {
     /// assert!(!GpsTimeType::Week.is_standard());
     /// assert!(GpsTimeType::Standard.is_standard());
     /// ```
-    pub fn is_standard(&self) -> bool {
-        match *self {
+    pub fn is_standard(self) -> bool {
+        match self {
             GpsTimeType::Week => false,
             GpsTimeType::Standard => true,
         }

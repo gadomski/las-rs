@@ -1,9 +1,9 @@
-use {Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr, raw};
 use chrono::{Date, Utc};
 use header::Error;
 use point::Format;
 use std::collections::HashMap;
 use uuid::Uuid;
+use {raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
 
 /// Builds headers.
 #[derive(Clone, Debug, Default)]
@@ -94,18 +94,21 @@ impl Builder {
         let mut point_format = Format::new(raw_header.point_data_record_format)?;
         let n = point_format.len();
         if raw_header.point_data_record_length < n {
-            return Err(
-                Error::PointDataRecordLength(point_format, raw_header.point_data_record_length)
-                    .into(),
-            );
+            return Err(Error::PointDataRecordLength(
+                point_format,
+                raw_header.point_data_record_length,
+            )
+            .into());
         } else if n < raw_header.point_data_record_length {
             point_format.extra_bytes = raw_header.point_data_record_length - n;
         }
         Ok(Builder {
-            date: Utc.yo_opt(
-                i32::from(raw_header.file_creation_year),
-                u32::from(raw_header.file_creation_day_of_year),
-            ).single(),
+            date: Utc
+                .yo_opt(
+                    i32::from(raw_header.file_creation_year),
+                    u32::from(raw_header.file_creation_day_of_year),
+                )
+                .single(),
             point_padding: Vec::new(),
             evlrs: Vec::new(),
             file_source_id: raw_header.file_source_id,
@@ -167,13 +170,13 @@ impl Builder {
     /// let header = Builder::new(Default::default()).unwrap().into_header().unwrap();
     /// ```
     pub fn into_header(mut self) -> Result<Header> {
-        use raw::POINT_DATA_START_SIGNATURE;
         use feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers};
         use header::Error;
+        use raw::POINT_DATA_START_SIGNATURE;
 
         let n = self.vlr_padding.len();
-        if self.version.requires_point_data_start_signature() &&
-            (n < 2 || !(self.vlr_padding[n - 2..] == POINT_DATA_START_SIGNATURE))
+        if self.version.requires_point_data_start_signature()
+            && (n < 2 || self.vlr_padding[n - 2..] != POINT_DATA_START_SIGNATURE)
         {
             self.vlr_padding.extend(&POINT_DATA_START_SIGNATURE);
         }
@@ -181,7 +184,8 @@ impl Builder {
             self.version.verify_support_for::<FileSourceId>()?;
         }
         if self.has_synthetic_return_numbers {
-            self.version.verify_support_for::<SyntheticReturnNumbers>()?;
+            self.version
+                .verify_support_for::<SyntheticReturnNumbers>()?;
         }
         if self.gps_time_type.is_standard() {
             self.version.verify_support_for::<GpsStandardTime>()?;
@@ -274,10 +278,12 @@ fn number_of_points_hash_map<T: Copy + Into<u64>>(slice: &[T]) -> HashMap<u8, u6
     slice
         .iter()
         .enumerate()
-        .filter_map(|(i, &n)| if n.into() > 0 {
-            Some((i as u8 + 1, n.into()))
-        } else {
-            None
+        .filter_map(|(i, &n)| {
+            if n.into() > 0 {
+                Some((i as u8 + 1, n.into()))
+            } else {
+                None
+            }
         })
         .collect()
 }

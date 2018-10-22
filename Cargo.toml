@@ -14,7 +14,7 @@ categories = ["science", "data-structures"]
 [dependencies]
 byteorder = "1.1"
 chrono = "0.4"
-log = "0.3"
+log = "0.4"
 num = "0.1"
 quick-error = "1.2"
 uuid = "0.6"
