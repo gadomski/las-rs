@@ -119,6 +119,9 @@ extern crate num;
 extern crate quick_error;
 extern crate uuid;
 
+#[cfg(feature = "lazperf-compression")]
+extern crate lazperf;
+
 pub mod feature;
 pub mod header;
 pub mod point;

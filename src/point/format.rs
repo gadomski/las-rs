@@ -9,6 +9,14 @@ const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
 const NIR_FORMATS: &'static [u8] = &[8, 10];
 const IS_COMPRESSED_MASK: u8 = 0x80;
 
+fn is_point_format_compressed(point_format_id: u8) -> bool {
+    point_format_id & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK
+}
+
+fn point_format_id_compressed_to_uncompressd(point_format_id: u8) -> u8 {
+    point_format_id & 0x3f
+}
+
 /// Point formats are defined by the las spec.
 ///
 /// As of las 1.4, there are eleven point formats (0-10). A new `Format` can be created from its
@@ -80,10 +88,11 @@ impl Format {
     /// assert!(Format::new(11).is_err());
     /// ```
     pub fn new(n: u8) -> Result<Format> {
-        let is_compressed = n & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK;
+        let is_compressed = is_point_format_compressed(n);
         if n > 10 && !is_compressed{
             Err(Error::FormatNumber(n).into())
         } else {
+            let n = point_format_id_compressed_to_uncompressd(n);
             Ok(Format {
                 has_gps_time: TIME_FORMATS.contains(&n),
                 has_color: COLOR_FORMATS.contains(&n),

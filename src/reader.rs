@@ -36,10 +36,13 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
-use {Builder, Header, Point, Result, Vlr, raw};
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom, Cursor};
 use std::path::Path;
+
+use byteorder::{LittleEndian, ReadBytesExt};
+
+use {Builder, Header, Point, raw, Result, Vlr};
 
 quick_error! {
     /// Error while reading.
@@ -66,6 +69,14 @@ pub struct Reader<R: Read + Seek> {
     number_read: u64,
     offset_to_point_data: u64,
     read: R,
+
+    #[cfg(feature = "lazperf-compression")]
+    vlr_decompressor: lazperf::VlrDecompressor,
+    #[cfg(feature = "lazperf-compression")]
+    raw_compressed_points: Vec<u8>,
+    #[cfg(feature = "lazperf-compression")]
+    tmp_point: Vec<u8>,
+
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -92,9 +103,11 @@ impl<R: Read + Seek> Reader<R> {
         let evlr = raw_header.evlr;
 
         let mut builder = Builder::new(raw_header)?;
-        if builder.point_format.is_compressed {
+
+        if !cfg!(feature = "lazperf-compression") && builder.point_format.is_compressed {
             return Err(::Error::Laszip);
         }
+
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
             position += vlr.len(false) as u64;
@@ -132,13 +145,45 @@ impl<R: Read + Seek> Reader<R> {
         read.seek(SeekFrom::Start(offset_to_point_data))?;
         let header = builder.into_header()?;
 
-        Ok(Reader {
-            number_of_points: header.number_of_points(),
-            header: header,
-            offset_to_point_data: offset_to_point_data,
-            read: read,
-            number_read: 0,
-        })
+
+        #[cfg(feature = "lazperf-compression")] {
+            // skip offset to chunk table
+            let offset_to_chunktable = read.read_u64::<LittleEndian>()?;
+            let size_of_compressed_points = offset_to_chunktable - (offset_to_point_data + std::mem::size_of::<u64>() as u64);
+            let mut raw_compressed_points = vec![0u8; size_of_compressed_points as usize];
+            read.read_exact(&mut raw_compressed_points)?;
+            let point_size = header.point_format().len() as usize;
+            let tmp_point = vec![0u8; point_size];
+
+            let mut laszip_vlr_data = None;
+            for vlr in header.vlrs() {
+                if &vlr.user_id == "laszip encoded" &&  vlr.record_id == 22204 {
+                    laszip_vlr_data = Some(vlr.data.clone());
+                }
+            }
+            let laszip_vlr_data = laszip_vlr_data.unwrap();
+            let vlr_decompressor = lazperf::VlrDecompressor::new(&raw_compressed_points, point_size, &laszip_vlr_data);
+
+            Ok(Reader {
+                number_of_points: header.number_of_points(),
+                header,
+                offset_to_point_data,
+                read,
+                number_read: 0,
+                vlr_decompressor,
+                raw_compressed_points,
+                tmp_point,
+            })
+        }
+        #[cfg(not(feature = "lazperf-compression"))] {
+            Ok(Reader {
+                number_of_points: header.number_of_points(),
+                header,
+                offset_to_point_data,
+                read,
+                number_read: 0,
+            })
+        }
     }
 
     /// Returns a reference to this reader's header.
@@ -169,12 +214,26 @@ impl<R: Read + Seek> Reader<R> {
         if self.number_read >= self.number_of_points {
             Ok(None)
         } else {
-            let point = raw::Point::read_from(&mut self.read, self.header.point_format())
-                .map(|raw_point| {
-                    Some(Point::new(raw_point, self.header.transforms()))
-                });
-            self.number_read += 1;
-            point
+            #[cfg(feature = "lazperf-compression")]
+            {
+                self.vlr_decompressor.decompress_one_to(self.tmp_point.as_mut_slice());
+                let mut read = Cursor::new(&self.tmp_point);
+                let point = raw::Point::read_from(&mut read, self.header.point_format())
+                    .map(|raw_point| {
+                        Some(Point::new(raw_point, self.header.transforms()))
+                    });
+                self.number_read += 1;
+                point
+            }
+            #[cfg(not(feature = "lazperf-compression"))]
+            {
+                let point = raw::Point::read_from(&mut self.read, self.header.point_format())
+                    .map(|raw_point| {
+                        Some(Point::new(raw_point, self.header.transforms()))
+                    });
+                self.number_read += 1;
+                point
+            }
         }
     }
 
@@ -250,8 +309,9 @@ impl<'a, R: Read + Seek> Iterator for Points<'a, R> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use Writer;
+
+    use super::*;
 
     #[test]
     fn seek() {
