@@ -1,6 +1,7 @@
-use Result;
-use point::Error;
 use std::fmt;
+
+use point::Error;
+use Result;
 
 const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
@@ -79,7 +80,8 @@ impl Format {
     /// assert!(Format::new(11).is_err());
     /// ```
     pub fn new(n: u8) -> Result<Format> {
-        if n > 10 {
+        let is_compressed = n & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK;
+        if n > 10 && !is_compressed{
             Err(Error::FormatNumber(n).into())
         } else {
             Ok(Format {
@@ -89,7 +91,7 @@ impl Format {
                 has_nir: NIR_FORMATS.contains(&n),
                 is_extended: n >= 6,
                 extra_bytes: 0,
-                is_compressed: n & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK,
+                is_compressed
             })
         }
     }
