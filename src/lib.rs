@@ -138,6 +138,8 @@ mod transform;
 mod utils;
 mod vector;
 mod version;
+#[cfg(feature = "lazperf-compression")]
+pub(crate) mod compression;
 
 pub use bounds::Bounds;
 pub use color::Color;

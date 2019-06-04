@@ -46,18 +46,20 @@
 //! assert_eq!(b"LASF", &raw_header.file_signature);
 //! ```
 
-mod builder;
-
-pub use self::builder::Builder;
-
-use {Bounds, GpsTimeType, Point, Result, Transform, Vector, Version, Vlr, raw};
-use chrono::{Date, Datelike, Utc};
-use point::Format;
 use std::collections::HashMap;
 use std::iter::Chain;
 use std::slice::Iter;
-use utils::FromLasStr;
+
+use chrono::{Date, Datelike, Utc};
 use uuid::Uuid;
+
+use {Bounds, GpsTimeType, Point, raw, Result, Transform, Vector, Version, Vlr};
+use point::Format;
+use utils::FromLasStr;
+
+pub use self::builder::Builder;
+
+mod builder;
 
 quick_error! {
     /// Header-specific errors.
@@ -345,6 +347,11 @@ impl Header {
         self.point_format
     }
 
+
+    pub(crate) fn point_format_mut(&mut self) -> &mut Format {
+        &mut self.point_format
+    }
+
     /// Returns this header's transforms.
     ///
     /// The transforms are the scales and offsets used to convert floating point numbers to `i16`.
@@ -445,6 +452,16 @@ impl Header {
     /// ```
     pub fn vlrs(&self) -> &Vec<Vlr> {
         &self.vlrs
+    }
+
+    #[cfg(feature = "lazperf-compression")]
+    pub(crate) fn vlrs_mut(&mut self) -> &mut Vec<Vlr> {
+        &mut self.vlrs
+    }
+
+    #[cfg(feature = "lazperf-compression")]
+    pub(crate) fn push_vlr(&mut self, vlr: Vlr) {
+        self.vlrs.push(vlr);
     }
 
     /// Returns a reference to header's extended variable length records.

@@ -169,7 +169,6 @@ impl Builder {
     pub fn into_header(mut self) -> Result<Header> {
         use raw::POINT_DATA_START_SIGNATURE;
         use feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers};
-        use header::Error;
 
         let n = self.vlr_padding.len();
         if self.version.requires_point_data_start_signature() &&

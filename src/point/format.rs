@@ -17,6 +17,10 @@ fn point_format_id_compressed_to_uncompressd(point_format_id: u8) -> u8 {
     point_format_id & 0x3f
 }
 
+fn point_format_id_uncompressed_to_compressed(point_format_id: u8) -> u8 {
+    point_format_id | 0x80
+}
+
 /// Point formats are defined by the las spec.
 ///
 /// As of las 1.4, there are eleven point formats (0-10). A new `Format` can be created from its
@@ -168,7 +172,8 @@ impl Format {
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
-        if self.is_compressed {
+
+        if !cfg!(feature = "lazperf-compression") &&self.is_compressed {
             Err(Error::Format(*self).into())
         } else if self.is_extended {
             if self.has_gps_time {
@@ -203,7 +208,12 @@ impl Format {
             if self.has_color {
                 n += 2;
             }
-            Ok(n)
+
+            if self.is_compressed {
+                Ok(point_format_id_uncompressed_to_compressed(n))
+            } else {
+                Ok(n)
+            }
         }
     }
 }
@@ -405,6 +415,10 @@ mod tests {
             is_compressed: true,
             ..Default::default()
         };
-        assert!(format.to_u8().is_err());
+        if cfg!(feature = "lazperf-compression") {
+            assert!(format.to_u8().is_ok());
+        } else {
+            assert!(format.to_u8().is_err());
+        }
     }
 }
