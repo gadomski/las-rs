@@ -12,7 +12,6 @@ fn detect_laszip() {
 }
 
 
-
 #[cfg(feature = "lazperf-compression")]
 mod lazperf_compression_test {
     use std::io::{Cursor, SeekFrom, Seek};
@@ -24,15 +23,13 @@ mod lazperf_compression_test {
         let mut reader = las::Reader::from_path(path).expect("Cannot open reader");
         let points: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
 
-        let mut builder = las::Builder::from((1, 2));
-        let mut point_format = las::point::Format::new(reader.header().point_format().to_u8().unwrap())
-            .unwrap();
-        point_format.is_compressed = true;
+        let mut header_builder = las::Builder::from(reader.header().version());
+        header_builder.point_format = reader.header().point_format().clone();
+        header_builder.point_format.is_compressed = true;
 
-        builder.point_format = point_format;
-
+        let header = header_builder.into_header().unwrap();
         let cursor = Cursor::new(Vec::<u8>::new());
-        let mut writer = las::Writer::new(cursor, builder.into_header().unwrap()).unwrap();
+        let mut writer = las::Writer::new(cursor, header).unwrap();
 
         for point in &points {
             writer.write(point.clone()).unwrap();
@@ -55,5 +52,11 @@ mod lazperf_compression_test {
     #[test]
     fn test_autzen_las() {
         test_compression_does_not_corrupt("tests/data/autzen.las");
+    }
+
+
+    #[test]
+    fn test_extra_bytes_laz() {
+        test_compression_does_not_corrupt("tests/data/extrabytes.laz");
     }
 }

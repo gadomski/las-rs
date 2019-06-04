@@ -12,14 +12,13 @@ pub(crate) fn create_laszip_vlr(laszip_vlr_data: Vec<u8>) -> Vlr {
 pub(crate) fn create_record_schema(header: &Header) -> lazperf::RecordSchema {
     let mut schema = lazperf::RecordSchema::new();
     schema.push_point();
+
     if header.point_format().has_gps_time {
         schema.push_gpstime();
-
     }
 
     if header.point_format().has_color {
         schema.push_rgb();
-
     }
 
     if header.point_format().extra_bytes != 0 {
