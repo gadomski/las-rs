@@ -343,8 +343,8 @@ impl Header {
     /// let header = Header::default();
     /// assert_eq!(0, header.point_format().to_u8().unwrap());
     /// ```
-    pub fn point_format(&self) -> Format {
-        self.point_format
+    pub fn point_format(&self) -> &Format {
+        &self.point_format
     }
 
 
@@ -365,8 +365,8 @@ impl Header {
     /// let transforms = header.transforms();
     /// assert_eq!(0.001, transforms.x.scale);
     /// ```
-    pub fn transforms(&self) -> Vector<Transform> {
-        self.transforms
+    pub fn transforms(&self) -> &Vector<Transform> {
+        &self.transforms
     }
 
     /// Returns the bounds of this header.
@@ -454,14 +454,10 @@ impl Header {
         &self.vlrs
     }
 
-    #[cfg(feature = "lazperf-compression")]
+    /// Used by the CompressedPointWriter to add the Laszip Vlr
+    #[cfg(feature = "laz")]
     pub(crate) fn vlrs_mut(&mut self) -> &mut Vec<Vlr> {
         &mut self.vlrs
-    }
-
-    #[cfg(feature = "lazperf-compression")]
-    pub(crate) fn push_vlr(&mut self, vlr: Vlr) {
-        self.vlrs.push(vlr);
     }
 
     /// Returns a reference to header's extended variable length records.

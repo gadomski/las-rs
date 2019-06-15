@@ -19,7 +19,7 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
     let header = writer.header().clone();
     let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
     assert_eq!(*point, reader.read().unwrap().unwrap());
-    assert_eq!(None, reader.read().unwrap());
+    assert_eq!(reader.read().is_none(), true);
     assert_eq!(header, *reader.header());
 }
 

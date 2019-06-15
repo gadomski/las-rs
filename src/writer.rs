@@ -34,16 +34,13 @@
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::fmt::Debug;
 
-#[cfg(feature = "lazperf-compression")]
-use byteorder::{LittleEndian, WriteBytesExt};
-
-#[cfg(feature = "lazperf-compression")]
-use compression;
+#[cfg(feature = "laz")]
+use compression::CompressedPointWriter;
 
 use {Header, Point, Result};
 use point::Format;
-
 
 quick_error! {
     /// Writer errors.
@@ -58,9 +55,107 @@ quick_error! {
             description("the attributes of the point format and point do not match")
             display("the attributes of point format {:?} does not match point {:?}", format, point)
         }
+        /// Wrapper around `std::io::Error`.
+        Io(err: std::io::Error) {
+            from()
+            cause(err)
+            description(err.description())
+            display("io error: {}", err)
+        }
     }
 }
 
+
+pub(crate) fn write_point_to<W: Write>(mut dst: &mut W, point: Point, header: &Header) -> Result<()> {
+    point
+        .into_raw(header.transforms())
+        .and_then(|raw_point| raw_point.write_to(&mut dst, header.point_format()))?;
+    Ok(())
+}
+
+/// Trait that defines a PointWriter, s
+pub(crate) trait PointWriter<W:Write> : Debug {
+    fn write_next(&mut self, point: Point) -> Result<()>;
+    //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
+    fn into_inner(self: Box<Self>) -> W;
+    fn get_mut(&mut self) -> &mut W;
+    fn header(&self) -> &Header;
+    // Needed because the compressed point writer needs to be told when its done encoding data
+    fn done(&mut self) -> Result<()>;
+}
+
+/// This struct is used to be able to get the inner stream of the writer when
+/// calling `into_inner`
+#[derive(Debug)]
+struct UnreachablePointWriter {}
+
+impl<W: Write> PointWriter<W> for UnreachablePointWriter {
+    fn write_next(&mut self, _point: Point) -> Result<()> {
+        unreachable!()
+    }
+
+    fn into_inner(self: Box<Self>) -> W {
+        unreachable!()
+    }
+
+    fn get_mut(&mut self) -> &mut W{
+        unreachable!()    }
+
+    fn header(&self) -> &Header {
+        unreachable!()
+    }
+
+    fn done(&mut self) -> Result<()> {
+        unreachable!()
+    }
+}
+
+
+#[derive(Debug)]
+struct UncompressedPointWriter<W: Write + Debug> {
+    dest: W,
+    header: Header
+}
+
+impl<W: Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
+    fn write_next(&mut self, point: Point) -> Result<()> {
+        self.header.add_point(&point);
+        write_point_to(&mut self.dest, point, &self.header)?;
+        Ok(())
+    }
+
+    fn into_inner(self: Box<Self>) -> W {
+        self.dest
+    }
+
+    fn get_mut(&mut self) -> &mut W {
+        &mut self.dest
+    }
+
+    fn header(&self) -> &Header {
+        &self.header
+    }
+
+    fn done(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+
+pub(crate) fn write_header_and_vlrs_to<W: Write>(mut dest: &mut W, header: &Header) -> Result<()> {
+    header.clone().into_raw().and_then(|raw_header| {
+        raw_header.write_to(&mut dest)
+    })?;
+    for vlr in header.vlrs() {
+        (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
+            raw_vlr.write_to(&mut dest)
+        })?;
+    }
+    if !header.vlr_padding().is_empty() {
+        dest.write_all(&header.vlr_padding())?;
+    }
+    Ok(())
+}
 
 
 /// Writes LAS data.
@@ -79,20 +174,13 @@ quick_error! {
 /// } // <- `close` is not called
 /// ```
 #[derive(Debug)]
-pub struct Writer<W: Seek + Write> {
+pub struct Writer<W: 'static + Write + Seek + Debug> {
     closed: bool,
-    header: Header,
     start: u64,
-    write: W,
-    #[cfg(feature = "lazperf-compression")]
-    point_start: u64,
-    #[cfg(feature = "lazperf-compression")]
-    compressor: Option<lazperf::VlrCompressor>,
-    #[cfg(feature = "lazperf-compression")]
-    tmp_raw: Vec<u8>,
+    point_writer: Box<dyn PointWriter<W>>
 }
 
-impl<W: Seek + Write> Writer<W> {
+impl<W: 'static + Write + Seek + Debug> Writer<W> {
     /// Creates a new writer.
     ///
     /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
@@ -105,69 +193,35 @@ impl<W: Seek + Write> Writer<W> {
     /// use las::Writer;
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
-    pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
-        let start = write.seek(SeekFrom::Current(0))?;
+        pub fn new(mut dest: W, mut header: Header) -> Result<Self> {
+        let start = dest.seek(SeekFrom::Current(0))?;
         header.clear();
 
-        #[cfg(feature = "lazperf-compression")]
-        {
-
+        #[cfg(feature = "laz")] {
             if header.point_format().is_compressed {
-                let schema = compression::create_record_schema(&header);
-                let vlr_compressor = lazperf::VlrCompressor::new(&schema);
-                let laszip_vlr_data = vlr_compressor.laszip_vlr_data();
-                header.push_vlr(compression::create_laszip_vlr(laszip_vlr_data));
-            }
-        }
-
-        header.clone().into_raw().and_then(|raw_header| {
-            raw_header.write_to(&mut write)
-        })?;
-        for vlr in header.vlrs() {
-            (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
-                raw_vlr.write_to(&mut write)
-            })?;
-        }
-        if !header.vlr_padding().is_empty() {
-            write.write_all(&header.vlr_padding())?;
-        }
-
-        #[cfg(feature = "lazperf-compression")]
-        {
-            if header.point_format().is_compressed {
-                let schema = compression::create_record_schema(&header);
-                let compressor = lazperf::VlrCompressor::new(&schema);
-                let tmp_raw = vec![0u8; header.point_format().len() as usize];
-                let point_start = write.seek(SeekFrom::Current(0))?;
-
-                Ok(Writer {
+                Ok(Self{
                     closed: false,
-                    header,
                     start,
-                    write,
-                    point_start,
-                    compressor: Some(compressor),
-                    tmp_raw,
+                    point_writer: Box::new(CompressedPointWriter::new(dest, header)?)
                 })
             } else {
-                Ok(Writer {
+                write_header_and_vlrs_to(&mut dest, &header)?;
+                Ok(Self {
                     closed: false,
-                    header,
                     start,
-                    write,
-                    point_start: 0,
-                    compressor: None,
-                    tmp_raw: Vec::<u8>::new(),
+                    point_writer: Box::new(UncompressedPointWriter{ dest, header })
                 })
             }
         }
-        #[cfg(not(feature = "lazperf-compression"))]
+        #[cfg(not(feature = "laz"))] {
+            write_header_and_vlrs_to(&mut dest, &header)?;
             Ok(Writer {
-            closed: false,
-            header,
-            start,
-            write,
-        })
+                closed: false,
+                start,
+                point_writer: Box::new(UncompressedPointWriter{ dest, header })
+            })
+        }
+
     }
 
     /// Returns a reference to this writer's header.
@@ -180,7 +234,7 @@ impl<W: Seek + Write> Writer<W> {
     /// let header = writer.header();
     /// ```
     pub fn header(&self) -> &Header {
-        &self.header
+        &self.point_writer.header()
     }
 
     /// Writes a point.
@@ -198,51 +252,13 @@ impl<W: Seek + Write> Writer<W> {
         if self.closed {
             return Err(Error::Closed.into());
         }
-        if !point.matches(self.header.point_format()) {
+        if !point.matches(self.header().point_format()) {
             return Err(
-                Error::PointAttributes(self.header.point_format(), point).into(),
+                Error::PointAttributes(*self.header().point_format(), point).into(),
             );
         }
-        self.header.add_point(&point);
+        self.point_writer.write_next(point)
 
-        #[cfg(feature = "lazperf-compression")]
-            {
-                if self.header.point_format().is_compressed {
-                    point.into_raw(self.header.transforms()).and_then(
-                        |raw_point| {
-                            let mut raw_pt = Cursor::new(&mut self.tmp_raw);
-                            raw_point.write_to(&mut raw_pt, self.header.point_format())
-                        },
-                    )?;
-
-                    match &mut self.compressor {
-                        Some(compressor) => {
-                            let compressed_size = compressor.compress_one(self.tmp_raw.as_mut_slice());
-                            if compressed_size != 0 {
-                                self.write.write_all(compressor.internal_data())?;
-                                compressor.reset_size();
-                            }
-                            Ok(())
-                        }
-                        None => unreachable!("Expected Compressor to be enabled")
-                    }
-                } else {
-                    self.write_one_uncompressed(point)
-                }
-            }
-        #[cfg(not(feature = "lazperf-compression"))]
-            {
-                self.write_one_uncompressed(point)
-            }
-    }
-
-    fn write_one_uncompressed(&mut self, point: Point) -> Result<()> {
-        point.into_raw(self.header.transforms()).and_then(
-            |raw_point| {
-                raw_point.write_to(&mut self.write, self.header.point_format())
-            },
-        )?;
-        Ok(())
     }
 
     /// Close this writer.
@@ -261,50 +277,35 @@ impl<W: Seek + Write> Writer<W> {
             return Err(Error::Closed.into());
         }
 
-        #[cfg(feature = "lazperf-compression")]
-            {
-                if self.header.point_format().is_compressed {
-                    match &mut self.compressor {
-                        Some(compressor) => {
-                            // Write the last points to the destination
-                            compressor.done();
-                            self.write.write_all(compressor.internal_data())?;
-                            compressor.reset_size();
-
-                            // Write chunk table
-                            let offset_to_chunk_table = self.write.seek(SeekFrom::Current(0))?;
-                            compressor.write_chunk_table();
-                            self.write.write_all(compressor.internal_data())?;
-
-                            // update chunk table offset
-                            self.write.seek(SeekFrom::Start(self.point_start))?;
-                            self.write.write_u64::<LittleEndian>(offset_to_chunk_table)?;
-                            self.write.seek(SeekFrom::End(0))?;
-                        }
-                        None => unreachable!("Expected Compressor to be enabled")
-                    }
-                }
-            }
+        self.point_writer.done()?;
 
 
-        self.write.write_all(self.header.point_padding())?;
-        for raw_evlr in self.header.evlrs().into_iter().map(|evlr| {
-            evlr.clone().into_raw(true)
-        })
-            {
-                raw_evlr?.write_to(&mut self.write)?;
-            }
-        self.write.seek(SeekFrom::Start(self.start))?;
-        self.header.clone().into_raw().and_then(|raw_header| {
-            raw_header.write_to(&mut self.write)
-        })?;
-        self.write.seek(SeekFrom::Start(self.start))?;
+        let point_padding = self.header().point_padding().clone();
+        self.point_writer.get_mut().write_all(&point_padding)?;
+        let raw_evlrs: Vec<Result<crate::raw::Vlr>> = {
+            self.point_writer.header()
+                .evlrs()
+                .iter()
+                .map(|evlr| evlr.clone().into_raw(true)).collect()
+
+        };
+
+        for raw_evlr in raw_evlrs {
+            raw_evlr?.write_to(&mut self.point_writer.get_mut())?;
+        }
+
+        self.point_writer.get_mut().seek(SeekFrom::Start(self.start))?;
+        self.header()
+            .clone()
+            .into_raw()
+            .and_then(|raw_header| {raw_header.write_to(&mut self.point_writer.get_mut())})?;
+        self.point_writer.get_mut().seek(SeekFrom::Start(self.start))?;
         self.closed = true;
         Ok(())
     }
 }
 
-impl<W: Write + Seek + Clone> Writer<W> {
+impl<W: 'static + Write + Seek + Debug> Writer<W> {
     /// Closes this writer and returns its inner `Write`, seeked to the beginning of the las data.
     ///
     /// # Examples
@@ -318,13 +319,26 @@ impl<W: Write + Seek + Clone> Writer<W> {
         if !self.closed {
             self.close()?;
         }
-        self.write.seek(SeekFrom::Start(self.start))?;
-        Ok(self.write.clone())
+
+        // since Writer implements Drop, the stream cannot be moved
+        // to work around this, we replace the current point writer with a point writer
+        // that will panic on any of the PintWriter fn call, basically meaning
+        // that any call to a Writer function after close can potentially cause a panic
+        // if the method does no checks for self.closed before, which should not be
+        // a problem as this function moves the writer, meaning the user won't have
+        // access to it anymore
+        let point_writer = std::mem::replace(&mut self.point_writer, Box::new(UnreachablePointWriter{}));
+        let mut inner = point_writer.into_inner();
+        inner.seek(SeekFrom::Start(self.start))?;
+        Ok(inner)
     }
 }
 
 impl Writer<BufWriter<File>> {
     /// Creates a new writer for a path.
+    ///
+    /// If the "laz" feature is enabled, guesses from the extension if the
+    /// data will be written compressed
     ///
     /// # Examples
     ///
@@ -333,17 +347,20 @@ impl Writer<BufWriter<File>> {
     /// let writer = Writer::from_path("/dev/null", Default::default());
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P, mut header: Header) -> Result<Writer<BufWriter<File>>> {
-        let compress = match path.as_ref().extension() {
-            Some(ext) => {
-                match &ext.to_str() {
-                    Some(ext_str) => {
-                        if &ext_str.to_lowercase() == "laz" { true } else { false }
+        let compress = if cfg!(feature = "laz") {
+            match path.as_ref().extension() {
+                Some(ext) => {
+                    match &ext.to_str() {
+                        Some(ext_str) => {
+                            if &ext_str.to_lowercase() == "laz" { true } else { false }
+                        }
+                        None => false
                     }
-                    None => false
                 }
+                None => false
             }
-            None => false
-        };
+        } else {false};
+
         header.point_format_mut().is_compressed = compress;
         File::create(path).map_err(::Error::from).and_then(|file| {
             Writer::new(BufWriter::new(file), header)
@@ -357,7 +374,7 @@ impl Default for Writer<Cursor<Vec<u8>>> {
     }
 }
 
-impl<W: Seek + Write> Drop for Writer<W> {
+impl<W: 'static + Seek + Write + Debug> Drop for Writer<W> {
     fn drop(&mut self) {
         if !self.closed {
             self.close().expect("Error when dropping the writer");

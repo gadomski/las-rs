@@ -9,7 +9,7 @@
 //! use las::{Vlr, Header, Point};
 //! let raw_header = Header::default().into_raw().unwrap();
 //! let raw_vlr = Vlr::default().into_raw(false).unwrap();
-//! let raw_point = Point::default().into_raw(Default::default()).unwrap();
+//! let raw_point = Point::default().into_raw(&Default::default()).unwrap();
 //! ```
 //!
 //! Raw structures all have `write_to` and `read_from` methods that can be used to put and extract
@@ -23,14 +23,14 @@
 //! let point_format = Format::new(3).unwrap();
 //!
 //! // Write the structures in an arbitrary order.
-//! Point::default().write_to(&mut cursor, point_format).unwrap();
+//! Point::default().write_to(&mut cursor, &point_format).unwrap();
 //! Header::default().write_to(&mut cursor).unwrap();
 //! Vlr::default().write_to(&mut cursor).unwrap();
 //!
 //! cursor.set_position(0);
 //!
 //! // And read them back.
-//! Point::read_from(&mut cursor, point_format).unwrap();
+//! Point::read_from(&mut cursor, &point_format).unwrap();
 //! Header::read_from(&mut cursor).unwrap();
 //! Vlr::read_from(&mut cursor, false).unwrap();
 //! ```

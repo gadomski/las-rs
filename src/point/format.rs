@@ -173,7 +173,7 @@ impl Format {
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
 
-        if !cfg!(feature = "lazperf-compression") &&self.is_compressed {
+        if !cfg!(feature = "laz") &&self.is_compressed {
             Err(Error::Format(*self).into())
         } else if self.is_extended {
             if self.has_gps_time {
@@ -415,7 +415,7 @@ mod tests {
             is_compressed: true,
             ..Default::default()
         };
-        if cfg!(feature = "lazperf-compression") {
+        if cfg!(feature = "laz") {
             assert!(format.to_u8().is_ok());
         } else {
             assert!(format.to_u8().is_err());

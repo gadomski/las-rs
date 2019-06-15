@@ -4,7 +4,7 @@ use las::Reader;
 
 #[test]
 fn detect_laszip() {
-    if cfg!(feature = "lazperf-compression") {
+    if cfg!(feature = "laz") {
         assert!(Reader::from_path("tests/data/autzen.laz").is_ok());
     } else {
         assert!(Reader::from_path("tests/data/autzen.laz").is_err());
@@ -12,9 +12,9 @@ fn detect_laszip() {
 }
 
 
-#[cfg(feature = "lazperf-compression")]
-mod lazperf_compression_test {
-    use std::io::{Cursor, SeekFrom, Seek};
+#[cfg(feature = "laz")]
+mod laz_compression_test {
+    use std::io::{Cursor};
 
 
     /// Read file, write it compressed, read the compressed data written
@@ -35,13 +35,18 @@ mod lazperf_compression_test {
             writer.write(point.clone()).unwrap();
         }
         writer.close().unwrap();
-        let mut cursor = writer.into_inner().unwrap();
+        let cursor = writer.into_inner().unwrap();
 
-        cursor.seek(SeekFrom::Start(0)).unwrap();
         let mut reader = las::Reader::new(cursor).unwrap();
         let points_2: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
 
+
         assert_eq!(points, points_2);
+    }
+
+    #[test]
+    fn test_autzen_las() {
+        test_compression_does_not_corrupt("tests/data/autzen.las");
     }
 
     #[test]
@@ -50,13 +55,8 @@ mod lazperf_compression_test {
     }
 
     #[test]
-    fn test_autzen_las() {
-        test_compression_does_not_corrupt("tests/data/autzen.las");
-    }
-
-
-    #[test]
     fn test_extra_bytes_laz() {
         test_compression_does_not_corrupt("tests/data/extrabytes.laz");
     }
+
 }

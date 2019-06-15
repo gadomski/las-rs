@@ -151,9 +151,9 @@ impl Point {
     /// use las::Point;
     /// use las::raw;
     /// let raw_point = raw::Point::default();
-    /// let point = Point::new(raw_point, Default::default());
+    /// let point = Point::new(raw_point, &Default::default());
     /// ```
-    pub fn new(mut raw_point: raw::Point, transforms: Vector<Transform>) -> Point {
+    pub fn new(mut raw_point: raw::Point, transforms: &Vector<Transform>) -> Point {
         let is_overlap = raw_point.flags.is_overlap();
         raw_point.flags.clear_overlap_class();
 
@@ -191,9 +191,9 @@ impl Point {
     /// ```
     /// use las::Point;
     /// let point = Point::default();
-    /// let raw_point = point.into_raw(Default::default()).unwrap();
+    /// let raw_point = point.into_raw(&Default::default()).unwrap();
     /// ```
-    pub fn into_raw(self, transforms: Vector<Transform>) -> Result<raw::Point> {
+    pub fn into_raw(self, transforms: &Vector<Transform>) -> Result<raw::Point> {
         Ok(raw::Point {
             x: transforms.x.inverse(self.x)?,
             y: transforms.y.inverse(self.y)?,
@@ -268,15 +268,15 @@ impl Point {
     ///
     /// let mut format = Format::new(0).unwrap();
     /// let mut point = Point::default();
-    /// assert!(point.matches(format));
+    /// assert!(point.matches(&format));
     ///
     /// format.has_gps_time = true;
-    /// assert!(!point.matches(format));
+    /// assert!(!point.matches(&format));
     ///
     /// point.gps_time = Some(42.);
-    /// assert!(point.matches(format));
+    /// assert!(point.matches(&format));
     /// ```
-    pub fn matches(&self, format: Format) -> bool {
+    pub fn matches(&self, format: &Format) -> bool {
         self.gps_time.is_some() == format.has_gps_time &&
             self.color.is_some() == format.has_color &&
             self.waveform.is_some() == format.has_waveform &&
@@ -330,7 +330,7 @@ mod tests {
             flags: Flags::TwoByte(0, 12),
             ..Default::default()
         };
-        let point = Point::new(raw_point, Default::default());
+        let point = Point::new(raw_point, &Default::default());
         assert_eq!(Classification::Unclassified, point.classification);
         assert!(point.is_overlap);
 
