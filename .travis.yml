@@ -3,6 +3,11 @@ rust:
   - stable
   - beta
   - nightly
+
+scrpipt:
+  - cargo test
+  - cargo test --features laz
+
 matrix:
   allow_failures:
     - rust: nightly
