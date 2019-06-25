@@ -36,16 +36,16 @@ pub(crate) fn extract_laszip_vlr(header: &mut Header) -> Option<Vlr> {
 
 /// struct that knows how to decompress LAZ
 ///
-/// Decompression is done in 2 step:
-/// 1) call the decompressor the read & decompress the next point
-/// and put its data in a in-memory buffer
+/// Decompression is done in 2 steps:
+/// 1) call the decompressor that reads & decompress the next point
+/// and put its data in an in-memory buffer
 /// 2) read the buffer to get the decompress point
 pub(crate) struct CompressedPointReader<R: Read +Seek> {
     /// decompressor that does the actual job
     decompressor: laz::las::laszip::LasZipDecompressor<R>,
     header: Header,
-    /// in-memory buffer where the decompressor writes deompression result
-    decomp_out: Cursor<Vec<u8>>,
+    /// in-memory buffer where the decompressor writes decompression result
+    decompressor_output: Cursor<Vec<u8>>,
     last_point_idx: u64,
 }
 
@@ -55,12 +55,12 @@ impl<R: Read + Seek> CompressedPointReader<R> {
             None => return Err(Error::LasZipVlrNotFound),
             Some(vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?
         };
-        let decomp_out = Cursor::new(vec![0u8; header.point_format().len() as usize]);
+        let decompressor_output = Cursor::new(vec![0u8; header.point_format().len() as usize]);
 
         Ok(Self {
             decompressor: laz::las::laszip::LasZipDecompressor::new(source, laszip_vlr)?,
             header,
-            decomp_out,
+            decompressor_output,
             last_point_idx: 0,
         })
     }
@@ -76,11 +76,11 @@ impl<R: Read + Seek> PointReader for CompressedPointReader<R> {
     fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;
-            self.decompressor.decompress_one(&mut self.decomp_out.get_mut()).unwrap();
-            if let Err(e) = self.decomp_out.seek(SeekFrom::Start(0)) {
+            self.decompressor.decompress_one(&mut self.decompressor_output.get_mut()).unwrap();
+            if let Err(e) = self.decompressor_output.seek(SeekFrom::Start(0)) {
                 Some(Err(e.into()))
             } else {
-                Some(read_point_from(&mut self.decomp_out, &self.header))
+                Some(read_point_from(&mut self.decompressor_output, &self.header))
             }
         } else {
 
@@ -107,9 +107,9 @@ impl<R: Read + Seek> PointReader for CompressedPointReader<R> {
 /// 2) call the laz compressor on this buffer
 pub(crate) struct CompressedPointWriter<W: Write + Seek> {
     header: Header,
-    /// buffer used to write the un compressed point
-    compression_in: Cursor<Vec<u8>>,
-    /// The compressor that actually doest the job of compressing the data
+    /// buffer used to write the uncompressed point
+    compressor_input: Cursor<Vec<u8>>,
+    /// The compressor that actually does the job of compressing the data
     compressor: laz::las::laszip::LasZipCompressor<W>
 }
 
@@ -140,12 +140,12 @@ impl<W: Write + Seek> CompressedPointWriter<W> {
 
         write_header_and_vlrs_to(&mut dest, &header)?;
 
-        let compression_in = Cursor::new(vec![0u8; header.point_format().len() as usize]);
+        let compressor_input = Cursor::new(vec![0u8; header.point_format().len() as usize]);
         let compressor = laz::las::laszip::LasZipCompressor::from_laz_vlr(dest, laz_vlr)?;
 
         Ok(Self {
             header,
-            compression_in,
+            compressor_input,
             compressor
         })
     }
@@ -154,9 +154,9 @@ impl<W: Write + Seek> CompressedPointWriter<W> {
 impl<W: Write + Seek> PointWriter<W> for CompressedPointWriter<W> {
     fn write_next(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
-        self.compression_in.seek(SeekFrom::Start(0))?;
-        write_point_to(&mut self.compression_in, point, &self.header)?;
-        self.compressor.compress_one(self.compression_in.get_ref())?;
+        self.compressor_input.seek(SeekFrom::Start(0))?;
+        write_point_to(&mut self.compressor_input, point, &self.header)?;
+        self.compressor.compress_one(self.compressor_input.get_ref())?;
         Ok(())
     }
 
