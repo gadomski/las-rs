@@ -4,7 +4,7 @@ rust:
   - beta
   - nightly
 
-scrpipt:
+script:
   - cargo test
   - cargo test --features laz
 
