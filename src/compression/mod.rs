@@ -7,6 +7,7 @@ use writer::{PointWriter, write_point_to, write_header_and_vlrs_to};
 use reader::{PointReader, read_point_from};
 use laz::las::laszip::{LazVlr, LASZIP_DESCRIPTION, LASZIP_RECORD_ID, LASZIP_USER_ID};
 use std::fmt::Debug;
+use error::Error;
 
 
 pub(crate) fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
@@ -18,6 +19,19 @@ pub(crate) fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
         description: LASZIP_DESCRIPTION.to_owned(),
         data: cursor.into_inner()
     })
+}
+
+pub(crate) fn extract_laszip_vlr(header: &mut Header) -> Option<Vlr> {
+    let mut index = None;
+    for (i, vlr) in header.vlrs().iter().enumerate() {
+        if &vlr.user_id == LASZIP_USER_ID && vlr.record_id == LASZIP_RECORD_ID {
+            index = Some(i);
+        }
+    }
+    match index {
+        Some(i) => Some(header.vlrs_mut().remove(i)),
+        None => None
+    }
 }
 
 /// struct that knows how to decompress LAZ
@@ -37,15 +51,10 @@ pub(crate) struct CompressedPointReader<R: Read +Seek> {
 
 impl<R: Read + Seek> CompressedPointReader<R> {
     pub(crate) fn new(source: R, mut header: Header) -> Result<Self> {
-        let mut index = None;
-        for (i, vlr) in header.vlrs().iter().enumerate() {
-            if &vlr.user_id == LASZIP_USER_ID && vlr.record_id == LASZIP_RECORD_ID {
-                index = Some(i);
-            }
-        }
-        let index = index.expect("Data is compressed but no Laszip VLR found");
-        let laszip_vlr = header.vlrs_mut().remove(index);
-        let laszip_vlr = laz::las::laszip::LazVlr::from_buffer(&laszip_vlr.data)?;
+        let laszip_vlr = match extract_laszip_vlr(&mut header) {
+            None => return Err(Error::LasZipVlrNotFound),
+            Some(vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?
+        };
         let decomp_out = Cursor::new(vec![0u8; header.point_format().len() as usize]);
 
         Ok(Self {

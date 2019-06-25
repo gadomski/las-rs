@@ -91,6 +91,15 @@ quick_error! {
             description("Error related to LAZ")
             display("LasZipError: {}", err)
         }
+
+
+        /// The Laszip vlr was not found, the points cannot be decompressed
+        #[cfg(feature = "laz")]
+        LasZipVlrNotFound {
+            description("Expected a Laszip vlr to decompress points, but none was found")
+            display("Expected a Laszip vlr to decompress points, but none was found")
+        }
+
     }
 }
 
