@@ -4,9 +4,12 @@ rust:
   - beta
   - nightly
 
+env:
+  - FEATURES=""
+  - FEATURES="--all-features"
+
 script:
-  - cargo test
-  - cargo test --features laz
+  - cargo test --verbose ${FEATURES}
 
 matrix:
   allow_failures:
