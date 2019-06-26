@@ -19,11 +19,16 @@
 //! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! ```
 //!
-//! For now, compressed files are not supported:
+//! Ccompressed files are supported when using the feature "laz":
 //!
 //! ```
 //! use las::Reader;
-//! assert!(Reader::from_path("tests/data/autzen.laz").is_err());
+//! if cfg!(feature = "laz") {
+//!  assert!(Reader::from_path("tests/data/autzen.laz").is_ok());
+//! } else {
+//!  assert!(Reader::from_path("tests/data/autzen.laz").is_err());
+//! }
+//!
 //! ```
 //!
 //! Use `Reader::read` to read one point, and `Reader::points` to get an iterator over
@@ -36,10 +41,15 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
-use {Builder, Header, Point, Result, Vlr, raw};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+
+#[cfg(feature = "laz")]
+use compression::CompressedPointReader;
+
+use {Builder, Header, Point, raw, Result, Vlr};
+use std::fmt::Debug;
 
 quick_error! {
     /// Error while reading.
@@ -58,17 +68,80 @@ quick_error! {
     }
 }
 
-/// Reads LAS data.
-#[derive(Debug)]
-pub struct Reader<R: Read + Seek> {
-    header: Header,
-    number_of_points: u64,
-    number_read: u64,
-    offset_to_point_data: u64,
-    read: R,
+
+#[inline]
+pub (crate) fn read_point_from<R: Read>(mut source: &mut R, header: &Header) -> Result<Point> {
+    let point = raw::Point::read_from(&mut source, header.point_format())
+        .map(|raw_point| Point::new(raw_point, header.transforms()));
+    point
 }
 
-impl<R: Read + Seek> Reader<R> {
+/// Trait to specify behaviour a a PointReader
+pub(crate) trait PointReader: Debug {
+    fn read_next(&mut self) -> Option<Result<Point>>;
+    fn seek(&mut self, position: u64) -> Result<()>;
+    fn header(&self) -> &Header;
+}
+
+/// An iterator over of the points in a `Reader`.
+///
+/// This struct is generally created by calling `points()` on `Reader`.
+#[derive(Debug)]
+pub struct PointIterator<'a> {
+    point_reader: &'a mut PointReader
+}
+
+impl<'a> Iterator for PointIterator<'a> {
+    type Item = Result<Point>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.point_reader.read_next()
+    }
+}
+
+#[derive(Debug)]
+struct UncompressedPointReader<R: Read + Seek> {
+    source: R,
+    header: Header,
+    offset_to_point_data: u64,
+    /// index of the last point read
+    last_point_idx: u64,
+}
+
+impl<R: Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
+    fn read_next(&mut self) -> Option<Result<Point>> {
+        if self.last_point_idx < self.header.number_of_points() {
+            self.last_point_idx += 1;
+            Some(read_point_from(&mut self.source, &self.header))
+        } else {
+            None
+        }
+    }
+
+    fn seek(&mut self, position: u64) -> Result<()> {
+        self.last_point_idx = position - 1;
+        self.source.seek(SeekFrom::Start(
+            self.offset_to_point_data +
+                position *
+                    u64::from(self.header.point_format().len()),
+        ))?;
+        Ok(())
+    }
+
+    fn header(&self) -> &Header {
+        &self.header
+    }
+}
+
+
+
+/// Reads LAS data.
+#[derive(Debug)]
+pub struct Reader {
+    point_reader: Box<dyn PointReader>
+}
+
+impl Reader {
     /// Creates a new reader.
     ///
     /// This does *not* wrap the `Read` in a `BufRead`, so if you're concered about performance you
@@ -83,7 +156,7 @@ impl<R: Read + Seek> Reader<R> {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new(mut read: R) -> Result<Reader<R>> {
+    pub fn new<R: Read + Seek + Debug + 'static>(mut read: R) -> Result<Reader> {
         let raw_header = raw::Header::read_from(&mut read)?;
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
@@ -92,9 +165,11 @@ impl<R: Read + Seek> Reader<R> {
         let evlr = raw_header.evlr;
 
         let mut builder = Builder::new(raw_header)?;
-        if builder.point_format.is_compressed {
+
+        if !cfg!(feature = "laz") && builder.point_format.is_compressed {
             return Err(::Error::Laszip);
         }
+
         for _ in 0..number_of_variable_length_records {
             let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
             position += vlr.len(false) as u64;
@@ -130,15 +205,27 @@ impl<R: Read + Seek> Reader<R> {
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
+
         let header = builder.into_header()?;
 
-        Ok(Reader {
-            number_of_points: header.number_of_points(),
-            header: header,
-            offset_to_point_data: offset_to_point_data,
-            read: read,
-            number_read: 0,
-        })
+        #[cfg(feature = "laz")] {
+            if header.point_format().is_compressed {
+                Ok(Reader {
+                    point_reader: Box::new(CompressedPointReader::new(read, header)?)
+                })
+            } else {
+                Ok(Reader {
+                    point_reader: Box::new(UncompressedPointReader {
+                        source: read, header, offset_to_point_data, last_point_idx: 0 })
+                })
+            }
+        }
+        #[cfg(not(feature = "laz"))] {
+            Ok(Reader {
+                point_reader: Box::new(UncompressedPointReader {
+                    source: read, header, offset_to_point_data, last_point_idx: 0 })
+            })
+        }
     }
 
     /// Returns a reference to this reader's header.
@@ -151,12 +238,11 @@ impl<R: Read + Seek> Reader<R> {
     /// let header = reader.header();
     /// ```
     pub fn header(&self) -> &Header {
-        &self.header
+        self.point_reader.header()
     }
 
+
     /// Reads a point.
-    ///
-    /// Returns `Ok(None)` if we have already read the last point.
     ///
     /// # Examples
     ///
@@ -165,20 +251,17 @@ impl<R: Read + Seek> Reader<R> {
     /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// let point = reader.read().unwrap().unwrap();
     /// ```
-    pub fn read(&mut self) -> Result<Option<Point>> {
-        if self.number_read >= self.number_of_points {
-            Ok(None)
-        } else {
-            let point = raw::Point::read_from(&mut self.read, self.header.point_format())
-                .map(|raw_point| {
-                    Some(Point::new(raw_point, self.header.transforms()))
-                });
-            self.number_read += 1;
-            point
-        }
+    pub fn read(&mut self) -> Option<Result<Point>> {
+       self.point_reader.read_next()
     }
 
+
     /// Seeks to the given point number, zero-indexed.
+    ///
+    /// Note that seeking on compressed (LAZ) data can be expensive as the reader
+    /// will have to seek to the closest chunk start and decompress all points up until
+    /// the point seeked to.
+    ///
     ///
     /// # Examples
     ///
@@ -189,13 +272,9 @@ impl<R: Read + Seek> Reader<R> {
     /// let the_second_point = reader.read().unwrap().unwrap();
     /// ```
     pub fn seek(&mut self, position: u64) -> Result<()> {
-        self.read.seek(SeekFrom::Start(
-            self.offset_to_point_data +
-                position *
-                    u64::from(self.header.point_format().len()),
-        ))?;
-        Ok(())
+        self.point_reader.seek(position)
     }
+
 
     /// Returns an iterator over this reader's points.
     ///
@@ -206,12 +285,12 @@ impl<R: Read + Seek> Reader<R> {
     /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
     /// ```
-    pub fn points(&mut self) -> Points<R> {
-        Points { reader: self }
+    pub fn points(&mut self) -> PointIterator {
+        PointIterator{point_reader: &mut *self.point_reader}
     }
 }
 
-impl Reader<BufReader<File>> {
+impl Reader {
     /// Creates a new reader from a path.
     ///
     /// The underlying `File` is wrapped in a `BufReader` for performance reasons.
@@ -222,36 +301,19 @@ impl Reader<BufReader<File>> {
     /// # use las::Reader;
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<BufReader<File>>> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader> {
         File::open(path).map_err(::Error::from).and_then(|file| {
             Reader::new(BufReader::new(file))
         })
     }
 }
 
-/// An iterator over of the points in a `Reader`.
-///
-/// This struct is generally created by calling `points()` on `Reader`.
-#[derive(Debug)]
-pub struct Points<'a, R: 'a + Read + Seek> {
-    reader: &'a mut Reader<R>,
-}
-
-impl<'a, R: Read + Seek> Iterator for Points<'a, R> {
-    type Item = Result<Point>;
-    fn next(&mut self) -> Option<Result<Point>> {
-        match self.reader.read() {
-            Ok(None) => None,
-            Ok(Some(point)) => Some(Ok(point)),
-            Err(err) => Some(Err(err)),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use Writer;
+
+    use super::*;
 
     #[test]
     fn seek() {

@@ -87,6 +87,37 @@
 //! let writer = Writer::new(write, header).unwrap();
 //! ```
 //!
+//! If compiled with laz you can compress the data written
+//!
+//! ```
+//! use std::io::Cursor;
+//! use las::{Writer, Builder};
+//! use las::point::Format;
+//!
+//! let mut builder = Builder::from((1, 4));
+//! builder.point_format = Format::new(2).unwrap();
+//! // asking to compress data
+//! builder.point_format.is_compressed = true;
+//! let header = builder.into_header().unwrap();
+//!
+//! let write = Cursor::new(Vec::new());
+//! let is_compiled_with_laz = cfg!(feature = "laz");
+//!
+//!
+//! let result =  Writer::new(write, header);
+//! if is_compiled_with_laz {
+//!     assert_eq!(result.is_ok(), true);
+//! } else {
+//!    assert_eq!(result.is_err(), true);
+//! }
+//!
+//! ```
+//!
+//! The [from_path](writer/struct.Writer.html#method.from_path) will use the extension of the output
+//! file to determine wether the data should be compressed or not
+//! 'laz' => compressed
+//! 'las' => not compressed
+//!
 //! ## Prefer `BufWrite`
 //!
 //! Just like the `Reader`, your performance will improve greatly if you use a `BufWrite` instead
@@ -105,11 +136,15 @@
 //! ```
 
 #![deny(missing_docs,
-        missing_debug_implementations, missing_copy_implementations,
-        trivial_casts, trivial_numeric_casts,
+        missing_debug_implementations,
+        missing_copy_implementations,
+        trivial_casts,
+        trivial_numeric_casts,
         unsafe_code,
         unstable_features,
-        unused_import_braces, unused_qualifications)]
+        unused_import_braces,
+        unused_qualifications)]
+
 #![recursion_limit="128"]
 
 extern crate byteorder;
@@ -118,6 +153,12 @@ extern crate num;
 #[macro_use]
 extern crate quick_error;
 extern crate uuid;
+
+#[cfg(feature = "laz")]
+extern crate laz;
+
+#[cfg(feature = "laz")]
+mod compression;
 
 pub mod feature;
 pub mod header;

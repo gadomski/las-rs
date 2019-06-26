@@ -3,6 +3,14 @@ rust:
   - stable
   - beta
   - nightly
+
+env:
+  - FEATURES=""
+  - FEATURES="--all-features"
+
+script:
+  - cargo test --verbose ${FEATURES}
+
 matrix:
   allow_failures:
     - rust: nightly

@@ -88,8 +88,7 @@ impl Classification {
             17 => Classification::BridgeDeck,
             18 => Classification::HighNoise,
             19...63 => Classification::Reserved(n),
-            64...255 => Classification::UserDefinable(n),
-            _ => unreachable!(),
+            63...255 => Classification::UserDefinable(n),
         })
     }
 }

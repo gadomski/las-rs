@@ -1,12 +1,25 @@
-use Result;
-use point::Error;
 use std::fmt;
+
+use point::Error;
+use Result;
 
 const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
 const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
 const NIR_FORMATS: &'static [u8] = &[8, 10];
 const IS_COMPRESSED_MASK: u8 = 0x80;
+
+fn is_point_format_compressed(point_format_id: u8) -> bool {
+    point_format_id & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK
+}
+
+fn point_format_id_compressed_to_uncompressd(point_format_id: u8) -> u8 {
+    point_format_id & 0x3f
+}
+
+fn point_format_id_uncompressed_to_compressed(point_format_id: u8) -> u8 {
+    point_format_id | 0x80
+}
 
 /// Point formats are defined by the las spec.
 ///
@@ -79,9 +92,11 @@ impl Format {
     /// assert!(Format::new(11).is_err());
     /// ```
     pub fn new(n: u8) -> Result<Format> {
-        if n > 10 {
+        let is_compressed = is_point_format_compressed(n);
+        if n > 10 && !is_compressed{
             Err(Error::FormatNumber(n).into())
         } else {
+            let n = point_format_id_compressed_to_uncompressd(n);
             Ok(Format {
                 has_gps_time: TIME_FORMATS.contains(&n),
                 has_color: COLOR_FORMATS.contains(&n),
@@ -89,7 +104,7 @@ impl Format {
                 has_nir: NIR_FORMATS.contains(&n),
                 is_extended: n >= 6,
                 extra_bytes: 0,
-                is_compressed: n & IS_COMPRESSED_MASK == IS_COMPRESSED_MASK,
+                is_compressed
             })
         }
     }
@@ -157,7 +172,8 @@ impl Format {
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
-        if self.is_compressed {
+
+        if !cfg!(feature = "laz") &&self.is_compressed {
             Err(Error::Format(*self).into())
         } else if self.is_extended {
             if self.has_gps_time {
@@ -192,7 +208,12 @@ impl Format {
             if self.has_color {
                 n += 2;
             }
-            Ok(n)
+
+            if self.is_compressed {
+                Ok(point_format_id_uncompressed_to_compressed(n))
+            } else {
+                Ok(n)
+            }
         }
     }
 }
@@ -394,6 +415,10 @@ mod tests {
             is_compressed: true,
             ..Default::default()
         };
-        assert!(format.to_u8().is_err());
+        if cfg!(feature = "laz") {
+            assert!(format.to_u8().is_ok());
+        } else {
+            assert!(format.to_u8().is_err());
+        }
     }
 }

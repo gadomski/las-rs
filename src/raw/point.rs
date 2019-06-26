@@ -351,9 +351,9 @@ impl Point {
     /// use las::point::Format;
     /// let mut file = File::open("tests/data/autzen.las").unwrap();
     /// file.seek(SeekFrom::Start(1994)).unwrap();
-    /// let point = Point::read_from(file, Format::new(1).unwrap()).unwrap();
+    /// let point = Point::read_from(file, &Format::new(1).unwrap()).unwrap();
     /// ```
-    pub fn read_from<R: Read>(mut read: R, format: Format) -> Result<Point> {
+    pub fn read_from<R: Read>(mut read: R, format: &Format) -> Result<Point> {
         use byteorder::{LittleEndian, ReadBytesExt};
         use utils;
 
@@ -414,9 +414,9 @@ impl Point {
     /// use las::point::Format;
     /// let mut cursor = Cursor::new(Vec::new());
     /// let point = Point::default();
-    /// point.write_to(cursor, Format::default()).unwrap();
+    /// point.write_to(cursor, &Format::default()).unwrap();
     /// ```
-    pub fn write_to<W: Write>(&self, mut write: W, format: Format) -> Result<()> {
+    pub fn write_to<W: Write>(&self, mut write: W, format: &Format) -> Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
         assert_eq!(format.extra_bytes as usize, self.extra_bytes.len());
 
@@ -848,9 +848,9 @@ mod tests {
                         point.waveform = Some(Waveform::default());
                     }
                     let mut cursor = Cursor::new(Vec::new());
-                    point.write_to(&mut cursor, format).unwrap();
+                    point.write_to(&mut cursor, &format).unwrap();
                     cursor.set_position(0);
-                    assert_eq!(point, Point::read_from(cursor, format).unwrap());
+                    assert_eq!(point, Point::read_from(cursor, &format).unwrap());
                 }
             }
         }

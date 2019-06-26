@@ -84,5 +84,34 @@ quick_error! {
             description("vlr error")
             display("vlr error: {}", err)
         }
+
+        /// Wrapper around `laz::LasZipError`
+        #[cfg(feature = "laz")]
+        LasZipError(err: laz::LasZipError) {
+            description("Error related to LAZ")
+            display("LasZipError: {}", err)
+        }
+
+
+        /// The Laszip vlr was not found, the points cannot be decompressed
+        #[cfg(feature = "laz")]
+        LasZipVlrNotFound {
+            description("Expected a Laszip vlr to decompress points, but none was found")
+            display("Expected a Laszip vlr to decompress points, but none was found")
+        }
+
+    }
+}
+
+// Because quick_error! fails to propagate the #[cfg(feature...)]
+// if "from()' is in the LasZipError enum variant declaration
+// resulting in a error when compiling las-rs without laz
+// telling that module laz is undeclared.
+// We have to implement it ourselves
+
+#[cfg(feature = "laz")]
+impl From<laz::LasZipError> for Error {
+    fn from(e: laz::LasZipError) -> Self {
+        Error::LasZipError(e)
     }
 }

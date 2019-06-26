@@ -46,18 +46,20 @@
 //! assert_eq!(b"LASF", &raw_header.file_signature);
 //! ```
 
-mod builder;
-
-pub use self::builder::Builder;
-
-use {Bounds, GpsTimeType, Point, Result, Transform, Vector, Version, Vlr, raw};
-use chrono::{Date, Datelike, Utc};
-use point::Format;
 use std::collections::HashMap;
 use std::iter::Chain;
 use std::slice::Iter;
-use utils::FromLasStr;
+
+use chrono::{Date, Datelike, Utc};
 use uuid::Uuid;
+
+use {Bounds, GpsTimeType, Point, raw, Result, Transform, Vector, Version, Vlr};
+use point::Format;
+use utils::FromLasStr;
+
+pub use self::builder::Builder;
+
+mod builder;
 
 quick_error! {
     /// Header-specific errors.
@@ -341,8 +343,13 @@ impl Header {
     /// let header = Header::default();
     /// assert_eq!(0, header.point_format().to_u8().unwrap());
     /// ```
-    pub fn point_format(&self) -> Format {
-        self.point_format
+    pub fn point_format(&self) -> &Format {
+        &self.point_format
+    }
+
+
+    pub(crate) fn point_format_mut(&mut self) -> &mut Format {
+        &mut self.point_format
     }
 
     /// Returns this header's transforms.
@@ -358,8 +365,8 @@ impl Header {
     /// let transforms = header.transforms();
     /// assert_eq!(0.001, transforms.x.scale);
     /// ```
-    pub fn transforms(&self) -> Vector<Transform> {
-        self.transforms
+    pub fn transforms(&self) -> &Vector<Transform> {
+        &self.transforms
     }
 
     /// Returns the bounds of this header.
@@ -445,6 +452,12 @@ impl Header {
     /// ```
     pub fn vlrs(&self) -> &Vec<Vlr> {
         &self.vlrs
+    }
+
+    /// Used by the CompressedPointWriter to add the Laszip Vlr
+    #[cfg(feature = "laz")]
+    pub(crate) fn vlrs_mut(&mut self) -> &mut Vec<Vlr> {
+        &mut self.vlrs
     }
 
     /// Returns a reference to header's extended variable length records.
