@@ -1,8 +1,8 @@
 //! Defines raw las points and some enums required to handle the various point formats.
 
-use {Color, Result};
 use point::{Classification, Error, Format, ScanDirection};
 use std::io::{Read, Write};
+use {Color, Result};
 
 const SCAN_ANGLE_SCALE_FACTOR: f32 = 0.006;
 const OVERLAP_CLASSIFICATION_CODE: u8 = 12;
@@ -442,9 +442,7 @@ impl Point {
         write.write_u8(self.user_data)?;
         write.write_u16::<LittleEndian>(self.point_source_id)?;
         if format.has_gps_time {
-            write.write_f64::<LittleEndian>(
-                self.gps_time.unwrap_or(0.0),
-            )?;
+            write.write_f64::<LittleEndian>(self.gps_time.unwrap_or(0.0))?;
         }
         if format.has_color {
             let color = self.color.unwrap_or_else(Color::default);
@@ -456,9 +454,9 @@ impl Point {
             write.write_u16::<LittleEndian>(self.nir.unwrap_or(0))?;
         }
         if format.has_waveform {
-            self.waveform.unwrap_or_else(Waveform::default).write_to(
-                &mut write,
-            )?;
+            self.waveform
+                .unwrap_or_else(Waveform::default)
+                .write_to(&mut write)?;
         }
         write.write_all(&self.extra_bytes)?;
         Ok(())
@@ -482,15 +480,9 @@ impl Waveform {
     fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
         write.write_u8(self.wave_packet_descriptor_index)?;
-        write.write_u64::<LittleEndian>(
-            self.byte_offset_to_waveform_data,
-        )?;
-        write.write_u32::<LittleEndian>(
-            self.waveform_packet_size_in_bytes,
-        )?;
-        write.write_f32::<LittleEndian>(
-            self.return_point_waveform_location,
-        )?;
+        write.write_u64::<LittleEndian>(self.byte_offset_to_waveform_data)?;
+        write.write_u32::<LittleEndian>(self.waveform_packet_size_in_bytes)?;
+        write.write_f32::<LittleEndian>(self.return_point_waveform_location)?;
         write.write_f32::<LittleEndian>(self.x_t)?;
         write.write_f32::<LittleEndian>(self.y_t)?;
         write.write_f32::<LittleEndian>(self.z_t)?;
@@ -742,12 +734,16 @@ impl Flags {
     /// ```
     pub fn clear_overlap_class(&mut self) {
         match *self {
-            Flags::TwoByte(_, ref mut b) => if *b & 0b1_1111 == OVERLAP_CLASSIFICATION_CODE {
-                *b = (*b & 0b1110_0000) + u8::from(Classification::Unclassified);
+            Flags::TwoByte(_, ref mut b) => {
+                if *b & 0b1_1111 == OVERLAP_CLASSIFICATION_CODE {
+                    *b = (*b & 0b1110_0000) + u8::from(Classification::Unclassified);
+                }
             }
-            Flags::ThreeByte(_, ref mut b, ref mut c) => if *c == OVERLAP_CLASSIFICATION_CODE {
-                *b |= 8;
-                *c = u8::from(Classification::Unclassified);
+            Flags::ThreeByte(_, ref mut b, ref mut c) => {
+                if *c == OVERLAP_CLASSIFICATION_CODE {
+                    *b |= 8;
+                    *c = u8::from(Classification::Unclassified);
+                }
             }
         }
     }
@@ -834,8 +830,8 @@ mod tests {
             mod $name {
                 #[test]
                 fn roundtrip() {
-                    use std::io::Cursor;
                     use super::*;
+                    use std::io::Cursor;
 
                     let mut format = Format::new($format).unwrap();
                     format.extra_bytes = 1;
@@ -853,7 +849,7 @@ mod tests {
                     assert_eq!(point, Point::read_from(cursor, &format).unwrap());
                 }
             }
-        }
+        };
     }
 
     roundtrip!(format_0, 0);

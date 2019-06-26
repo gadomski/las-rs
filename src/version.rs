@@ -1,7 +1,7 @@
-use {Error, Result};
-use Feature;
 use point::Format;
 use std::fmt;
+use Feature;
+use {Error, Result};
 
 /// LAS version.
 ///
@@ -190,7 +190,7 @@ mod tests {
                     }
                 }
             }
-        }
+        };
     }
 
     version!(las_1_0, 1, 0, [false; 5], 1);

@@ -53,9 +53,9 @@ use std::slice::Iter;
 use chrono::{Date, Datelike, Utc};
 use uuid::Uuid;
 
-use {Bounds, GpsTimeType, Point, raw, Result, Transform, Vector, Version, Vlr};
 use point::Format;
 use utils::FromLasStr;
+use {raw, Bounds, GpsTimeType, Point, Result, Transform, Vector, Version, Vlr};
 
 pub use self::builder::Builder;
 
@@ -202,7 +202,8 @@ impl Header {
     pub fn add_point(&mut self, point: &Point) {
         self.number_of_points += 1;
         if point.return_number > 0 {
-            let entry = self.number_of_points_by_return
+            let entry = self
+                .number_of_points_by_return
                 .entry(point.return_number)
                 .or_insert(0);
             *entry += 1;
@@ -346,7 +347,6 @@ impl Header {
     pub fn point_format(&self) -> &Format {
         &self.point_format
     }
-
 
     pub(crate) fn point_format_mut(&mut self) -> &mut Format {
         &mut self.point_format
@@ -549,17 +549,17 @@ impl Header {
 
     fn system_identifier_raw(&self) -> Result<[u8; 32]> {
         let mut system_identifier = [0; 32];
-        system_identifier.as_mut().from_las_str(
-            &self.system_identifier,
-        )?;
+        system_identifier
+            .as_mut()
+            .from_las_str(&self.system_identifier)?;
         Ok(system_identifier)
     }
 
     fn generating_software_raw(&self) -> Result<[u8; 32]> {
         let mut generating_software = [0; 32];
-        generating_software.as_mut().from_las_str(
-            &self.generating_software,
-        )?;
+        generating_software
+            .as_mut()
+            .from_las_str(&self.generating_software)?;
         Ok(generating_software)
     }
 
@@ -598,16 +598,14 @@ impl Header {
     }
 
     fn number_of_points_raw(&self) -> Result<u32> {
-        use std::u32;
         use feature::LargeFiles;
+        use std::u32;
 
         if self.number_of_points > u64::from(u32::MAX) {
             if self.version.supports::<LargeFiles>() {
                 Ok(0)
             } else {
-                Err(
-                    Error::TooManyPoints(self.number_of_points, self.version).into(),
-                )
+                Err(Error::TooManyPoints(self.number_of_points, self.version).into())
             }
         } else {
             Ok(self.number_of_points as u32)
@@ -615,8 +613,8 @@ impl Header {
     }
 
     fn number_of_points_by_return_raw(&self) -> Result<[u32; 5]> {
-        use std::u32;
         use feature::LargeFiles;
+        use std::u32;
 
         let mut number_of_points_by_return = [0; 5];
         for (&i, &n) in &self.number_of_points_by_return {
@@ -646,8 +644,9 @@ impl Header {
         } else if n > u32::MAX as usize {
             Err(Error::TooManyEvlrs(n).into())
         } else {
-            let start_of_first_evlr = self.point_data_len() + self.point_padding.len() as u64 +
-                u64::from(self.offset_to_point_data()?);
+            let start_of_first_evlr = self.point_data_len()
+                + self.point_padding.len() as u64
+                + u64::from(self.offset_to_point_data()?);
             Ok(Some(raw::header::Evlr {
                 start_of_first_evlr: start_of_first_evlr,
                 number_of_evlrs: n as u32,
@@ -702,9 +701,9 @@ impl Default for Header {
 
 impl<V: Into<Version>> From<V> for Header {
     fn from(version: V) -> Header {
-        Builder::from(version).into_header().expect(
-            "Default builder could not be converted into a header",
-        )
+        Builder::from(version)
+            .into_header()
+            .expect("Default builder could not be converted into a header")
     }
 }
 
@@ -837,17 +836,15 @@ mod tests {
         use std::u32;
 
         let mut header = Header::from((1, 2));
-        header.number_of_points_by_return.insert(
-            1,
-            u32::MAX as u64 + 1,
-        );
+        header
+            .number_of_points_by_return
+            .insert(1, u32::MAX as u64 + 1);
         assert!(header.into_raw().is_err());
 
         let mut header = Header::from((1, 4));
-        header.number_of_points_by_return.insert(
-            1,
-            u32::MAX as u64 + 1,
-        );
+        header
+            .number_of_points_by_return
+            .insert(1, u32::MAX as u64 + 1);
         let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_points_by_return[0]);
         assert_eq!(
@@ -873,7 +870,8 @@ mod tests {
             padding: vec![0; u16::MAX as usize - 226],
             version: (1, 2).into(),
             ..Default::default()
-        }).unwrap();
+        })
+        .unwrap();
         assert!(builder.into_header().unwrap().into_raw().is_err());
     }
 

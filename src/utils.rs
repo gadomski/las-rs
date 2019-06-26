@@ -1,6 +1,6 @@
-use {Error, Result};
 use num::Zero;
 use std::str;
+use {Error, Result};
 
 pub trait AsLasStr {
     fn as_las_str(&self) -> Result<&str>;
@@ -11,7 +11,11 @@ pub trait FromLasStr {
 }
 
 pub fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
-    if n.is_zero() { None } else { Some(n) }
+    if n.is_zero() {
+        None
+    } else {
+        Some(n)
+    }
 }
 
 impl<'a> AsLasStr for &'a [u8] {

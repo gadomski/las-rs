@@ -1,7 +1,7 @@
 //! Variable length records, both extended and regular.
 
-use Result;
 use std::io::{Read, Write};
+use Result;
 
 /// A raw variable length record.
 #[derive(Debug, Default, PartialEq)]
@@ -81,10 +81,8 @@ impl Vlr {
             RecordLength::Vlr(read.read_u16::<LittleEndian>()?)
         };
         read.read_exact(&mut vlr.description)?;
-        vlr.data.resize(
-            usize::from(vlr.record_length_after_header),
-            0,
-        );
+        vlr.data
+            .resize(usize::from(vlr.record_length_after_header), 0);
         read.read_exact(&mut vlr.data)?;
         Ok(vlr)
     }
@@ -160,6 +158,5 @@ mod tests {
         evlr.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
         assert_eq!(evlr, Vlr::read_from(cursor, true).unwrap());
-
     }
 }

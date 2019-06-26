@@ -11,11 +11,9 @@ fn detect_laszip() {
     }
 }
 
-
 #[cfg(feature = "laz")]
 mod laz_compression_test {
-    use std::io::{Cursor};
-
+    use std::io::Cursor;
 
     /// Read file, write it compressed, read the compressed data written
     /// compare that points are the same
@@ -39,7 +37,6 @@ mod laz_compression_test {
 
         let mut reader = las::Reader::new(cursor).unwrap();
         let points_2: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
-
 
         assert_eq!(points, points_2);
     }

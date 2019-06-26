@@ -1,10 +1,10 @@
 //! Raw file metadata.
 
-use {Result, Version};
 use byteorder::{LittleEndian, ReadBytesExt};
 use feature::{Evlrs, LargeFiles, Waveforms};
 use raw::LASF;
 use std::io::{Read, Write};
+use {Result, Version};
 
 /// A las header.
 ///
@@ -253,8 +253,8 @@ impl Header {
     /// let header = Header::read_from(&mut file).unwrap();
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
-        use utils;
         use header::Error;
+        use utils;
 
         let mut header = Header::default();
         read.read_exact(&mut header.file_signature)?;
@@ -326,8 +326,8 @@ impl Header {
     /// assert_eq!(227, Header::default().offset_to_end_of_points());
     /// ```
     pub fn offset_to_end_of_points(&self) -> u64 {
-        u64::from(self.offset_to_point_data) +
-            u64::from(self.number_of_point_records) * u64::from(self.point_data_record_length)
+        u64::from(self.offset_to_point_data)
+            + u64::from(self.number_of_point_records) * u64::from(self.point_data_record_length)
     }
 
     /// Writes a raw header to a `Write`.
@@ -352,22 +352,14 @@ impl Header {
         write.write_u8(self.version.minor)?;
         write.write_all(&self.system_identifier)?;
         write.write_all(&self.generating_software)?;
-        write.write_u16::<LittleEndian>(
-            self.file_creation_day_of_year,
-        )?;
+        write.write_u16::<LittleEndian>(self.file_creation_day_of_year)?;
         write.write_u16::<LittleEndian>(self.file_creation_year)?;
         write.write_u16::<LittleEndian>(self.header_size)?;
         write.write_u32::<LittleEndian>(self.offset_to_point_data)?;
-        write.write_u32::<LittleEndian>(
-            self.number_of_variable_length_records,
-        )?;
+        write.write_u32::<LittleEndian>(self.number_of_variable_length_records)?;
         write.write_u8(self.point_data_record_format)?;
-        write.write_u16::<LittleEndian>(
-            self.point_data_record_length,
-        )?;
-        write.write_u32::<LittleEndian>(
-            self.number_of_point_records,
-        )?;
+        write.write_u16::<LittleEndian>(self.point_data_record_length)?;
+        write.write_u32::<LittleEndian>(self.number_of_point_records)?;
         for n in &self.number_of_points_by_return {
             write.write_u32::<LittleEndian>(*n)?;
         }
@@ -395,9 +387,7 @@ impl Header {
         }
         if self.version.supports::<LargeFiles>() {
             let large_file = self.large_file.unwrap_or_else(LargeFile::default);
-            write.write_u64::<LittleEndian>(
-                large_file.number_of_point_records,
-            )?;
+            write.write_u64::<LittleEndian>(large_file.number_of_point_records)?;
             for n in &large_file.number_of_points_by_return {
                 write.write_u64::<LittleEndian>(*n)?;
             }
@@ -509,8 +499,8 @@ mod tests {
             mod $name {
                 #[test]
                 fn roundtrip() {
-                    use std::io::Cursor;
                     use super::*;
+                    use std::io::Cursor;
 
                     let version = Version::new(1, $minor);
                     let mut header = Header {
@@ -526,7 +516,7 @@ mod tests {
                     assert_eq!(header, Header::read_from(cursor).unwrap());
                 }
             }
-        }
+        };
     }
 
     roundtrip!(las_1_0, 0);

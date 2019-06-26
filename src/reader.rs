@@ -48,8 +48,8 @@ use std::path::Path;
 #[cfg(feature = "laz")]
 use compression::CompressedPointReader;
 
-use {Builder, Header, Point, raw, Result, Vlr};
 use std::fmt::Debug;
+use {raw, Builder, Header, Point, Result, Vlr};
 
 quick_error! {
     /// Error while reading.
@@ -68,9 +68,8 @@ quick_error! {
     }
 }
 
-
 #[inline]
-pub (crate) fn read_point_from<R: Read>(mut source: &mut R, header: &Header) -> Result<Point> {
+pub(crate) fn read_point_from<R: Read>(mut source: &mut R, header: &Header) -> Result<Point> {
     let point = raw::Point::read_from(&mut source, header.point_format())
         .map(|raw_point| Point::new(raw_point, header.transforms()));
     point
@@ -88,7 +87,7 @@ pub(crate) trait PointReader: Debug {
 /// This struct is generally created by calling `points()` on `Reader`.
 #[derive(Debug)]
 pub struct PointIterator<'a> {
-    point_reader: &'a mut PointReader
+    point_reader: &'a mut PointReader,
 }
 
 impl<'a> Iterator for PointIterator<'a> {
@@ -121,9 +120,7 @@ impl<R: Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
     fn seek(&mut self, position: u64) -> Result<()> {
         self.last_point_idx = position - 1;
         self.source.seek(SeekFrom::Start(
-            self.offset_to_point_data +
-                position *
-                    u64::from(self.header.point_format().len()),
+            self.offset_to_point_data + position * u64::from(self.header.point_format().len()),
         ))?;
         Ok(())
     }
@@ -133,12 +130,10 @@ impl<R: Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
     }
 }
 
-
-
 /// Reads LAS data.
 #[derive(Debug)]
 pub struct Reader {
-    point_reader: Box<dyn PointReader>
+    point_reader: Box<dyn PointReader>,
 }
 
 impl Reader {
@@ -176,9 +171,7 @@ impl Reader {
             builder.vlrs.push(vlr);
         }
         if position > offset_to_point_data {
-            return Err(
-                Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into(),
-            );
+            return Err(Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into());
         } else if position < offset_to_point_data {
             read.by_ref()
                 .take(offset_to_point_data - position)
@@ -188,42 +181,48 @@ impl Reader {
         read.seek(SeekFrom::Start(offset_to_end_of_points))?;
         if let Some(evlr) = evlr {
             if evlr.start_of_first_evlr < offset_to_end_of_points {
-                return Err(
-                    Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into(),
-                );
+                return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into());
             } else if evlr.start_of_first_evlr > offset_to_end_of_points {
                 let n = evlr.start_of_first_evlr - offset_to_end_of_points;
-                read.by_ref().take(n).read_to_end(
-                    &mut builder.point_padding,
-                )?;
+                read.by_ref()
+                    .take(n)
+                    .read_to_end(&mut builder.point_padding)?;
             }
-            builder.evlrs.push(
-                raw::Vlr::read_from(&mut read, true).and_then(
-                    Vlr::new,
-                )?,
-            );
+            builder
+                .evlrs
+                .push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
 
         let header = builder.into_header()?;
 
-        #[cfg(feature = "laz")] {
+        #[cfg(feature = "laz")]
+        {
             if header.point_format().is_compressed {
                 Ok(Reader {
-                    point_reader: Box::new(CompressedPointReader::new(read, header)?)
+                    point_reader: Box::new(CompressedPointReader::new(read, header)?),
                 })
             } else {
                 Ok(Reader {
                     point_reader: Box::new(UncompressedPointReader {
-                        source: read, header, offset_to_point_data, last_point_idx: 0 })
+                        source: read,
+                        header,
+                        offset_to_point_data,
+                        last_point_idx: 0,
+                    }),
                 })
             }
         }
-        #[cfg(not(feature = "laz"))] {
+        #[cfg(not(feature = "laz"))]
+        {
             Ok(Reader {
                 point_reader: Box::new(UncompressedPointReader {
-                    source: read, header, offset_to_point_data, last_point_idx: 0 })
+                    source: read,
+                    header,
+                    offset_to_point_data,
+                    last_point_idx: 0,
+                }),
             })
         }
     }
@@ -241,7 +240,6 @@ impl Reader {
         self.point_reader.header()
     }
 
-
     /// Reads a point.
     ///
     /// # Examples
@@ -252,9 +250,8 @@ impl Reader {
     /// let point = reader.read().unwrap().unwrap();
     /// ```
     pub fn read(&mut self) -> Option<Result<Point>> {
-       self.point_reader.read_next()
+        self.point_reader.read_next()
     }
-
 
     /// Seeks to the given point number, zero-indexed.
     ///
@@ -275,7 +272,6 @@ impl Reader {
         self.point_reader.seek(position)
     }
 
-
     /// Returns an iterator over this reader's points.
     ///
     /// # Examples
@@ -286,7 +282,9 @@ impl Reader {
     /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
     /// ```
     pub fn points(&mut self) -> PointIterator {
-        PointIterator{point_reader: &mut *self.point_reader}
+        PointIterator {
+            point_reader: &mut *self.point_reader,
+        }
     }
 }
 
@@ -302,12 +300,11 @@ impl Reader {
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader> {
-        File::open(path).map_err(::Error::from).and_then(|file| {
-            Reader::new(BufReader::new(file))
-        })
+        File::open(path)
+            .map_err(::Error::from)
+            .and_then(|file| Reader::new(BufReader::new(file)))
     }
 }
-
 
 #[cfg(test)]
 mod tests {

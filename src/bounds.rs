@@ -1,5 +1,5 @@
-use {Point, Vector};
 use std::f64;
+use {Point, Vector};
 
 /// Minimum and maximum bounds in three dimensions.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -69,7 +69,9 @@ mod tests {
 
     #[test]
     fn grow() {
-        let mut bounds = Bounds { ..Default::default() };
+        let mut bounds = Bounds {
+            ..Default::default()
+        };
         bounds.grow(&Point {
             x: 1.,
             y: 2.,

@@ -93,7 +93,7 @@ impl Format {
     /// ```
     pub fn new(n: u8) -> Result<Format> {
         let is_compressed = is_point_format_compressed(n);
-        if n > 10 && !is_compressed{
+        if n > 10 && !is_compressed {
             Err(Error::FormatNumber(n).into())
         } else {
             let n = point_format_id_compressed_to_uncompressd(n);
@@ -104,7 +104,7 @@ impl Format {
                 has_nir: NIR_FORMATS.contains(&n),
                 is_extended: n >= 6,
                 extra_bytes: 0,
-                is_compressed
+                is_compressed,
             })
         }
     }
@@ -172,14 +172,17 @@ impl Format {
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
-
-        if !cfg!(feature = "laz") &&self.is_compressed {
+        if !cfg!(feature = "laz") && self.is_compressed {
             Err(Error::Format(*self).into())
         } else if self.is_extended {
             if self.has_gps_time {
                 if self.has_color {
                     if self.has_nir {
-                        if self.has_waveform { Ok(10) } else { Ok(8) }
+                        if self.has_waveform {
+                            Ok(10)
+                        } else {
+                            Ok(8)
+                        }
                     } else if self.has_waveform {
                         Err(Error::Format(*self).into())
                     } else {
@@ -199,7 +202,11 @@ impl Format {
             Err(Error::Format(*self).into())
         } else if self.has_waveform {
             if self.has_gps_time {
-                if self.has_color { Ok(5) } else { Ok(4) }
+                if self.has_color {
+                    Ok(5)
+                } else {
+                    Ok(4)
+                }
             } else {
                 Err(Error::Format(*self).into())
             }
@@ -252,7 +259,7 @@ mod tests {
                     assert_eq!($n, Format::new($n).unwrap().to_u8().unwrap());
                 }
             }
-        }
+        };
     }
 
     format!(format_0, 0, Format::default(), 20);

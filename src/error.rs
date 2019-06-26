@@ -1,6 +1,6 @@
-use {Transform, Version, header, point, reader, vlr, writer};
 use std::io;
 use std::str;
+use {header, point, reader, vlr, writer, Transform, Version};
 
 quick_error! {
     /// Crate-specific error enum.

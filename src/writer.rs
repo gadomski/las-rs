@@ -31,16 +31,16 @@
 //! assert!(writer.write(point).is_err()); // the point's color would be lost
 //! ```
 
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Seek, SeekFrom, Write};
 use std::path::Path;
-use std::fmt::Debug;
 
 #[cfg(feature = "laz")]
 use compression::CompressedPointWriter;
 
-use {Header, Point, Result};
 use point::Format;
+use {Header, Point, Result};
 
 quick_error! {
     /// Writer errors.
@@ -65,8 +65,11 @@ quick_error! {
     }
 }
 
-
-pub(crate) fn write_point_to<W: Write>(mut dst: &mut W, point: Point, header: &Header) -> Result<()> {
+pub(crate) fn write_point_to<W: Write>(
+    mut dst: &mut W,
+    point: Point,
+    header: &Header,
+) -> Result<()> {
     point
         .into_raw(header.transforms())
         .and_then(|raw_point| raw_point.write_to(&mut dst, header.point_format()))?;
@@ -74,7 +77,7 @@ pub(crate) fn write_point_to<W: Write>(mut dst: &mut W, point: Point, header: &H
 }
 
 /// Trait that defines a PointWriter, s
-pub(crate) trait PointWriter<W:Write> : Debug {
+pub(crate) trait PointWriter<W: Write>: Debug {
     fn write_next(&mut self, point: Point) -> Result<()>;
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
@@ -98,8 +101,9 @@ impl<W: Write> PointWriter<W> for UnreachablePointWriter {
         unreachable!()
     }
 
-    fn get_mut(&mut self) -> &mut W{
-        unreachable!()    }
+    fn get_mut(&mut self) -> &mut W {
+        unreachable!()
+    }
 
     fn header(&self) -> &Header {
         unreachable!()
@@ -110,11 +114,10 @@ impl<W: Write> PointWriter<W> for UnreachablePointWriter {
     }
 }
 
-
 #[derive(Debug)]
 struct UncompressedPointWriter<W: Write + Debug> {
     dest: W,
-    header: Header
+    header: Header,
 }
 
 impl<W: Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
@@ -141,22 +144,22 @@ impl<W: Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
     }
 }
 
-
 pub(crate) fn write_header_and_vlrs_to<W: Write>(mut dest: &mut W, header: &Header) -> Result<()> {
-    header.clone().into_raw().and_then(|raw_header| {
-        raw_header.write_to(&mut dest)
-    })?;
+    header
+        .clone()
+        .into_raw()
+        .and_then(|raw_header| raw_header.write_to(&mut dest))?;
     for vlr in header.vlrs() {
-        (*vlr).clone().into_raw(false).and_then(|raw_vlr| {
-            raw_vlr.write_to(&mut dest)
-        })?;
+        (*vlr)
+            .clone()
+            .into_raw(false)
+            .and_then(|raw_vlr| raw_vlr.write_to(&mut dest))?;
     }
     if !header.vlr_padding().is_empty() {
         dest.write_all(&header.vlr_padding())?;
     }
     Ok(())
 }
-
 
 /// Writes LAS data.
 ///
@@ -177,7 +180,7 @@ pub(crate) fn write_header_and_vlrs_to<W: Write>(mut dest: &mut W, header: &Head
 pub struct Writer<W: 'static + Write + Seek + Debug> {
     closed: bool,
     start: u64,
-    point_writer: Box<dyn PointWriter<W>>
+    point_writer: Box<dyn PointWriter<W>>,
 }
 
 impl<W: 'static + Write + Seek + Debug> Writer<W> {
@@ -193,35 +196,36 @@ impl<W: 'static + Write + Seek + Debug> Writer<W> {
     /// use las::Writer;
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
-        pub fn new(mut dest: W, mut header: Header) -> Result<Self> {
+    pub fn new(mut dest: W, mut header: Header) -> Result<Self> {
         let start = dest.seek(SeekFrom::Current(0))?;
         header.clear();
 
-        #[cfg(feature = "laz")] {
+        #[cfg(feature = "laz")]
+        {
             if header.point_format().is_compressed {
-                Ok(Self{
+                Ok(Self {
                     closed: false,
                     start,
-                    point_writer: Box::new(CompressedPointWriter::new(dest, header)?)
+                    point_writer: Box::new(CompressedPointWriter::new(dest, header)?),
                 })
             } else {
                 write_header_and_vlrs_to(&mut dest, &header)?;
                 Ok(Self {
                     closed: false,
                     start,
-                    point_writer: Box::new(UncompressedPointWriter{ dest, header })
+                    point_writer: Box::new(UncompressedPointWriter { dest, header }),
                 })
             }
         }
-        #[cfg(not(feature = "laz"))] {
+        #[cfg(not(feature = "laz"))]
+        {
             write_header_and_vlrs_to(&mut dest, &header)?;
             Ok(Writer {
                 closed: false,
                 start,
-                point_writer: Box::new(UncompressedPointWriter{ dest, header })
+                point_writer: Box::new(UncompressedPointWriter { dest, header }),
             })
         }
-
     }
 
     /// Returns a reference to this writer's header.
@@ -253,12 +257,9 @@ impl<W: 'static + Write + Seek + Debug> Writer<W> {
             return Err(Error::Closed.into());
         }
         if !point.matches(self.header().point_format()) {
-            return Err(
-                Error::PointAttributes(*self.header().point_format(), point).into(),
-            );
+            return Err(Error::PointAttributes(*self.header().point_format(), point).into());
         }
         self.point_writer.write_next(point)
-
     }
 
     /// Close this writer.
@@ -279,27 +280,31 @@ impl<W: 'static + Write + Seek + Debug> Writer<W> {
 
         self.point_writer.done()?;
 
-
         let point_padding = self.header().point_padding().clone();
         self.point_writer.get_mut().write_all(&point_padding)?;
         let raw_evlrs: Vec<Result<crate::raw::Vlr>> = {
-            self.point_writer.header()
+            self.point_writer
+                .header()
                 .evlrs()
                 .iter()
-                .map(|evlr| evlr.clone().into_raw(true)).collect()
-
+                .map(|evlr| evlr.clone().into_raw(true))
+                .collect()
         };
 
         for raw_evlr in raw_evlrs {
             raw_evlr?.write_to(&mut self.point_writer.get_mut())?;
         }
 
-        self.point_writer.get_mut().seek(SeekFrom::Start(self.start))?;
+        self.point_writer
+            .get_mut()
+            .seek(SeekFrom::Start(self.start))?;
         self.header()
             .clone()
             .into_raw()
-            .and_then(|raw_header| {raw_header.write_to(&mut self.point_writer.get_mut())})?;
-        self.point_writer.get_mut().seek(SeekFrom::Start(self.start))?;
+            .and_then(|raw_header| raw_header.write_to(&mut self.point_writer.get_mut()))?;
+        self.point_writer
+            .get_mut()
+            .seek(SeekFrom::Start(self.start))?;
         self.closed = true;
         Ok(())
     }
@@ -327,7 +332,8 @@ impl<W: 'static + Write + Seek + Debug> Writer<W> {
         // if the method does no checks for self.closed before, which should not be
         // a problem as this function moves the writer, meaning the user won't have
         // access to it anymore
-        let point_writer = std::mem::replace(&mut self.point_writer, Box::new(UnreachablePointWriter{}));
+        let point_writer =
+            std::mem::replace(&mut self.point_writer, Box::new(UnreachablePointWriter {}));
         let mut inner = point_writer.into_inner();
         inner.seek(SeekFrom::Start(self.start))?;
         Ok(inner)
@@ -346,25 +352,32 @@ impl Writer<BufWriter<File>> {
     /// use las::Writer;
     /// let writer = Writer::from_path("/dev/null", Default::default());
     /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P, mut header: Header) -> Result<Writer<BufWriter<File>>> {
+    pub fn from_path<P: AsRef<Path>>(
+        path: P,
+        mut header: Header,
+    ) -> Result<Writer<BufWriter<File>>> {
         let compress = if cfg!(feature = "laz") {
             match path.as_ref().extension() {
-                Some(ext) => {
-                    match &ext.to_str() {
-                        Some(ext_str) => {
-                            if &ext_str.to_lowercase() == "laz" { true } else { false }
+                Some(ext) => match &ext.to_str() {
+                    Some(ext_str) => {
+                        if &ext_str.to_lowercase() == "laz" {
+                            true
+                        } else {
+                            false
                         }
-                        None => false
                     }
-                }
-                None => false
+                    None => false,
+                },
+                None => false,
             }
-        } else {false};
+        } else {
+            false
+        };
 
         header.point_format_mut().is_compressed = compress;
-        File::create(path).map_err(::Error::from).and_then(|file| {
-            Writer::new(BufWriter::new(file), header)
-        })
+        File::create(path)
+            .map_err(::Error::from)
+            .and_then(|file| Writer::new(BufWriter::new(file), header))
     }
 }
 
@@ -452,8 +465,8 @@ mod tests {
 
     #[test]
     fn write_not_at_start() {
-        use Reader;
         use byteorder::WriteBytesExt;
+        use Reader;
 
         let mut cursor = Cursor::new(Vec::new());
         cursor.write_u8(42).unwrap();

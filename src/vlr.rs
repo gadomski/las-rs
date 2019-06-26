@@ -29,7 +29,7 @@
 //! assert_eq!(1, header.vlrs().len());
 //! ```
 
-use {Result, raw};
+use {raw, Result};
 
 const REGULAR_HEADER_SIZE: usize = 54;
 const EXTENDED_HEADER_SIZE: usize = 60;
@@ -125,8 +125,8 @@ impl Vlr {
     /// assert_eq!(55, vlr.len(false));
     /// ```
     pub fn len(&self, is_extended: bool) -> usize {
-        self.data.len() +
-            if is_extended {
+        self.data.len()
+            + if is_extended {
                 EXTENDED_HEADER_SIZE
             } else {
                 REGULAR_HEADER_SIZE

@@ -35,9 +35,9 @@
 //! Vlr::read_from(&mut cursor, false).unwrap();
 //! ```
 
+pub mod header;
 pub mod point;
 pub mod vlr;
-pub mod header;
 
 pub use self::header::Header;
 pub use self::point::Point;

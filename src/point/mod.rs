@@ -20,9 +20,9 @@ pub use self::classification::Classification;
 pub use self::format::Format;
 pub use self::scan_direction::ScanDirection;
 
-use {Color, Result, Transform, Vector};
 use raw;
 use raw::point::Waveform;
+use {Color, Result, Transform, Vector};
 
 quick_error! {
     /// Point-specific errors
@@ -166,9 +166,10 @@ impl Point {
             number_of_returns: raw_point.flags.number_of_returns(),
             scan_direction: raw_point.flags.scan_direction(),
             is_edge_of_flight_line: raw_point.flags.is_edge_of_flight_line(),
-            classification: raw_point.flags.to_classification().expect(
-                "Overlap classification should have been cleared",
-            ),
+            classification: raw_point
+                .flags
+                .to_classification()
+                .expect("Overlap classification should have been cleared"),
             is_synthetic: raw_point.flags.is_synthetic(),
             is_key_point: raw_point.flags.is_key_point(),
             is_withheld: raw_point.flags.is_withheld(),
@@ -277,11 +278,11 @@ impl Point {
     /// assert!(point.matches(&format));
     /// ```
     pub fn matches(&self, format: &Format) -> bool {
-        self.gps_time.is_some() == format.has_gps_time &&
-            self.color.is_some() == format.has_color &&
-            self.waveform.is_some() == format.has_waveform &&
-            self.nir.is_some() == format.has_nir &&
-            self.extra_bytes.len() == format.extra_bytes as usize
+        self.gps_time.is_some() == format.has_gps_time
+            && self.color.is_some() == format.has_color
+            && self.waveform.is_some() == format.has_waveform
+            && self.nir.is_some() == format.has_nir
+            && self.extra_bytes.len() == format.extra_bytes as usize
     }
 }
 
@@ -291,35 +292,32 @@ mod tests {
 
     #[test]
     fn flags_invalid_return_number() {
-        assert!(
-            Point {
-                return_number: 16,
-                ..Default::default()
-            }.flags()
-                .is_err()
-        );
+        assert!(Point {
+            return_number: 16,
+            ..Default::default()
+        }
+        .flags()
+        .is_err());
     }
 
     #[test]
     fn flags_invalid_number_of_returns() {
-        assert!(
-            Point {
-                number_of_returns: 16,
-                ..Default::default()
-            }.flags()
-                .is_err()
-        );
+        assert!(Point {
+            number_of_returns: 16,
+            ..Default::default()
+        }
+        .flags()
+        .is_err());
     }
 
     #[test]
     fn flags_invalid_scanner_channel() {
-        assert!(
-            Point {
-                scanner_channel: 4,
-                ..Default::default()
-            }.flags()
-                .is_err()
-        );
+        assert!(Point {
+            scanner_channel: 4,
+            ..Default::default()
+        }
+        .flags()
+        .is_err());
     }
 
     #[test]
@@ -333,6 +331,5 @@ mod tests {
         let point = Point::new(raw_point, &Default::default());
         assert_eq!(Classification::Unclassified, point.classification);
         assert!(point.is_overlap);
-
     }
 }
