@@ -9,8 +9,15 @@ use laz::las::laszip::{LazVlr, LASZIP_DESCRIPTION, LASZIP_RECORD_ID, LASZIP_USER
 use std::fmt::Debug;
 use error::Error;
 
+fn is_laszip_vlr(vlr: &Vlr) -> bool {
+    if &vlr.user_id == LASZIP_USER_ID && vlr.record_id == LASZIP_RECORD_ID {
+        true
+    } else {
+        false
+    }
+}
 
-pub(crate) fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
+fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
     let mut cursor = Cursor::new(Vec::<u8>::new());
     laszip_vlr.write_to(&mut cursor)?;
     Ok(Vlr{
@@ -21,18 +28,6 @@ pub(crate) fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
     })
 }
 
-pub(crate) fn extract_laszip_vlr(header: &mut Header) -> Option<Vlr> {
-    let mut index = None;
-    for (i, vlr) in header.vlrs().iter().enumerate() {
-        if &vlr.user_id == LASZIP_USER_ID && vlr.record_id == LASZIP_RECORD_ID {
-            index = Some(i);
-        }
-    }
-    match index {
-        Some(i) => Some(header.vlrs_mut().remove(i)),
-        None => None
-    }
-}
 
 /// struct that knows how to decompress LAZ
 ///
@@ -50,10 +45,10 @@ pub(crate) struct CompressedPointReader<R: Read +Seek> {
 }
 
 impl<R: Read + Seek> CompressedPointReader<R> {
-    pub(crate) fn new(source: R, mut header: Header) -> Result<Self> {
-        let laszip_vlr = match extract_laszip_vlr(&mut header) {
+    pub(crate) fn new(source: R, header: Header) -> Result<Self> {
+        let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
             None => return Err(Error::LasZipVlrNotFound),
-            Some(vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?
+            Some(ref vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?
         };
         let decompressor_output = Cursor::new(vec![0u8; header.point_format().len() as usize]);
 
@@ -83,7 +78,6 @@ impl<R: Read + Seek> PointReader for CompressedPointReader<R> {
                 Some(read_point_from(&mut self.decompressor_output, &self.header))
             }
         } else {
-
             None
         }
     }
@@ -136,6 +130,8 @@ impl<W: Write + Seek> CompressedPointWriter<W> {
         }
 
         let laz_vlr = LazVlr::from_laz_items(laz_items.build());
+        // Clear any existing laszip vlr as they might not be correct
+        header.vlrs_mut().retain(|vlr| !is_laszip_vlr(vlr));
         header.vlrs_mut().push(create_laszip_vlr(&laz_vlr)?);
 
         write_header_and_vlrs_to(&mut dest, &header)?;
