@@ -19,7 +19,7 @@ num = "0.1"
 quick-error = "1.2"
 uuid = "0.6"
 
-laz = {version = "0.1.0", optional = true }
+laz = { version = "0.1.0", optional = true }
 
 
 [badges]
