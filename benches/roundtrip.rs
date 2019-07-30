@@ -3,15 +3,15 @@
 extern crate las;
 extern crate test;
 
-use las::{Point, Reader, Writer};
+use las::{Point, Reader, StdReader, Writer, StdWriter};
 use test::Bencher;
 
 fn roundtrip(npoints: usize) {
-    let mut writer = Writer::default();
+    let mut writer = StdWriter::default();
     for _ in 0..npoints {
         writer.write(Point::default()).unwrap();
     }
-    let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
+    let mut reader = StdReader::new(writer.into_inner().unwrap()).unwrap();
     for point in reader.points() {
         let _ = point.unwrap();
     }

@@ -4,7 +4,7 @@ extern crate chrono;
 extern crate las;
 extern crate uuid;
 
-use las::{Builder, Point, Reader, Writer};
+use las::{Builder, Point, StdReader, Reader, StdWriter, Writer};
 use std::io::Cursor;
 
 pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
@@ -14,10 +14,10 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
         assert!(builder.into_header().is_err());
         return;
     };
-    let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
+    let mut writer = StdWriter::new(Cursor::new(Vec::new()), header).unwrap();
     writer.write(point.clone()).unwrap();
     let header = writer.header().clone();
-    let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
+    let mut reader = StdReader::new(writer.into_inner().unwrap()).unwrap();
     assert_eq!(*point, reader.read().unwrap().unwrap());
     assert_eq!(reader.read().is_none(), true);
     assert_eq!(header, *reader.header());

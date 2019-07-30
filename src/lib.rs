@@ -3,11 +3,11 @@
 //!
 //! # Reading
 //!
-//! Create a `Reader` from a `Path`:
+//! Create an object that implements `Reader` from a `Path`:
 //!
 //! ```
-//! use las::Reader;
-//! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+//! use las::StdReader;
+//! let reader = StdReader::from_path("tests/data/autzen.las").unwrap();
 //! ```
 //!
 //! Or anything that implements `Read`:
@@ -15,9 +15,9 @@
 //! ```
 //! use std::io::BufReader;
 //! use std::fs::File;
-//! use las::Reader;
+//! use las::StdReader;
 //! let read = BufReader::new(File::open("tests/data/autzen.las").unwrap());
-//! let reader = Reader::new(read).unwrap();
+//! let reader = StdReader::new(read).unwrap();
 //! ```
 //!
 //! ## Prefer `BufRead`
@@ -30,16 +30,16 @@
 //! Read points one-by-one with `Reader::read`:
 //!
 //! ```
-//! use las::Reader;
-//! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+//! use las::{Reader, StdReader};
+//! let mut reader = StdReader::from_path("tests/data/autzen.las").unwrap();
 //! let point = reader.read().unwrap().unwrap();
 //! ```
 //!
 //! Or iterate over all points with `Reader::points`:
 //!
 //! ```
-//! use las::Reader;
-//! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+//! use las::{Reader, StdReader};
+//! let mut reader = StdReader::from_path("tests/data/autzen.las").unwrap();
 //! for wrapped_point in reader.points() {
 //!     let point = wrapped_point.unwrap();
 //!     println!("Point coordinates: ({}, {}, {})", point.x, point.y, point.z);
@@ -55,28 +55,28 @@
 //!
 //! # Writing
 //!
-//! Create a `Writer` from a `Write` and a `Header`:
+//! Create a `StdWriter` from a `Write` and a `Header`:
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Header};
+//! use las::{StdWriter, Header};
 //! let write = Cursor::new(Vec::new());
 //! let header = Header::default();
-//! let writer = Writer::new(write, header).unwrap();
+//! let writer = StdWriter::new(write, header).unwrap();
 //! ```
 //!
-//! You can also write out to a path (automatically buffered with `BufWriter`):
+//! You can also write out to a path (automatically buffered with `BufStdWriter`):
 //!
 //! ```
-//! use las::Writer;
-//! let writer = Writer::from_path("/dev/null", Default::default());
+//! use las::StdWriter;
+//! let writer = StdWriter::from_path("/dev/null", Default::default());
 //! ```
 //!
 //! Use a `Builder` to customize the las data:
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Builder};
+//! use las::{StdWriter, Builder};
 //! use las::point::Format;
 //!
 //! let mut builder = Builder::from((1, 4));
@@ -84,14 +84,14 @@
 //! let header = builder.into_header().unwrap();
 //!
 //! let write = Cursor::new(Vec::new());
-//! let writer = Writer::new(write, header).unwrap();
+//! let writer = StdWriter::new(write, header).unwrap();
 //! ```
 //!
 //! If compiled with laz you can compress the data written
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Builder};
+//! use las::{StdWriter, Builder};
 //! use las::point::Format;
 //!
 //! let mut builder = Builder::from((1, 4));
@@ -104,7 +104,7 @@
 //! let is_compiled_with_laz = cfg!(feature = "laz");
 //!
 //!
-//! let result =  Writer::new(write, header);
+//! let result =  StdWriter::new(write, header);
 //! if is_compiled_with_laz {
 //!     assert_eq!(result.is_ok(), true);
 //! } else {
@@ -113,7 +113,7 @@
 //!
 //! ```
 //!
-//! The [from_path](writer/struct.Writer.html#method.from_path) will use the extension of the output
+//! The [from_path](writer/struct.StdWriter.html#method.from_path) will use the extension of the output
 //! file to determine wether the data should be compressed or not
 //! 'laz' => compressed
 //! 'las' => not compressed
@@ -129,8 +129,8 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Point};
-//! let mut writer = Writer::default();
+//! use las::{StdWriter, Writer, Point};
+//! let mut writer = StdWriter::default();
 //! let point = Point { x: 1., y: 2., z: 3., ..Default::default() };
 //! writer.write(point).unwrap();
 //! ```
@@ -185,12 +185,12 @@ pub use feature::Feature;
 pub use gps_time_type::GpsTimeType;
 pub use header::{Builder, Header};
 pub use point::Point;
-pub use reader::Reader;
+pub use reader::{Reader, StdReader};
 pub use transform::Transform;
 pub use vector::Vector;
 pub use version::Version;
 pub use vlr::Vlr;
-pub use writer::Writer;
+pub use writer::{StdWriter, Writer};
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;
