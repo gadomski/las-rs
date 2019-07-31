@@ -5,33 +5,33 @@
 //! A `Reader` uses a `Header` to expose metadata:
 //!
 //! ```
-//! use las::{Reader, StdReader};
-//! let reader = StdReader::from_path("tests/data/autzen.las").unwrap();
+//! use las::Reader;
+//! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let header = reader.header();
 //! println!("The file has {} points.", header.number_of_points());
 //! ```
 //!
 //! # Writing
 //!
-//! A `StdWriter` uses a header to configure how it will write points.  To create a las file, you can
+//! A `Writer` uses a header to configure how it will write points.  To create a las file, you can
 //! use a `Header` from another file, use the default `Header`, or create one with a `Builder`:
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{StdWriter, Builder, Reader, StdReader, Header};
+//! use las::{Writer, Builder, Reader, Header};
 //!
 //! // Copy the configuration from an existing file.
-//! let header = StdReader::from_path("tests/data/autzen.las").unwrap().header().clone();
-//! let writer = StdWriter::new(Cursor::new(Vec::new()), header).unwrap();
+//! let header = Reader::from_path("tests/data/autzen.las").unwrap().header().clone();
+//! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
 //!
 //! // Use the default configuration, which writes to a `Cursor<Vec<u8>>`.
-//! let writer = StdWriter::default();
+//! let writer = Writer::default();
 //!
 //! // Set your own configuration with a `Builder`.
 //! let mut builder = Builder::from((1, 4));
 //! builder.system_identifier = "Synthetic points".to_string();
 //! let header = builder.into_header().unwrap();
-//! let writer = StdWriter::new(Cursor::new(Vec::new()), header).unwrap();
+//! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
 //! ```
 //!
 //! # Into raw bytes
