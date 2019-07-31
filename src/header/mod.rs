@@ -5,7 +5,7 @@
 //! A `Reader` uses a `Header` to expose metadata:
 //!
 //! ```
-//! use las::Reader;
+//! use las::{Read, Reader};
 //! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let header = reader.header();
 //! println!("The file has {} points.", header.number_of_points());
@@ -18,7 +18,7 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Builder, Reader, Header};
+//! use las::{Write, Writer, Builder, Read, Reader, Header};
 //!
 //! // Copy the configuration from an existing file.
 //! let header = Reader::from_path("tests/data/autzen.las").unwrap().header().clone();
