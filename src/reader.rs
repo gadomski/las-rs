@@ -35,14 +35,14 @@
 //! `Result<Point>`:
 //!
 //! ```
-//! use las::Reader;
+//! use las::{Read, Reader};
 //! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let first_point = reader.read().unwrap().unwrap();
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Seek, SeekFrom};
 use std::path::Path;
 
 #[cfg(feature = "laz")]
@@ -69,7 +69,7 @@ quick_error! {
 }
 
 #[inline]
-pub(crate) fn read_point_from<R: Read>(mut source: &mut R, header: &Header) -> Result<Point> {
+pub(crate) fn read_point_from<R: std::io::Read>(mut source: &mut R, header: &Header) -> Result<Point> {
     let point = raw::Point::read_from(&mut source, header.point_format())
         .map(|raw_point| Point::new(raw_point, header.transforms()));
     point
@@ -99,7 +99,7 @@ impl<'a> Iterator for PointIterator<'a> {
 }
 
 #[derive(Debug)]
-struct UncompressedPointReader<R: Read + Seek> {
+struct UncompressedPointReader<R: std::io::Read + Seek> {
     source: R,
     header: Header,
     offset_to_point_data: u64,
@@ -107,7 +107,7 @@ struct UncompressedPointReader<R: Read + Seek> {
     last_point_idx: u64,
 }
 
-impl<R: Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
+impl<R: std::io::Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
     fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;
@@ -128,6 +128,59 @@ impl<R: Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
     fn header(&self) -> &Header {
         &self.header
     }
+}
+
+/// A trait for objects which read LAS data.
+pub trait Read {
+    /// Returns a reference to this reader's header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Read, Reader};
+    /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let header = reader.header();
+    /// ```
+    fn header(&self) -> &Header;
+
+    /// Reads a point.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::{Read, Reader};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let point = reader.read().unwrap().unwrap();
+    /// ```
+    fn read(&mut self) -> Option<Result<Point>>;
+
+    /// Seeks to the given point number, zero-indexed.
+    ///
+    /// Note that seeking on compressed (LAZ) data can be expensive as the reader
+    /// will have to seek to the closest chunk start and decompress all points up until
+    /// the point seeked to.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Read, Reader};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// reader.seek(1).unwrap(); // <- seeks to the second point
+    /// let the_second_point = reader.read().unwrap().unwrap();
+    /// ```
+    fn seek(&mut self, position: u64) -> Result<()>;
+
+    /// Returns an iterator over this reader's points.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::{Read, Reader};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
+    /// ```
+    fn points(&mut self) -> PointIterator;
 }
 
 /// Reads LAS data.
@@ -151,7 +204,9 @@ impl Reader {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new<R: Read + Seek + Debug + 'static>(mut read: R) -> Result<Reader> {
+    pub fn new<R: std::io::Read + Seek + Debug + 'static>(mut read: R) -> Result<Reader> {
+        use std::io::Read;
+
         let raw_header = raw::Header::read_from(&mut read)?;
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
@@ -226,62 +281,26 @@ impl Reader {
             })
         }
     }
+}
 
+impl Read for Reader {
     /// Returns a reference to this reader's header.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Reader;
-    /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// let header = reader.header();
-    /// ```
-    pub fn header(&self) -> &Header {
+    fn header(&self) -> &Header {
         self.point_reader.header()
     }
 
     /// Reads a point.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Reader;
-    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// let point = reader.read().unwrap().unwrap();
-    /// ```
-    pub fn read(&mut self) -> Option<Result<Point>> {
+    fn read(&mut self) -> Option<Result<Point>> {
         self.point_reader.read_next()
     }
 
     /// Seeks to the given point number, zero-indexed.
-    ///
-    /// Note that seeking on compressed (LAZ) data can be expensive as the reader
-    /// will have to seek to the closest chunk start and decompress all points up until
-    /// the point seeked to.
-    ///
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Reader;
-    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// reader.seek(1).unwrap(); // <- seeks to the second point
-    /// let the_second_point = reader.read().unwrap().unwrap();
-    /// ```
-    pub fn seek(&mut self, position: u64) -> Result<()> {
+    fn seek(&mut self, position: u64) -> Result<()> {
         self.point_reader.seek(position)
     }
 
     /// Returns an iterator over this reader's points.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Reader;
-    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
-    /// ```
-    pub fn points(&mut self) -> PointIterator {
+    fn points(&mut self) -> PointIterator {
         PointIterator {
             point_reader: &mut *self.point_reader,
         }
@@ -308,7 +327,7 @@ impl Reader {
 
 #[cfg(test)]
 mod tests {
-    use Writer;
+    use {Write, Writer};
 
     use super::*;
 

@@ -13,7 +13,7 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Builder, Writer, Point};
+//! use las::{Builder, Write, Writer, Point};
 //! use las::point::Format;
 //! use las::Color;
 //!
@@ -33,7 +33,7 @@
 
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::{BufWriter, Cursor, Seek, SeekFrom, Write};
+use std::io::{BufWriter, Cursor, Seek, SeekFrom};
 use std::path::Path;
 
 #[cfg(feature = "laz")]
@@ -65,7 +65,7 @@ quick_error! {
     }
 }
 
-pub(crate) fn write_point_to<W: Write>(
+pub(crate) fn write_point_to<W: std::io::Write>(
     mut dst: &mut W,
     point: Point,
     header: &Header,
@@ -77,7 +77,7 @@ pub(crate) fn write_point_to<W: Write>(
 }
 
 /// Trait that defines a PointWriter, s
-pub(crate) trait PointWriter<W: Write>: Debug {
+pub(crate) trait PointWriter<W: std::io::Write>: Debug {
     fn write_next(&mut self, point: Point) -> Result<()>;
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
@@ -92,7 +92,7 @@ pub(crate) trait PointWriter<W: Write>: Debug {
 #[derive(Debug)]
 struct UnreachablePointWriter {}
 
-impl<W: Write> PointWriter<W> for UnreachablePointWriter {
+impl<W: std::io::Write> PointWriter<W> for UnreachablePointWriter {
     fn write_next(&mut self, _point: Point) -> Result<()> {
         unreachable!()
     }
@@ -115,12 +115,12 @@ impl<W: Write> PointWriter<W> for UnreachablePointWriter {
 }
 
 #[derive(Debug)]
-struct UncompressedPointWriter<W: Write + Debug> {
+struct UncompressedPointWriter<W: std::io::Write + Debug> {
     dest: W,
     header: Header,
 }
 
-impl<W: Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
+impl<W: std::io::Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
     fn write_next(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
         write_point_to(&mut self.dest, point, &self.header)?;
@@ -144,7 +144,7 @@ impl<W: Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
     }
 }
 
-pub(crate) fn write_header_and_vlrs_to<W: Write>(mut dest: &mut W, header: &Header) -> Result<()> {
+pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(mut dest: &mut W, header: &Header) -> Result<()> {
     header
         .clone()
         .into_raw()
@@ -163,6 +163,35 @@ pub(crate) fn write_header_and_vlrs_to<W: Write>(mut dest: &mut W, header: &Head
 
 /// Writes LAS data.
 ///
+/// See StdWriter for a concrete implementation.
+pub trait Write {
+    /// Returns a reference to this writer's header.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Write, Writer};
+    /// let writer = Writer::default();
+    /// let header = writer.header();
+    /// ```
+    fn header(&self) -> &Header;
+
+    /// Writes a point
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    /// use las::{Write, Writer};
+    ///
+    /// let mut writer = Writer::default();
+    /// writer.write(Default::default()).unwrap();
+    /// ```
+    fn write(&mut self, point: Point) -> Result<()>;
+}
+
+/// Writes LAS data.
+///
 /// The LAS header needs to be re-written when the writer closes. For convenience, this is done via
 /// the `Drop` implementation of the writer. One consequence is that if the header re-write fails
 /// during the drop, a panic will result. If you want to check for errors instead of panicing, use
@@ -177,13 +206,13 @@ pub(crate) fn write_header_and_vlrs_to<W: Write>(mut dest: &mut W, header: &Head
 /// } // <- `close` is not called
 /// ```
 #[derive(Debug)]
-pub struct Writer<W: 'static + Write + Seek + Debug> {
+pub struct Writer<W: 'static + std::io::Write + Seek + Debug> {
     closed: bool,
     start: u64,
     point_writer: Box<dyn PointWriter<W>>,
 }
 
-impl<W: 'static + Write + Seek + Debug> Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Debug> Writer<W> {
     /// Creates a new writer.
     ///
     /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
@@ -226,40 +255,6 @@ impl<W: 'static + Write + Seek + Debug> Writer<W> {
                 point_writer: Box::new(UncompressedPointWriter { dest, header }),
             })
         }
-    }
-
-    /// Returns a reference to this writer's header.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Writer;
-    /// let writer = Writer::default();
-    /// let header = writer.header();
-    /// ```
-    pub fn header(&self) -> &Header {
-        &self.point_writer.header()
-    }
-
-    /// Writes a point.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use las::Writer;
-    ///
-    /// let mut writer = Writer::default();
-    /// writer.write(Default::default()).unwrap();
-    /// ```
-    pub fn write(&mut self, point: Point) -> Result<()> {
-        if self.closed {
-            return Err(Error::Closed.into());
-        }
-        if !point.matches(self.header().point_format()) {
-            return Err(Error::PointAttributes(*self.header().point_format(), point).into());
-        }
-        self.point_writer.write_next(point)
     }
 
     /// Close this writer.
@@ -310,7 +305,25 @@ impl<W: 'static + Write + Seek + Debug> Writer<W> {
     }
 }
 
-impl<W: 'static + Write + Seek + Debug> Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Debug> Write for Writer<W> {
+    /// Returns a reference to this writer's header.
+    fn header(&self) -> &Header {
+        &self.point_writer.header()
+    }
+
+    /// Writes a point.
+    fn write(&mut self, point: Point) -> Result<()> {
+        if self.closed {
+            return Err(Error::Closed.into());
+        }
+        if !point.matches(self.header().point_format()) {
+            return Err(Error::PointAttributes(*self.header().point_format(), point).into());
+        }
+        self.point_writer.write_next(point)
+    }
+}
+
+impl<W: 'static + std::io::Write + Seek + Debug> Writer<W> {
     /// Closes this writer and returns its inner `Write`, seeked to the beginning of the las data.
     ///
     /// # Examples
@@ -387,7 +400,7 @@ impl Default for Writer<Cursor<Vec<u8>>> {
     }
 }
 
-impl<W: 'static + Seek + Write + Debug> Drop for Writer<W> {
+impl<W: 'static + Seek + std::io::Write + Debug> Drop for Writer<W> {
     fn drop(&mut self) {
         if !self.closed {
             self.close().expect("Error when dropping the writer");
@@ -466,7 +479,7 @@ mod tests {
     #[test]
     fn write_not_at_start() {
         use byteorder::WriteBytesExt;
-        use Reader;
+        use {Read, Reader};
 
         let mut cursor = Cursor::new(Vec::new());
         cursor.write_u8(42).unwrap();

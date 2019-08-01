@@ -30,7 +30,7 @@
 //! Read points one-by-one with `Reader::read`:
 //!
 //! ```
-//! use las::Reader;
+//! use las::{Read, Reader};
 //! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let point = reader.read().unwrap().unwrap();
 //! ```
@@ -38,7 +38,7 @@
 //! Or iterate over all points with `Reader::points`:
 //!
 //! ```
-//! use las::Reader;
+//! use las::{Read, Reader};
 //! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! for wrapped_point in reader.points() {
 //!     let point = wrapped_point.unwrap();
@@ -129,7 +129,7 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Point};
+//! use las::{Write, Writer, Point};
 //! let mut writer = Writer::default();
 //! let point = Point { x: 1., y: 2., z: 3., ..Default::default() };
 //! writer.write(point).unwrap();
@@ -185,12 +185,12 @@ pub use feature::Feature;
 pub use gps_time_type::GpsTimeType;
 pub use header::{Builder, Header};
 pub use point::Point;
-pub use reader::Reader;
+pub use reader::{Read, Reader};
 pub use transform::Transform;
 pub use vector::Vector;
 pub use version::Version;
 pub use vlr::Vlr;
-pub use writer::Writer;
+pub use writer::{Write, Writer};
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;

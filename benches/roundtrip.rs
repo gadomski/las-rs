@@ -3,7 +3,7 @@
 extern crate las;
 extern crate test;
 
-use las::{Point, Reader, Writer};
+use las::{Point, Read, Reader, Write, Writer};
 use test::Bencher;
 
 fn roundtrip(npoints: usize) {
