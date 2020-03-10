@@ -87,8 +87,8 @@ impl Classification {
             16 => Classification::WireStructureConnector,
             17 => Classification::BridgeDeck,
             18 => Classification::HighNoise,
-            19...63 => Classification::Reserved(n),
-            63...255 => Classification::UserDefinable(n),
+            19..=63 => Classification::Reserved(n),
+            64..=255 => Classification::UserDefinable(n),
         })
     }
 }

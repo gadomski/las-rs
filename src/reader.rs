@@ -69,7 +69,10 @@ quick_error! {
 }
 
 #[inline]
-pub(crate) fn read_point_from<R: std::io::Read>(mut source: &mut R, header: &Header) -> Result<Point> {
+pub(crate) fn read_point_from<R: std::io::Read>(
+    mut source: &mut R,
+    header: &Header,
+) -> Result<Point> {
     let point = raw::Point::read_from(&mut source, header.point_format())
         .map(|raw_point| Point::new(raw_point, header.transforms()));
     point
@@ -87,7 +90,7 @@ pub(crate) trait PointReader: Debug {
 /// This struct is generally created by calling `points()` on `Reader`.
 #[derive(Debug)]
 pub struct PointIterator<'a> {
-    point_reader: &'a mut PointReader,
+    point_reader: &'a mut dyn PointReader,
 }
 
 impl<'a> Iterator for PointIterator<'a> {
