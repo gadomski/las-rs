@@ -73,7 +73,6 @@ pub struct Format {
     pub is_compressed: bool,
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
 impl Format {
     /// Creates a new point format from a u8.
     ///

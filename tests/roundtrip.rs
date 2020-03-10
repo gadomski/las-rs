@@ -173,8 +173,7 @@ macro_rules! version {
                     |b: &mut Builder| b.has_synthetic_return_numbers = true,
                     3
                 );
-                roundtrip_builder!(guid, |b: &mut Builder| b.guid =
-                    Uuid::from_bytes(&[42; 16]).unwrap());
+                roundtrip_builder!(guid, |b: &mut Builder| b.guid = Uuid::from_bytes([42; 16]));
                 roundtrip_builder!(system_identifier, |b: &mut Builder| b.system_identifier =
                     "roundtrip test".to_string());
                 roundtrip_builder!(generating_software, |b: &mut Builder| b

@@ -118,7 +118,7 @@ impl Builder {
                 .as_las_str()?
                 .to_string(),
             gps_time_type: raw_header.global_encoding.into(),
-            guid: Uuid::from_bytes(&raw_header.guid).unwrap(),
+            guid: Uuid::from_bytes(raw_header.guid),
             has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
             padding: raw_header.padding,
             point_format: point_format,
