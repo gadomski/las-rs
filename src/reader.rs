@@ -121,7 +121,7 @@ impl<R: std::io::Read + Seek + Debug> PointReader for UncompressedPointReader<R>
     }
 
     fn seek(&mut self, position: u64) -> Result<()> {
-        self.last_point_idx = position - 1;
+        self.last_point_idx = position;
         self.source.seek(SeekFrom::Start(
             self.offset_to_point_data + position * u64::from(self.header.point_format().len()),
         ))?;
@@ -348,5 +348,6 @@ mod tests {
         let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
         reader.seek(1).unwrap();
         assert_eq!(point, reader.read().unwrap().unwrap());
+        assert_eq!(reader.read().is_none(), true);
     }
 }

@@ -87,7 +87,7 @@ impl<'a, R: Read + Seek> PointReader for CompressedPointReader<'a, R> {
     }
 
     fn seek(&mut self, position: u64) -> Result<()> {
-        self.last_point_idx = position - 1;
+        self.last_point_idx = position;
         self.decompressor.seek(position)?;
         Ok(())
     }
