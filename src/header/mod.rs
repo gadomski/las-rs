@@ -512,7 +512,7 @@ impl Header {
             header_size: self.header_size()?,
             offset_to_point_data: self.offset_to_point_data()?,
             number_of_variable_length_records: self.number_of_variable_length_records()?,
-            point_data_record_format: self.point_format.to_u8()?,
+            point_data_record_format: self.point_format.to_writable_u8()?,
             point_data_record_length: self.point_format.len(),
             number_of_point_records: self.number_of_points_raw()?,
             number_of_points_by_return: self.number_of_points_by_return_raw()?,
