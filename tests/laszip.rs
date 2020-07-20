@@ -43,6 +43,15 @@ mod laz_compression_test {
     }
 
     #[test]
+    fn test_point_format_id_is_correct() {
+        let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
+        let mut laz_reader = las::Reader::from_path("tests/data/autzen.laz").unwrap();
+
+        assert_eq!(laz_reader.header().point_format().to_u8().unwrap(), 3);
+        assert_eq!(laz_reader.header().point_format().to_u8().unwrap(), 3);
+    }
+
+    #[test]
     fn test_autzen_las() {
         test_compression_does_not_corrupt("tests/data/autzen.las");
     }
