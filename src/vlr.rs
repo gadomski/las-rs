@@ -29,21 +29,18 @@
 //! assert_eq!(1, header.vlrs().len());
 //! ```
 
+use thiserror::Error;
 use {raw, Result};
 
 const REGULAR_HEADER_SIZE: usize = 54;
 const EXTENDED_HEADER_SIZE: usize = 60;
 
-quick_error! {
-    /// Vlr-specific errors.
-    #[derive(Debug, Clone, Copy)]
-    pub enum Error {
-        /// The vlr data is too long.
-        TooLong(len: usize) {
-            description("The vlr is too long")
-            display("the vlr is too long: {}", len)
-        }
-    }
+/// Vlr-specific errors.
+#[derive(Error, Debug, Clone, Copy)]
+pub enum Error {
+    /// The vlr data is too long.
+    #[error("the vlr is too long: {0}")]
+    TooLong(usize),
 }
 
 /// A variable length record.

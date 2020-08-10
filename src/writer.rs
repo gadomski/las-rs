@@ -40,29 +40,24 @@ use std::path::Path;
 use compression::CompressedPointWriter;
 
 use point::Format;
+use thiserror::Error;
 use {Header, Point, Result};
 
-quick_error! {
-    /// Writer errors.
-    #[derive(Debug)]
-    pub enum Error {
-        /// The writer is closed.
-        Closed {
-            description("the writer is closed")
-        }
-        /// The attributes of the point format and point do not match.
-        PointAttributes(format: Format, point: Point) {
-            description("the attributes of the point format and point do not match")
-            display("the attributes of point format {:?} does not match point {:?}", format, point)
-        }
-        /// Wrapper around `std::io::Error`.
-        Io(err: std::io::Error) {
-            from()
-            cause(err)
-            description(err.description())
-            display("io error: {}", err)
-        }
-    }
+/// Writer errors.
+#[derive(Error, Debug)]
+pub enum Error {
+    /// The writer is closed.
+    #[error("the writer is closed")]
+    Closed,
+
+    /// The attributes of the point format and point do not match.
+    #[error("the attributes of the point format ({format}) do not match the point: {point:?}")]
+    #[allow(missing_docs)]
+    PointAttributes { format: Format, point: Point },
+
+    /// Wrapper around `std::io::Error`.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 pub(crate) fn write_point_to<W: std::io::Write>(
@@ -144,7 +139,10 @@ impl<W: std::io::Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
     }
 }
 
-pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(mut dest: &mut W, header: &Header) -> Result<()> {
+pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(
+    mut dest: &mut W,
+    header: &Header,
+) -> Result<()> {
     header
         .clone()
         .into_raw()
@@ -317,7 +315,11 @@ impl<W: 'static + std::io::Write + Seek + Debug> Write for Writer<W> {
             return Err(Error::Closed.into());
         }
         if !point.matches(self.header().point_format()) {
-            return Err(Error::PointAttributes(*self.header().point_format(), point).into());
+            return Err(Error::PointAttributes {
+                format: *self.header().point_format(),
+                point: point,
+            }
+            .into());
         }
         self.point_writer.write_next(point)
     }

@@ -83,7 +83,10 @@ impl Version {
         if self.supports::<F>() {
             Ok(())
         } else {
-            Err(Error::Feature(*self, F::name()))
+            Err(Error::Feature {
+                version: *self,
+                feature: F::name(),
+            })
         }
     }
 
