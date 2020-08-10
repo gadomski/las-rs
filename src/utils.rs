@@ -4,6 +4,7 @@ use {Error, Result};
 
 pub trait AsLasStr {
     fn as_las_str(&self) -> Result<&str>;
+    fn as_las_string_lossy(&self) -> String;
 }
 
 pub trait FromLasStr {
@@ -33,6 +34,13 @@ impl<'a> AsLasStr for &'a [u8] {
             Err(Error::NotAscii(s.to_string()))
         } else {
             Ok(s)
+        }
+    }
+
+    fn as_las_string_lossy(&self) -> String {
+        match self.as_las_str() {
+            Ok(s) => s.to_string(),
+            Err(_) => String::from_utf8_lossy(self).to_string(),
         }
     }
 }
