@@ -28,7 +28,6 @@ pub enum Error {
     Io(#[from] io::Error),
 
     /// The las data is laszip compressed.
-    /// TODO Only include this error when building w/o laszip
     #[error(
         "the las data is laszip compressed, but laszip compression is not supported by this build"
     )]
