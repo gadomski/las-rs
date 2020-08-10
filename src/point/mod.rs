@@ -22,44 +22,41 @@ pub use self::scan_direction::ScanDirection;
 
 use raw;
 use raw::point::Waveform;
+use thiserror::Error;
 use {Color, Result, Transform, Vector};
 
-quick_error! {
-    /// Point-specific errors
-    #[derive(Debug, Clone, Copy)]
-    pub enum Error {
-        /// An invalid classification number.
-        Classification(n: u8) {
-            description("invalid classification")
-            display("invalid classification: {}", n)
-        }
-        /// This is an invalid format.
-        ///
-        /// It has a combination of options that can't exist.
-        Format(format: Format) {
-            description("invalid format")
-            display("invalid format: {}", format)
-        }
-        /// This is an invalid format number.
-        FormatNumber(n: u8) {
-            description("invalid format number")
-            display("invalid format number: {}", n)
-        }
-        /// Overlap points are handled by an attribute on `las::Point`, not by a classification.
-        OverlapClassification {
-            description("Overlap points are handled by the `is_overlap` member of `las::Point`, not by classifications")
-        }
-        /// This is not a valid return number.
-        ReturnNumber(n: u8, version: Option<::Version>) {
-            description("invalid return number")
-            display("invalid return number: {} (for version: {:?})", n, version)
-        }
-        /// This is not a valid scanner channel
-        ScannerChannel(n: u8) {
-            description("invalid scanner channel")
-            display("the scanner channel is invalid: {}", n)
-        }
-    }
+/// Point-specific errors
+#[derive(Debug, Clone, Copy, Error)]
+pub enum Error {
+    /// An invalid classification number.
+    #[error("invalid classification: {0}")]
+    Classification(u8),
+
+    /// This is an invalid format.
+    ///
+    /// It has a combination of options that can't exist.
+    #[error("invalid format: {0}")]
+    Format(Format),
+
+    /// This is an invalid format number.
+    #[error("invalid format number: {0}")]
+    FormatNumber(u8),
+
+    /// Overlap points are handled by an attribute on `las::Point`, not by a classification.
+    #[error("overlap points are handled by the `is_overlap` member of `las::Point`, not by classifications")]
+    OverlapClassification,
+
+    /// This is not a valid return number.
+    #[error("invalid return number {return_number} for version {version:?}")]
+    #[allow(missing_docs)]
+    ReturnNumber {
+        return_number: u8,
+        version: Option<::Version>,
+    },
+
+    /// This is not a valid scanner channel
+    #[error("invalid scanner channel: {0}")]
+    ScannerChannel(u8),
 }
 
 /// A three dimensional point.
@@ -223,9 +220,17 @@ impl Point {
     /// ```
     pub fn flags(&self) -> Result<raw::point::Flags> {
         if self.return_number > 15 {
-            Err(Error::ReturnNumber(self.return_number, None).into())
+            Err(Error::ReturnNumber {
+                return_number: self.return_number,
+                version: None,
+            }
+            .into())
         } else if self.number_of_returns > 15 {
-            Err(Error::ReturnNumber(self.number_of_returns, None).into())
+            Err(Error::ReturnNumber {
+                return_number: self.number_of_returns,
+                version: None,
+            }
+            .into())
         } else if self.scanner_channel > 3 {
             Err(Error::ScannerChannel(self.scanner_channel).into())
         } else {

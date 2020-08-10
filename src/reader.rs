@@ -49,23 +49,19 @@ use std::path::Path;
 use compression::CompressedPointReader;
 
 use std::fmt::Debug;
+use thiserror::Error;
 use {raw, Builder, Header, Point, Result, Vlr};
 
-quick_error! {
-    /// Error while reading.
-    #[derive(Clone, Copy, Debug)]
-    pub enum Error {
-        /// The offset to the point data was too small.
-        OffsetToPointDataTooSmall(offset: u32) {
-            description("offset to point data too small")
-            display("offset to point data too small: {}", offset)
-        }
-        /// The offset to the start of the evlrs is too small.
-        OffsetToEvlrsTooSmall(offset: u64) {
-            description("offset the evlrs is too small")
-            display("offset to the evlrs is too small: {}", offset)
-        }
-    }
+/// Error while reading.
+#[derive(Error, Clone, Copy, Debug)]
+pub enum Error {
+    /// The offset to the point data was too small.
+    #[error("offset to the point data is too small: {0}")]
+    OffsetToPointDataTooSmall(u32),
+
+    /// The offset to the start of the evlrs is too small.
+    #[error("offset to the start of the evlrs is too small: {0}")]
+    OffsetToEvlrsTooSmall(u64),
 }
 
 #[inline]

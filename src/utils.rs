@@ -40,7 +40,10 @@ impl<'a> AsLasStr for &'a [u8] {
 impl<'a> FromLasStr for &'a mut [u8] {
     fn from_las_str(&mut self, s: &str) -> Result<()> {
         if self.len() < s.bytes().count() {
-            return Err(Error::StringTooLong(s.to_string(), self.len()));
+            return Err(Error::StringTooLong {
+                string: s.to_string(),
+                len: self.len(),
+            });
         }
         for (a, b) in self.iter_mut().zip(s.bytes()) {
             *a = b;

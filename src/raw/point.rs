@@ -659,9 +659,17 @@ impl Flags {
             Flags::TwoByte(a, b) => Ok((a, b)),
             Flags::ThreeByte(_, _, c) => {
                 if self.return_number() > 7 {
-                    Err(Error::ReturnNumber(self.return_number(), None).into())
+                    Err(Error::ReturnNumber {
+                        return_number: self.return_number(),
+                        version: None,
+                    }
+                    .into())
                 } else if self.number_of_returns() > 7 {
-                    Err(Error::ReturnNumber(self.number_of_returns(), None).into())
+                    Err(Error::ReturnNumber {
+                        return_number: self.number_of_returns(),
+                        version: None,
+                    }
+                    .into())
                 } else if c > 31 {
                     Err(Error::Classification(c).into())
                 } else if self.scanner_channel() > 0 {

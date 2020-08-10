@@ -51,6 +51,7 @@ use std::iter::Chain;
 use std::slice::Iter;
 
 use chrono::{Date, Datelike, Utc};
+use thiserror::Error;
 use uuid::Uuid;
 
 use point::Format;
@@ -61,65 +62,55 @@ pub use self::builder::Builder;
 
 mod builder;
 
-quick_error! {
-    /// Header-specific errors.
-    #[derive(Clone, Copy, Debug)]
-    pub enum Error {
-        /// The file signature is not LASF.
-        FileSignature(b: [u8; 4]) {
-            description("the file signature was not LASF")
-            display("the file signature was not LASF: {:?}", b)
-        }
-        /// The point format is not supported by version.
-        Format(version: Version, format: Format) {
-            description("format is not supported by version")
-            display("format {} is not supported by version {}", format, version)
-        }
-        /// The offset to point data is too large.
-        OffsetToPointDataTooLarge(offset: usize) {
-            description("the offset to the point data is too large")
-            display("the offset to the point data is too large: {}", offset)
-        }
-        /// The point data record length is too small for the format.
-        PointDataRecordLength(format: Format, len: u16) {
-            description("the point data record length is too small for the format")
-            display("the point data record length {} is too small for format {}", len, format)
-        }
-        /// Point padding is only allowed when evlrs are present.
-        PointPadding {
-            description("point padding is only allowed when evlrs are present")
-        }
-        /// The header size, as computed, is too large.
-        TooLarge(len: usize) {
-            description("the header is too large to convert to a raw header")
-            display("the header is too large to convert to a raw header: {} bytes", len)
-        }
-        /// Too many extended variable length records.
-        TooManyEvlrs(count: usize) {
-            description("too many extended variable length records")
-            display("too many extended variable length records: {}", count)
-        }
-        /// Too many points for this version.
-        TooManyPoints(n: u64, version: Version) {
-            description("too many points for this version")
-            display("too many points for this version {}: {}", version, n)
-        }
-        /// Too many variable length records.
-        TooManyVlrs(count: usize) {
-            description("too many variable length records")
-            display("too many variable length records: {}", count)
-        }
-        /// The header size, as provided by the raw header, is too small.
-        TooSmall(len: u16) {
-            description("the header size is too small")
-            display("the header size is too small: {}", len)
-        }
-        /// Wkt is required for this point format.
-        WktRequired(format: Format) {
-            description("wkt is required for this point format")
-            display("wkt is required for point format {}", format)
-        }
-    }
+/// Header-specific errors.
+#[derive(Clone, Copy, Debug, Error)]
+pub enum Error {
+    /// The file signature is not LASF.
+    #[error("the file signature is not 'LASF': {0:?}")]
+    FileSignature([u8; 4]),
+
+    /// The point format is not supported by version.
+    #[error("version {version} does not support format {format}")]
+    #[allow(missing_docs)]
+    Format { version: Version, format: Format },
+
+    /// The offset to point data is too large.
+    #[error("the offset to the point data is too large: {0}")]
+    OffsetToPointDataTooLarge(usize),
+
+    /// The point data record length is too small for the format.
+    #[error("the point data record length {len} is too small for format {format}")]
+    #[allow(missing_docs)]
+    PointDataRecordLength { format: Format, len: u16 },
+
+    /// Point padding is only allowed when evlrs are present.
+    #[error("point padding is only allowed when evlrs are present")]
+    PointPadding,
+
+    /// The header size, as computed, is too large.
+    #[error("the header is too large ({0} bytes) to convert to a raw header")]
+    TooLarge(usize),
+
+    /// Too many extended variable length records.
+    #[error("too many extended variable length records: {0}")]
+    TooManyEvlrs(usize),
+
+    /// Too many points for this version.
+    #[error("too many points for version {version}: {n}")]
+    #[allow(missing_docs)]
+    TooManyPoints { n: u64, version: Version },
+
+    /// Too many variable length records.
+    #[error("too many variable length records: {0}")]
+    TooManyVlrs(usize),
+
+    /// The header size, as provided by the raw header, is too small.
+    #[error("the header is too small ({0} bytes)")]
+    TooSmall(u16),
+
+    /// Wkt is required for this point format.
+    #[error("wkt is required for this point format: {0}")]
+    WktRequired(Format),
 }
 
 /// Metadata describing the layout, source, and interpretation of the points.
@@ -605,7 +596,11 @@ impl Header {
             if self.version.supports::<LargeFiles>() {
                 Ok(0)
             } else {
-                Err(Error::TooManyPoints(self.number_of_points, self.version).into())
+                Err(Error::TooManyPoints {
+                    n: self.number_of_points,
+                    version: self.version,
+                }
+                .into())
             }
         } else {
             Ok(self.number_of_points as u32)
@@ -620,12 +615,20 @@ impl Header {
         for (&i, &n) in &self.number_of_points_by_return {
             if i > 5 {
                 if !self.version.supports::<LargeFiles>() {
-                    return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
+                    return Err(::point::Error::ReturnNumber {
+                        return_number: i,
+                        version: Some(self.version),
+                    }
+                    .into());
                 }
             } else if i > 0 {
                 if n > u64::from(u32::MAX) {
                     if !self.version.supports::<LargeFiles>() {
-                        return Err(Error::TooManyPoints(n, self.version).into());
+                        return Err(Error::TooManyPoints {
+                            n,
+                            version: self.version,
+                        }
+                        .into());
                     }
                 } else {
                     number_of_points_by_return[i as usize - 1] = n as u32;
@@ -658,7 +661,11 @@ impl Header {
         let mut number_of_points_by_return = [0; 15];
         for (&i, &n) in &self.number_of_points_by_return {
             if i > 15 {
-                return Err(::point::Error::ReturnNumber(i, Some(self.version)).into());
+                return Err(::point::Error::ReturnNumber {
+                    return_number: i,
+                    version: Some(self.version),
+                }
+                .into());
             } else if i > 0 {
                 number_of_points_by_return[i as usize - 1] = n;
             }
