@@ -70,16 +70,16 @@ impl Vlr {
     /// ```
     /// use las::{Vlr, raw};
     /// let raw_vlr = raw::Vlr::default();
-    /// let vlr = Vlr::new(raw_vlr).unwrap();
+    /// let vlr = Vlr::new(raw_vlr);
     /// ```
-    pub fn new(raw_vlr: raw::Vlr) -> Result<Vlr> {
+    pub fn new(raw_vlr: raw::Vlr) -> Vlr {
         use utils::AsLasStr;
-        Ok(Vlr {
-            user_id: raw_vlr.user_id.as_ref().as_las_str()?.to_string(),
+        Vlr {
+            user_id: raw_vlr.user_id.as_ref().as_las_string_lossy(),
             record_id: raw_vlr.record_id,
-            description: raw_vlr.description.as_ref().as_las_str()?.to_string(),
+            description: raw_vlr.description.as_ref().as_las_string_lossy(),
             data: raw_vlr.data,
-        })
+        }
     }
 
     /// Converts this vlr to a raw vlr.
@@ -199,5 +199,34 @@ mod tests {
             ..Default::default()
         };
         assert!(vlr.into_raw(false).is_err());
+    }
+
+    #[test]
+    fn allow_non_ascii_user_id() {
+        let raw_vlr = raw::Vlr {
+            user_id: [0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ..Default::default()
+        };
+        let vlr = Vlr::new(raw_vlr);
+        assert_eq!(
+            "\u{0}*\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
+            vlr.user_id
+        );
+    }
+
+    #[test]
+    fn allow_non_ascii_description() {
+        let raw_vlr = raw::Vlr {
+            description: [
+                0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
+            ],
+            ..Default::default()
+        };
+        let vlr = Vlr::new(raw_vlr);
+        assert_eq!(
+            "\u{0}*\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}*\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
+            vlr.description
+        );
     }
 }

@@ -220,7 +220,7 @@ impl Reader {
         }
 
         for _ in 0..number_of_variable_length_records {
-            let vlr = raw::Vlr::read_from(&mut read, false).and_then(Vlr::new)?;
+            let vlr = raw::Vlr::read_from(&mut read, false).map(Vlr::new)?;
             position += vlr.len(false) as u64;
             builder.vlrs.push(vlr);
         }
@@ -244,7 +244,7 @@ impl Reader {
             }
             builder
                 .evlrs
-                .push(raw::Vlr::read_from(&mut read, true).and_then(Vlr::new)?);
+                .push(raw::Vlr::read_from(&mut read, true).map(Vlr::new)?);
         }
 
         read.seek(SeekFrom::Start(offset_to_point_data))?;
