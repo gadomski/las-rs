@@ -207,7 +207,7 @@ pub trait Write {
 pub struct Writer<W: 'static + std::io::Write + Seek + Debug + Send> {
     closed: bool,
     start: u64,
-    point_writer: Box<dyn PointWriter<W>>,
+    point_writer: Box<dyn PointWriter<W> + Send>,
 }
 
 impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
