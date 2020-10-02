@@ -75,7 +75,7 @@ pub(crate) fn read_point_from<R: std::io::Read>(
 }
 
 /// Trait to specify behaviour a a PointReader
-pub(crate) trait PointReader: Debug {
+pub(crate) trait PointReader: Debug + Send {
     fn read_next(&mut self) -> Option<Result<Point>>;
     fn seek(&mut self, position: u64) -> Result<()>;
     fn header(&self) -> &Header;
@@ -106,7 +106,7 @@ struct UncompressedPointReader<R: std::io::Read + Seek> {
     last_point_idx: u64,
 }
 
-impl<R: std::io::Read + Seek + Debug> PointReader for UncompressedPointReader<R> {
+impl<R: std::io::Read + Seek + Debug + Send> PointReader for UncompressedPointReader<R> {
     fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;
@@ -203,7 +203,7 @@ impl Reader {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new<R: std::io::Read + Seek + Debug + 'static>(mut read: R) -> Result<Reader> {
+    pub fn new<R: std::io::Read + Seek + Send + Debug + 'static>(mut read: R) -> Result<Reader> {
         use std::io::Read;
 
         let raw_header = raw::Header::read_from(&mut read)?;

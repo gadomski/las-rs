@@ -33,7 +33,7 @@ fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
 /// 1) call the decompressor that reads & decompress the next point
 /// and put its data in an in-memory buffer
 /// 2) read the buffer to get the decompress point
-pub(crate) struct CompressedPointReader<'a, R: Read + Seek> {
+pub(crate) struct CompressedPointReader<'a, R: Read + Seek + Send> {
     /// decompressor that does the actual job
     decompressor: laz::las::laszip::LasZipDecompressor<'a, R>,
     header: Header,
@@ -42,7 +42,7 @@ pub(crate) struct CompressedPointReader<'a, R: Read + Seek> {
     last_point_idx: u64,
 }
 
-impl<'a, R: Read + Seek> CompressedPointReader<'a, R> {
+impl<'a, R: Read + Seek + Send> CompressedPointReader<'a, R> {
     pub(crate) fn new(source: R, header: Header) -> Result<Self> {
         let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
             None => return Err(Error::LasZipVlrNotFound),
@@ -59,7 +59,7 @@ impl<'a, R: Read + Seek> CompressedPointReader<'a, R> {
     }
 }
 
-impl<'a, R: Read + Seek> Debug for CompressedPointReader<'a, R> {
+impl<'a, R: Read + Seek + Send> Debug for CompressedPointReader<'a, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -69,7 +69,7 @@ impl<'a, R: Read + Seek> Debug for CompressedPointReader<'a, R> {
     }
 }
 
-impl<'a, R: Read + Seek> PointReader for CompressedPointReader<'a, R> {
+impl<'a, R: Read + Seek + Send> PointReader for CompressedPointReader<'a, R> {
     fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;
@@ -97,12 +97,51 @@ impl<'a, R: Read + Seek> PointReader for CompressedPointReader<'a, R> {
     }
 }
 
+
+fn laz_vlr_from_point_format(point_format: &crate::point::Format) -> LazVlr {
+    let mut laz_items = laz::las::laszip::LazItemRecordBuilder::new();
+    if !point_format.is_extended {
+        laz_items.add_item(laz::LazItemType::Point10);
+
+        if point_format.has_gps_time {
+            laz_items.add_item(laz::LazItemType::GpsTime);
+        }
+
+        if point_format.has_color {
+            laz_items.add_item(laz::LazItemType::RGB12);
+        }
+
+        if point_format.extra_bytes > 0 {
+            laz_items.add_item(laz::LazItemType::Byte(
+                point_format.extra_bytes,
+            ));
+        }
+    } else {
+        laz_items.add_item(laz::LazItemType::Point14);
+
+        if point_format.has_color {
+            // Point format 7 & 8 both have RGB
+            if point_format.has_nir {
+                laz_items.add_item(laz::LazItemType::RGBNIR14);
+            } else {
+                laz_items.add_item(laz::LazItemType::RGB14);
+            }
+        }
+        if point_format.extra_bytes > 0 {
+            laz_items.add_item(laz::LazItemType::Byte14(
+                point_format.extra_bytes,
+            ));
+        }
+    }
+    laz::LazVlr::from_laz_items(laz_items.build())
+}
+
 /// struct that knows how to write LAZ
 ///
 /// Writing a point compressed is done in 2 steps
 /// 1) write the point to a in-memory buffer
 /// 2) call the laz compressor on this buffer
-pub(crate) struct CompressedPointWriter<'a, W: Write + Seek> {
+pub(crate) struct CompressedPointWriter<'a, W: Write + Seek + Send> {
     header: Header,
     /// buffer used to write the uncompressed point
     compressor_input: Cursor<Vec<u8>>,
@@ -110,30 +149,9 @@ pub(crate) struct CompressedPointWriter<'a, W: Write + Seek> {
     compressor: laz::las::laszip::LasZipCompressor<'a, W>,
 }
 
-impl<'a, W: Write + Seek> CompressedPointWriter<'a, W> {
+impl<'a, W: Write + Seek + Send> CompressedPointWriter<'a, W> {
     pub(crate) fn new(mut dest: W, mut header: Header) -> Result<Self> {
-        if header.point_format().is_extended {
-            panic!("Writing Extended point data is not supported");
-        }
-
-        let mut laz_items = laz::las::laszip::LazItemRecordBuilder::new();
-        laz_items.add_item(laz::las::laszip::LazItemType::Point10);
-
-        if header.point_format().has_gps_time {
-            laz_items.add_item(laz::las::laszip::LazItemType::GpsTime);
-        }
-
-        if header.point_format().has_color {
-            laz_items.add_item(laz::las::laszip::LazItemType::RGB12);
-        }
-
-        if header.point_format().extra_bytes > 0 {
-            laz_items.add_item(laz::las::laszip::LazItemType::Byte(
-                header.point_format().extra_bytes,
-            ));
-        }
-
-        let laz_vlr = LazVlr::from_laz_items(laz_items.build());
+        let laz_vlr = laz_vlr_from_point_format(header.point_format());
         // Clear any existing laszip vlr as they might not be correct
         header.vlrs_mut().retain(|vlr| !is_laszip_vlr(vlr));
         header.vlrs_mut().push(create_laszip_vlr(&laz_vlr)?);
@@ -141,7 +159,7 @@ impl<'a, W: Write + Seek> CompressedPointWriter<'a, W> {
         write_header_and_vlrs_to(&mut dest, &header)?;
 
         let compressor_input = Cursor::new(vec![0u8; header.point_format().len() as usize]);
-        let compressor = laz::las::laszip::LasZipCompressor::from_laz_vlr(dest, laz_vlr)?;
+        let compressor = laz::las::laszip::LasZipCompressor::new(dest, laz_vlr)?;
 
         Ok(Self {
             header,
@@ -151,7 +169,7 @@ impl<'a, W: Write + Seek> CompressedPointWriter<'a, W> {
     }
 }
 
-impl<'a, W: Write + Seek> PointWriter<W> for CompressedPointWriter<'a, W> {
+impl<'a, W: Write + Seek + Send> PointWriter<W> for CompressedPointWriter<'a, W> {
     fn write_next(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
         self.compressor_input.seek(SeekFrom::Start(0))?;
@@ -162,7 +180,7 @@ impl<'a, W: Write + Seek> PointWriter<W> for CompressedPointWriter<'a, W> {
     }
 
     fn into_inner(self: Box<Self>) -> W {
-        self.compressor.into_stream()
+        self.compressor.into_inner()
     }
 
     fn get_mut(&mut self) -> &mut W {
@@ -179,7 +197,7 @@ impl<'a, W: Write + Seek> PointWriter<W> for CompressedPointWriter<'a, W> {
     }
 }
 
-impl<'a, W: Write + Seek> Debug for CompressedPointWriter<'a, W> {
+impl<'a, W: Write + Seek + Send> Debug for CompressedPointWriter<'a, W> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "CompressedPointWriter(header: {:?})", self.header)
     }
