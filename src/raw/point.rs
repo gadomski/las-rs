@@ -367,12 +367,13 @@ impl Point {
         } else {
             Flags::TwoByte(read.read_u8()?, read.read_u8()?)
         };
-        point.scan_angle = if format.is_extended {
-            ScanAngle::Scaled(read.read_i16::<LittleEndian>()?)
+        if format.is_extended {
+            point.user_data = read.read_u8()?;
+            point.scan_angle = ScanAngle::Scaled(read.read_i16::<LittleEndian>()?);
         } else {
-            ScanAngle::Rank(read.read_i8()?)
+            point.scan_angle = ScanAngle::Rank(read.read_i8()?);
+            point.user_data = read.read_u8()?;
         };
-        point.user_data = read.read_u8()?;
         point.point_source_id = read.read_u16::<LittleEndian>()?;
         point.gps_time = if format.has_gps_time {
             utils::some_or_none_if_zero(read.read_f64::<LittleEndian>()?)
@@ -435,11 +436,12 @@ impl Point {
             write.write_u8(b)?;
         }
         if format.is_extended {
+            write.write_u8(self.user_data)?;
             write.write_i16::<LittleEndian>(self.scan_angle.into())?;
         } else {
             write.write_i8(self.scan_angle.into())?;
+            write.write_u8(self.user_data)?;
         }
-        write.write_u8(self.user_data)?;
         write.write_u16::<LittleEndian>(self.point_source_id)?;
         if format.has_gps_time {
             write.write_f64::<LittleEndian>(self.gps_time.unwrap_or(0.0))?;
