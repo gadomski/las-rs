@@ -13,8 +13,8 @@ fn detect_laszip() {
 
 #[cfg(feature = "laz")]
 mod laz_compression_test {
-    use std::io::Cursor;
     use las::{Read, Write};
+    use std::io::Cursor;
 
     /// Read file, write it compressed, read the compressed data written
     /// compare that points are the same
@@ -44,10 +44,9 @@ mod laz_compression_test {
 
     #[test]
     fn test_point_format_id_is_correct() {
-        let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
-        let mut laz_reader = las::Reader::from_path("tests/data/autzen.laz").unwrap();
-
-        assert_eq!(laz_reader.header().point_format().to_u8().unwrap(), 3);
+        let las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
+        assert_eq!(las_reader.header().point_format().to_u8().unwrap(), 1);
+        let laz_reader = las::Reader::from_path("tests/data/autzen.laz").unwrap();
         assert_eq!(laz_reader.header().point_format().to_u8().unwrap(), 3);
     }
 
@@ -65,5 +64,4 @@ mod laz_compression_test {
     fn test_extra_bytes_laz() {
         test_compression_does_not_corrupt("tests/data/extrabytes.laz");
     }
-
 }
