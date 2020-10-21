@@ -72,7 +72,7 @@ pub(crate) fn write_point_to<W: std::io::Write>(
 }
 
 /// Trait that defines a PointWriter, s
-pub(crate) trait PointWriter<W: std::io::Write>: Debug {
+pub(crate) trait PointWriter<W: std::io::Write>: Debug + Send {
     fn write_next(&mut self, point: Point) -> Result<()>;
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
@@ -115,7 +115,7 @@ struct UncompressedPointWriter<W: std::io::Write + Debug> {
     header: Header,
 }
 
-impl<W: std::io::Write + Debug> PointWriter<W> for UncompressedPointWriter<W> {
+impl<W: std::io::Write + Debug + Send> PointWriter<W> for UncompressedPointWriter<W> {
     fn write_next(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
         write_point_to(&mut self.dest, point, &self.header)?;
@@ -204,13 +204,13 @@ pub trait Write {
 /// } // <- `close` is not called
 /// ```
 #[derive(Debug)]
-pub struct Writer<W: 'static + std::io::Write + Seek + Debug> {
+pub struct Writer<W: 'static + std::io::Write + Seek + Debug + Send> {
     closed: bool,
     start: u64,
-    point_writer: Box<dyn PointWriter<W>>,
+    point_writer: Box<dyn PointWriter<W> + Send>,
 }
 
-impl<W: 'static + std::io::Write + Seek + Debug> Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
     /// Creates a new writer.
     ///
     /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
@@ -303,7 +303,7 @@ impl<W: 'static + std::io::Write + Seek + Debug> Writer<W> {
     }
 }
 
-impl<W: 'static + std::io::Write + Seek + Debug> Write for Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
     /// Returns a reference to this writer's header.
     fn header(&self) -> &Header {
         &self.point_writer.header()
@@ -325,7 +325,7 @@ impl<W: 'static + std::io::Write + Seek + Debug> Write for Writer<W> {
     }
 }
 
-impl<W: 'static + std::io::Write + Seek + Debug> Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
     /// Closes this writer and returns its inner `Write`, seeked to the beginning of the las data.
     ///
     /// # Examples
@@ -402,7 +402,7 @@ impl Default for Writer<Cursor<Vec<u8>>> {
     }
 }
 
-impl<W: 'static + Seek + std::io::Write + Debug> Drop for Writer<W> {
+impl<W: 'static + Seek + std::io::Write + Debug + Send> Drop for Writer<W> {
     fn drop(&mut self) {
         if !self.closed {
             self.close().expect("Error when dropping the writer");

@@ -18,7 +18,7 @@ log = "0.4"
 num = "0.3"
 thiserror = "1.0"
 uuid = "0.8"
-laz = { version = "0.3.0", optional = true }
+laz = { version = "0.5.1", optional = true }
 
 [features]
 unstable = []
