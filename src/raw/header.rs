@@ -450,10 +450,10 @@ impl Evlr {
     }
 
     fn into_option(self) -> Option<Evlr> {
-        if self.start_of_first_evlr == 0 && self.number_of_evlrs == 0 {
-            None
-        } else {
+        if self.start_of_first_evlr > 0 && self.number_of_evlrs > 0 {
             Some(self)
+        } else {
+            None
         }
     }
 }
