@@ -494,6 +494,36 @@ mod tests {
         assert!(write_read(header).is_err());
     }
 
+    #[test]
+    fn number_of_evlrs_none() {
+        let mut buff = Cursor::new(vec![
+            0;
+            std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
+        ]);
+
+        buff.write(&u64::MAX.to_le_bytes()).unwrap();
+        buff.write(&0_u32.to_le_bytes()).unwrap();
+
+        buff.set_position(0);
+        let evlr = Evlr::read_from(buff).unwrap();
+        assert!(evlr.into_option().is_none());
+    }
+
+    #[test]
+    fn number_of_evlrs_some() {
+        let mut buff = Cursor::new(vec![
+            0;
+            std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
+        ]);
+
+        buff.write(&u64::MAX.to_le_bytes()).unwrap();
+        buff.write(&1_u32.to_le_bytes()).unwrap();
+
+        buff.set_position(0);
+        let evlr = Evlr::read_from(buff).unwrap();
+        assert!(evlr.into_option().is_some());
+    }
+
     macro_rules! roundtrip {
         ($name:ident, $minor:expr) => {
             mod $name {
