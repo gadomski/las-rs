@@ -490,6 +490,8 @@ impl Header {
     /// let raw_header = Header::default().into_raw().unwrap();
     /// ```
     pub fn into_raw(self) -> Result<raw::Header> {
+        // Scale the bounding box properly
+        let bounds = self.bounds.adapt(&self.transforms)?;
         Ok(raw::Header {
             file_signature: raw::LASF,
             file_source_id: self.file_source_id,
@@ -513,12 +515,12 @@ impl Header {
             x_offset: self.transforms.x.offset,
             y_offset: self.transforms.y.offset,
             z_offset: self.transforms.z.offset,
-            max_x: self.bounds.max.x,
-            min_x: self.bounds.min.x,
-            max_y: self.bounds.max.y,
-            min_y: self.bounds.min.y,
-            max_z: self.bounds.max.z,
-            min_z: self.bounds.min.z,
+            max_x: bounds.max.x,
+            min_x: bounds.min.x,
+            max_y: bounds.max.y,
+            min_y: bounds.min.y,
+            max_z: bounds.max.z,
+            min_z: bounds.min.z,
             // FIXME waveforms
             start_of_waveform_data_packet_record: None,
             evlr: self.evlr()?,
