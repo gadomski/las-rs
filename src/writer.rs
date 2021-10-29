@@ -154,7 +154,7 @@ pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(
             .and_then(|raw_vlr| raw_vlr.write_to(&mut dest))?;
     }
     if !header.vlr_padding().is_empty() {
-        dest.write_all(&header.vlr_padding())?;
+        dest.write_all(header.vlr_padding())?;
     }
     Ok(())
 }
@@ -306,7 +306,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
 impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
     /// Returns a reference to this writer's header.
     fn header(&self) -> &Header {
-        &self.point_writer.header()
+        self.point_writer.header()
     }
 
     /// Writes a point.
@@ -317,7 +317,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
         if !point.matches(self.header().point_format()) {
             return Err(Error::PointAttributes {
                 format: *self.header().point_format(),
-                point: point,
+                point,
             }
             .into());
         }
@@ -374,13 +374,7 @@ impl Writer<BufWriter<File>> {
         let compress = if cfg!(feature = "laz") {
             match path.as_ref().extension() {
                 Some(ext) => match &ext.to_str() {
-                    Some(ext_str) => {
-                        if &ext_str.to_lowercase() == "laz" {
-                            true
-                        } else {
-                            false
-                        }
-                    }
+                    Some(ext_str) => &ext_str.to_lowercase() == "laz",
                     None => false,
                 },
                 None => false,

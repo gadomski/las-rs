@@ -170,7 +170,7 @@ impl Point {
             is_synthetic: raw_point.flags.is_synthetic(),
             is_key_point: raw_point.flags.is_key_point(),
             is_withheld: raw_point.flags.is_withheld(),
-            is_overlap: is_overlap,
+            is_overlap,
             scan_angle: raw_point.scan_angle.into(),
             scanner_channel: raw_point.flags.scanner_channel(),
             user_data: raw_point.user_data,

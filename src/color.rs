@@ -22,10 +22,6 @@ impl Color {
     /// assert_eq!(3, color.blue);
     /// ```
     pub fn new(red: u16, green: u16, blue: u16) -> Color {
-        Color {
-            red: red,
-            green: green,
-            blue: blue,
-        }
+        Color { red, green, blue }
     }
 }

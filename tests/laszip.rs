@@ -23,7 +23,7 @@ mod laz_compression_test {
         let points: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
 
         let mut header_builder = las::Builder::from(reader.header().version());
-        header_builder.point_format = reader.header().point_format().clone();
+        header_builder.point_format = *reader.header().point_format();
         header_builder.point_format.is_compressed = true;
 
         let header = header_builder.into_header().unwrap();

@@ -3,10 +3,10 @@ use std::fmt;
 use point::Error;
 use Result;
 
-const TIME_FORMATS: &'static [u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
-const COLOR_FORMATS: &'static [u8] = &[2, 3, 5, 7, 8, 10];
-const WAVEFORM_FORMATS: &'static [u8] = &[4, 5, 9, 10];
-const NIR_FORMATS: &'static [u8] = &[8, 10];
+const TIME_FORMATS: &[u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
+const COLOR_FORMATS: &[u8] = &[2, 3, 5, 7, 8, 10];
+const WAVEFORM_FORMATS: &[u8] = &[4, 5, 9, 10];
+const NIR_FORMATS: &[u8] = &[8, 10];
 const IS_COMPRESSED_MASK: u8 = 0x80;
 
 fn is_point_format_compressed(point_format_id: u8) -> bool {
@@ -73,6 +73,7 @@ pub struct Format {
     pub is_compressed: bool,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl Format {
     /// Creates a new point format from a u8.
     ///
@@ -220,15 +221,14 @@ impl Format {
 
     /// When the data is compressed (LAZ) the point format id written in the
     /// header is slightly different to let readers know the data is compressed
-    pub(crate) fn to_writable_u8(&self) -> Result<u8> {
-        self.to_u8()
-            .map(|id|
-                if self.is_compressed {
-                    point_format_id_uncompressed_to_compressed(id)
-                } else {
-                    id
-                }
-            )
+    pub(crate) fn to_writable_u8(self) -> Result<u8> {
+        self.to_u8().map(|id| {
+            if self.is_compressed {
+                point_format_id_uncompressed_to_compressed(id)
+            } else {
+                id
+            }
+        })
     }
 }
 

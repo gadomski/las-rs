@@ -100,10 +100,10 @@ impl Vlr {
         description.as_mut().from_las_str(&self.description)?;
         Ok(raw::Vlr {
             reserved: 0,
-            user_id: user_id,
+            user_id,
             record_id: self.record_id,
             record_length_after_header: self.record_length_after_header(is_extended)?,
-            description: description,
+            description,
             data: self.data,
         })
     }
@@ -183,7 +183,7 @@ mod tests {
     fn len() {
         let data = vec![0; 1];
         let vlr = Vlr {
-            data: data,
+            data,
             ..Default::default()
         };
         assert_eq!(55, vlr.len(false));
@@ -195,7 +195,7 @@ mod tests {
         use std::u16;
         let data = vec![0; u16::MAX as usize + 1];
         let vlr = Vlr {
-            data: data,
+            data,
             ..Default::default()
         };
         assert!(vlr.into_raw(false).is_err());

@@ -1,5 +1,5 @@
 use error::Error;
-use laz::las::laszip::{LazVlr, LASZIP_DESCRIPTION, LASZIP_RECORD_ID, LASZIP_USER_ID};
+use laz::las::laszip::LazVlr;
 use reader::{read_point_from, PointReader};
 use std::fmt::Debug;
 /// Module with functions and structs specific to brigde the las crate and laz crate to allow
@@ -9,20 +9,16 @@ use writer::{write_header_and_vlrs_to, write_point_to, PointWriter};
 use {Header, Point, Result, Vlr};
 
 fn is_laszip_vlr(vlr: &Vlr) -> bool {
-    if &vlr.user_id == LASZIP_USER_ID && vlr.record_id == LASZIP_RECORD_ID {
-        true
-    } else {
-        false
-    }
+    vlr.user_id == LazVlr::USER_ID && vlr.record_id == LazVlr::RECORD_ID
 }
 
 fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
     let mut cursor = Cursor::new(Vec::<u8>::new());
     laszip_vlr.write_to(&mut cursor)?;
     Ok(Vlr {
-        user_id: LASZIP_USER_ID.to_owned(),
-        record_id: LASZIP_RECORD_ID,
-        description: LASZIP_DESCRIPTION.to_owned(),
+        user_id: LazVlr::USER_ID.to_owned(),
+        record_id: LazVlr::RECORD_ID,
+        description: LazVlr::DESCRIPTION.to_owned(),
         data: cursor.into_inner(),
     })
 }
@@ -46,7 +42,7 @@ impl<'a, R: Read + Seek + Send> CompressedPointReader<'a, R> {
     pub(crate) fn new(source: R, header: Header) -> Result<Self> {
         let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
             None => return Err(Error::LasZipVlrNotFound),
-            Some(ref vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?,
+            Some(vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?,
         };
         let decompressor_output = Cursor::new(vec![0u8; header.point_format().len() as usize]);
 
@@ -97,7 +93,6 @@ impl<'a, R: Read + Seek + Send> PointReader for CompressedPointReader<'a, R> {
     }
 }
 
-
 fn laz_vlr_from_point_format(point_format: &crate::point::Format) -> LazVlr {
     let mut laz_items = laz::las::laszip::LazItemRecordBuilder::new();
     if !point_format.is_extended {
@@ -112,9 +107,7 @@ fn laz_vlr_from_point_format(point_format: &crate::point::Format) -> LazVlr {
         }
 
         if point_format.extra_bytes > 0 {
-            laz_items.add_item(laz::LazItemType::Byte(
-                point_format.extra_bytes,
-            ));
+            laz_items.add_item(laz::LazItemType::Byte(point_format.extra_bytes));
         }
     } else {
         laz_items.add_item(laz::LazItemType::Point14);
@@ -128,9 +121,7 @@ fn laz_vlr_from_point_format(point_format: &crate::point::Format) -> LazVlr {
             }
         }
         if point_format.extra_bytes > 0 {
-            laz_items.add_item(laz::LazItemType::Byte14(
-                point_format.extra_bytes,
-            ));
+            laz_items.add_item(laz::LazItemType::Byte14(point_format.extra_bytes));
         }
     }
     laz::LazVlr::from_laz_items(laz_items.build())

@@ -48,7 +48,7 @@ use std::path::Path;
 #[cfg(feature = "laz")]
 use compression::CompressedPointReader;
 
-use std::fmt::Debug;
+use std::{cmp::Ordering, fmt::Debug};
 use thiserror::Error;
 use {raw, Builder, Header, Point, Result, Vlr};
 
@@ -224,23 +224,31 @@ impl Reader {
             position += vlr.len(false) as u64;
             builder.vlrs.push(vlr);
         }
-        if position > offset_to_point_data {
-            return Err(Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into());
-        } else if position < offset_to_point_data {
-            read.by_ref()
-                .take(offset_to_point_data - position)
-                .read_to_end(&mut builder.vlr_padding)?;
+        match position.cmp(&offset_to_point_data) {
+            Ordering::Less => {
+                read.by_ref()
+                    .take(offset_to_point_data - position)
+                    .read_to_end(&mut builder.vlr_padding)?;
+            }
+            Ordering::Equal => {} // pass
+            Ordering::Greater => {
+                return Err(Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into())
+            }
         }
 
         read.seek(SeekFrom::Start(offset_to_end_of_points))?;
         if let Some(evlr) = evlr {
-            if evlr.start_of_first_evlr < offset_to_end_of_points {
-                return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into());
-            } else if evlr.start_of_first_evlr > offset_to_end_of_points {
-                let n = evlr.start_of_first_evlr - offset_to_end_of_points;
-                read.by_ref()
-                    .take(n)
-                    .read_to_end(&mut builder.point_padding)?;
+            match evlr.start_of_first_evlr.cmp(&offset_to_end_of_points) {
+                Ordering::Less => {
+                    return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into())
+                }
+                Ordering::Equal => {} // pass
+                Ordering::Greater => {
+                    let n = evlr.start_of_first_evlr - offset_to_end_of_points;
+                    read.by_ref()
+                        .take(n)
+                        .read_to_end(&mut builder.point_padding)?;
+                }
             }
             builder
                 .evlrs
@@ -344,6 +352,6 @@ mod tests {
         let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
         reader.seek(1).unwrap();
         assert_eq!(point, reader.read().unwrap().unwrap());
-        assert_eq!(reader.read().is_none(), true);
+        assert!(reader.read().is_none());
     }
 }
