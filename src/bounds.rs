@@ -1,5 +1,6 @@
 use std::f64;
-use {Point, Vector};
+
+use {Point, Result, Transform, Vector};
 
 /// Minimum and maximum bounds in three dimensions.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,6 +42,53 @@ impl Bounds {
         if point.z > self.max.z {
             self.max.z = point.z;
         }
+    }
+
+    /// Transform the bounds to be compatible with the chosen transform. Otherwise, points may lay outside of the bounding box due to floating-point issues.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use las::{Bounds, Transform, Vector};
+    ///
+    /// let bounds = Bounds {
+    ///     min: Vector {
+    ///         x: -2.7868618965148926,
+    ///         y: -0.9322229027748108,
+    ///         z: -5.8063459396362305,
+    ///     },
+    ///     max: Vector {
+    ///         x: 0.6091402173042297,
+    ///         y: 1.5428568124771118,
+    ///         z: -0.09441471844911575,
+    ///     },
+    /// };
+    ///
+    /// // Currently, the default scale is 0.001.
+    /// let new_bounds = bounds.adapt(&Default::default()).unwrap();
+    /// assert_eq!(new_bounds.max.z, -0.094);
+    /// ```
+    pub fn adapt(&self, transform: &Vector<Transform>) -> Result<Self> {
+        fn inner_convert(value: f64, transform: &Transform) -> Result<f64> {
+            // During saving, an instance with +-inf is saved. We must consider for this corner case.
+            if value.is_infinite() {
+                return Ok(value);
+            }
+            Ok(transform.direct(transform.inverse(value)?))
+        }
+
+        Ok(Self {
+            min: Vector {
+                x: inner_convert(self.min.x, &transform.x)?,
+                y: inner_convert(self.min.y, &transform.y)?,
+                z: inner_convert(self.min.z, &transform.z)?,
+            },
+            max: Vector {
+                x: inner_convert(self.max.x, &transform.x)?,
+                y: inner_convert(self.max.y, &transform.y)?,
+                z: inner_convert(self.max.z, &transform.z)?,
+            },
+        })
     }
 }
 
