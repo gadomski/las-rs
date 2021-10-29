@@ -199,7 +199,7 @@ impl Header {
                 .or_insert(0);
             *entry += 1;
         }
-        self.bounds.grow(&point);
+        self.bounds.grow(point);
     }
 
     /// Returns this header's file source id.
@@ -399,7 +399,7 @@ impl Header {
     /// assert_eq!(None, header.number_of_points_by_return(1));
     /// ```
     pub fn number_of_points_by_return(&self, n: u8) -> Option<u64> {
-        self.number_of_points_by_return.get(&n).map(|&n| n)
+        self.number_of_points_by_return.get(&n).copied()
     }
 
     /// Returns a reference to this header's vlr padding.
@@ -653,7 +653,7 @@ impl Header {
                 + self.point_padding.len() as u64
                 + u64::from(self.offset_to_point_data()?);
             Ok(Some(raw::header::Evlr {
-                start_of_first_evlr: start_of_first_evlr,
+                start_of_first_evlr,
                 number_of_evlrs: n as u32,
             }))
         }
@@ -674,7 +674,7 @@ impl Header {
         }
         Ok(Some(raw::header::LargeFile {
             number_of_point_records: self.number_of_points,
-            number_of_points_by_return: number_of_points_by_return,
+            number_of_points_by_return,
         }))
     }
 
@@ -806,13 +806,16 @@ mod tests {
 
     #[test]
     fn prefer_legacy_fields() {
-        let mut raw_header = raw::Header::default();
-        raw_header.version = (1, 4).into();
-        raw_header.number_of_point_records = 42;
-        raw_header.number_of_points_by_return[0] = 42;
-        let mut large_file = raw::header::LargeFile::default();
-        large_file.number_of_point_records = 43;
-        large_file.number_of_points_by_return[0] = 43;
+        let mut raw_header = raw::Header {
+            version: (1, 4).into(),
+            number_of_point_records: 42,
+            number_of_points_by_return: [42, 0, 0, 0, 0],
+            ..Default::default()
+        };
+        let large_file = raw::header::LargeFile {
+            number_of_point_records: 43,
+            number_of_points_by_return: [43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        };
         raw_header.large_file = Some(large_file);
         let header = Header::from_raw(raw_header).unwrap();
         assert_eq!(42, header.number_of_points());

@@ -353,6 +353,7 @@ impl Point {
     /// file.seek(SeekFrom::Start(1994)).unwrap();
     /// let point = Point::read_from(file, &Format::new(1).unwrap()).unwrap();
     /// ```
+    #[allow(clippy::field_reassign_with_default)]
     pub fn read_from<R: Read>(mut read: R, format: &Format) -> Result<Point> {
         use byteorder::{LittleEndian, ReadBytesExt};
         use utils;
@@ -447,7 +448,7 @@ impl Point {
             write.write_f64::<LittleEndian>(self.gps_time.unwrap_or(0.0))?;
         }
         if format.has_color {
-            let color = self.color.unwrap_or_else(Color::default);
+            let color = self.color.unwrap_or_default();
             write.write_u16::<LittleEndian>(color.red)?;
             write.write_u16::<LittleEndian>(color.green)?;
             write.write_u16::<LittleEndian>(color.blue)?;
@@ -456,9 +457,7 @@ impl Point {
             write.write_u16::<LittleEndian>(self.nir.unwrap_or(0))?;
         }
         if format.has_waveform {
-            self.waveform
-                .unwrap_or_else(Waveform::default)
-                .write_to(&mut write)?;
+            self.waveform.unwrap_or_default().write_to(&mut write)?;
         }
         write.write_all(&self.extra_bytes)?;
         Ok(())
@@ -779,6 +778,7 @@ impl From<Flags> for (u8, u8, u8) {
 }
 
 impl PartialEq for Flags {
+    #[allow(clippy::many_single_char_names)]
     fn eq(&self, other: &Flags) -> bool {
         let (a, b, c) = (*self).into();
         let (d, e, f) = (*other).into();

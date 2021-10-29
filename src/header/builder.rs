@@ -1,7 +1,7 @@
 use chrono::{Date, Utc};
 use header::Error;
 use point::Format;
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 use uuid::Uuid;
 use {raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
 
@@ -93,14 +93,16 @@ impl Builder {
             };
         let mut point_format = Format::new(raw_header.point_data_record_format)?;
         let n = point_format.len();
-        if raw_header.point_data_record_length < n {
-            return Err(Error::PointDataRecordLength {
-                format: point_format,
-                len: raw_header.point_data_record_length,
+        match raw_header.point_data_record_length.cmp(&n) {
+            Ordering::Less => {
+                return Err(Error::PointDataRecordLength {
+                    format: point_format,
+                    len: raw_header.point_data_record_length,
+                }
+                .into())
             }
-            .into());
-        } else if n < raw_header.point_data_record_length {
-            point_format.extra_bytes = raw_header.point_data_record_length - n;
+            Ordering::Equal => {} // pass
+            Ordering::Greater => point_format.extra_bytes = raw_header.point_data_record_length - n,
         }
         Ok(Builder {
             date: Utc
@@ -121,7 +123,7 @@ impl Builder {
             guid: Uuid::from_bytes(raw_header.guid),
             has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
             padding: raw_header.padding,
-            point_format: point_format,
+            point_format,
             system_identifier: raw_header
                 .system_identifier
                 .as_ref()
@@ -156,8 +158,8 @@ impl Builder {
                     z: raw_header.max_z,
                 },
             },
-            number_of_points: number_of_points,
-            number_of_points_by_return: number_of_points_by_return,
+            number_of_points,
+            number_of_points_by_return,
         })
     }
 
@@ -175,7 +177,7 @@ impl Builder {
 
         let n = self.vlr_padding.len();
         if self.version.requires_point_data_start_signature()
-            && (n < 2 || !(self.vlr_padding[n - 2..] == POINT_DATA_START_SIGNATURE))
+            && (n < 2 || self.vlr_padding[n - 2..] != POINT_DATA_START_SIGNATURE)
         {
             self.vlr_padding.extend(&POINT_DATA_START_SIGNATURE);
         }
@@ -221,7 +223,7 @@ impl Builder {
         let header = Header {
             bounds: self.bounds,
             date: self.date,
-            evlrs: evlrs,
+            evlrs,
             file_source_id: self.file_source_id,
             generating_software: self.generating_software,
             gps_time_type: self.gps_time_type,
@@ -236,7 +238,7 @@ impl Builder {
             transforms: self.transforms,
             version: self.version,
             vlr_padding: self.vlr_padding,
-            vlrs: vlrs,
+            vlrs,
         };
         Ok(header)
     }
@@ -244,9 +246,10 @@ impl Builder {
 
 impl<V: Into<Version>> From<V> for Builder {
     fn from(version: V) -> Builder {
-        let mut builder = Builder::default();
-        builder.version = version.into();
-        builder
+        Builder {
+            version: version.into(),
+            ..Default::default()
+        }
     }
 }
 
@@ -329,8 +332,10 @@ mod tests {
     #[test]
     fn evlr_upgrade() {
         let mut builder = Builder::from((1, 4));
-        let mut vlr = Vlr::default();
-        vlr.data = vec![0; ::std::u16::MAX as usize + 1];
+        let vlr = Vlr {
+            data: vec![0; ::std::u16::MAX as usize + 1],
+            ..Default::default()
+        };
         builder.vlrs.push(vlr);
         let header = builder.into_header().unwrap();
         assert_eq!(0, header.vlrs().len());

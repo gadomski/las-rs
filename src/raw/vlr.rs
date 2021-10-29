@@ -68,6 +68,7 @@ impl Vlr {
     /// // If the second parameter were true, it would be read as an extended vlr.
     /// let vlr = Vlr::read_from(file, false).unwrap();
     /// ```
+    #[allow(clippy::field_reassign_with_default)]
     pub fn read_from<R: Read>(mut read: R, extended: bool) -> Result<Vlr> {
         use byteorder::{LittleEndian, ReadBytesExt};
 

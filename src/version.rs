@@ -30,10 +30,7 @@ impl Version {
     /// let version = Version::new(1, 2);
     /// ```
     pub fn new(major: u8, minor: u8) -> Version {
-        Version {
-            major: major,
-            minor: minor,
-        }
+        Version { major, minor }
     }
 
     /// Does this version require the point data start signature?
@@ -147,10 +144,7 @@ impl fmt::Display for Version {
 
 impl From<(u8, u8)> for Version {
     fn from((major, minor): (u8, u8)) -> Version {
-        Version {
-            major: major,
-            minor: minor,
-        }
+        Version { major, minor }
     }
 }
 

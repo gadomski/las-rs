@@ -381,12 +381,12 @@ impl Header {
             )?;
         }
         if self.version.supports::<Evlrs>() {
-            let elvr = self.evlr.unwrap_or_else(Evlr::default);
+            let elvr = self.evlr.unwrap_or_default();
             write.write_u64::<LittleEndian>(elvr.start_of_first_evlr)?;
             write.write_u32::<LittleEndian>(elvr.number_of_evlrs)?;
         }
         if self.version.supports::<LargeFiles>() {
-            let large_file = self.large_file.unwrap_or_else(LargeFile::default);
+            let large_file = self.large_file.unwrap_or_default();
             write.write_u64::<LittleEndian>(large_file.number_of_point_records)?;
             for n in &large_file.number_of_points_by_return {
                 write.write_u64::<LittleEndian>(*n)?;
@@ -409,7 +409,7 @@ impl Default for Header {
             file_source_id: 0,
             global_encoding: 0,
             guid: [0; 16],
-            version: version,
+            version,
             system_identifier: [0; 32],
             generating_software: [0; 32],
             file_creation_day_of_year: 0,
@@ -466,8 +466,8 @@ impl LargeFile {
             *n = read.read_u64::<LittleEndian>()?
         }
         Ok(LargeFile {
-            number_of_point_records: number_of_point_records,
-            number_of_points_by_return: number_of_points_by_return,
+            number_of_point_records,
+            number_of_points_by_return,
         })
     }
 }
@@ -501,8 +501,8 @@ mod tests {
             std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
         ]);
 
-        buff.write(&u64::MAX.to_le_bytes()).unwrap();
-        buff.write(&0_u32.to_le_bytes()).unwrap();
+        buff.write_all(&u64::MAX.to_le_bytes()).unwrap();
+        buff.write_all(&0_u32.to_le_bytes()).unwrap();
 
         buff.set_position(0);
         let evlr = Evlr::read_from(buff).unwrap();
@@ -516,8 +516,8 @@ mod tests {
             std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
         ]);
 
-        buff.write(&u64::MAX.to_le_bytes()).unwrap();
-        buff.write(&1_u32.to_le_bytes()).unwrap();
+        buff.write_all(&u64::MAX.to_le_bytes()).unwrap();
+        buff.write_all(&1_u32.to_le_bytes()).unwrap();
 
         buff.set_position(0);
         let evlr = Evlr::read_from(buff).unwrap();
@@ -534,7 +534,7 @@ mod tests {
 
                     let version = Version::new(1, $minor);
                     let mut header = Header {
-                        version: version,
+                        version,
                         ..Default::default()
                     };
                     if version.minor == 4 {
