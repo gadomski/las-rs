@@ -150,7 +150,7 @@
 
 extern crate byteorder;
 extern crate chrono;
-extern crate num;
+extern crate num_traits;
 extern crate thiserror;
 extern crate uuid;
 
