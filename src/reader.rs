@@ -184,11 +184,11 @@ pub trait Read {
 
 /// Reads LAS data.
 #[derive(Debug)]
-pub struct Reader {
-    point_reader: Box<dyn PointReader>,
+pub struct Reader<'a> {
+    point_reader: Box<dyn PointReader + 'a>,
 }
 
-impl Reader {
+impl<'a> Reader<'a> {
     /// Creates a new reader.
     ///
     /// This does *not* wrap the `Read` in a `BufRead`, so if you're concered about performance you
@@ -203,7 +203,7 @@ impl Reader {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new<R: std::io::Read + Seek + Send + Debug + 'static>(mut read: R) -> Result<Reader> {
+    pub fn new<R: std::io::Read + Seek + Send + Debug + 'a>(mut read: R) -> Result<Reader<'a>> {
         use std::io::Read;
 
         let raw_header = raw::Header::read_from(&mut read)?;
@@ -290,7 +290,7 @@ impl Reader {
     }
 }
 
-impl Read for Reader {
+impl<'a> Read for Reader<'a> {
     /// Returns a reference to this reader's header.
     fn header(&self) -> &Header {
         self.point_reader.header()
@@ -314,7 +314,7 @@ impl Read for Reader {
     }
 }
 
-impl Reader {
+impl<'a> Reader<'a> {
     /// Creates a new reader from a path.
     ///
     /// The underlying `File` is wrapped in a `BufReader` for performance reasons.
@@ -325,7 +325,7 @@ impl Reader {
     /// # use las::Reader;
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<'a>> {
         File::open(path)
             .map_err(::Error::from)
             .and_then(|file| Reader::new(BufReader::new(file)))
