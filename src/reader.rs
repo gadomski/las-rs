@@ -210,7 +210,6 @@ impl<'a> Reader<'a> {
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
         let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
-        let offset_to_end_of_points = raw_header.offset_to_end_of_points();
         let evlr = raw_header.evlr;
 
         let mut builder = Builder::new(raw_header)?;
@@ -236,20 +235,8 @@ impl<'a> Reader<'a> {
             }
         }
 
-        read.seek(SeekFrom::Start(offset_to_end_of_points))?;
         if let Some(evlr) = evlr {
-            match evlr.start_of_first_evlr.cmp(&offset_to_end_of_points) {
-                Ordering::Less => {
-                    return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into())
-                }
-                Ordering::Equal => {} // pass
-                Ordering::Greater => {
-                    let n = evlr.start_of_first_evlr - offset_to_end_of_points;
-                    read.by_ref()
-                        .take(n)
-                        .read_to_end(&mut builder.point_padding)?;
-                }
-            }
+            read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
             builder
                 .evlrs
                 .push(raw::Vlr::read_from(&mut read, true).map(Vlr::new)?);

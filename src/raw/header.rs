@@ -317,18 +317,6 @@ impl Header {
         Ok(header)
     }
 
-    /// Returns the total file offset to the first byte *after* all of the points.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::raw::Header;
-    /// assert_eq!(227, Header::default().offset_to_end_of_points());
-    /// ```
-    pub fn offset_to_end_of_points(&self) -> u64 {
-        u64::from(self.offset_to_point_data)
-            + u64::from(self.number_of_point_records) * u64::from(self.point_data_record_length)
-    }
 
     /// Writes a raw header to a `Write`.
     ///
