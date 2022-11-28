@@ -158,7 +158,7 @@ macro_rules! version {
             }
 
             mod builder {
-                use chrono::{TimeZone, Utc};
+                use chrono::NaiveDate;
                 use las::{GpsTimeType, Vlr};
                 use uuid::Uuid;
 
@@ -179,7 +179,8 @@ macro_rules! version {
                 roundtrip_builder!(generating_software, |b: &mut Builder| b
                     .generating_software =
                     "roundtrip test".to_string());
-                roundtrip_builder!(date, |b: &mut Builder| b.date = Some(Utc.ymd(2017, 10, 30)));
+                roundtrip_builder!(date, |b: &mut Builder| b.date =
+                    NaiveDate::from_ymd_opt(2017, 10, 30));
                 roundtrip_builder!(transforms, |b: &mut Builder| {
                     use las::{Transform, Vector};
 
