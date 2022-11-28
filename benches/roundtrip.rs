@@ -1,10 +1,8 @@
-#![cfg(all(feature = "unstable", feature(test)))]
-
+extern crate criterion;
 extern crate las;
-extern crate test;
 
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use las::{Point, Read, Reader, Write, Writer};
-use test::Bencher;
 
 fn roundtrip(npoints: usize) {
     let mut writer = Writer::default();
@@ -17,22 +15,13 @@ fn roundtrip(npoints: usize) {
     }
 }
 
-#[bench]
-fn roundtrip_0(bencher: &mut Bencher) {
-    bencher.iter(|| roundtrip(0));
+fn bench(criterion: &mut Criterion) {
+    for npoints in 0..4 {
+        criterion.bench_function(&format!("roundtrip {} points", npoints), |b| {
+            b.iter(|| roundtrip(black_box(npoints)))
+        });
+    }
 }
 
-#[bench]
-fn roundtrip_1(bencher: &mut Bencher) {
-    bencher.iter(|| roundtrip(1));
-}
-
-#[bench]
-fn roundtrip_100(bencher: &mut Bencher) {
-    bencher.iter(|| roundtrip(100));
-}
-
-#[bench]
-fn roundtrip_10000(bencher: &mut Bencher) {
-    bencher.iter(|| roundtrip(10000));
-}
+criterion_group!(benches, bench);
+criterion_main!(benches);

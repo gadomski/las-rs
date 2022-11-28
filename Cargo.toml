@@ -20,5 +20,9 @@ thiserror = "1.0"
 uuid = "1"
 laz = { version = "0.7", optional = true }
 
-[features]
-unstable = []
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "roundtrip"
+harness = false
