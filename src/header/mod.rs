@@ -50,7 +50,7 @@ use std::collections::HashMap;
 use std::iter::Chain;
 use std::slice::Iter;
 
-use chrono::{Date, Datelike, Utc};
+use chrono::{Datelike, NaiveDate, Utc};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -120,7 +120,7 @@ pub enum Error {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Header {
     bounds: Bounds,
-    date: Option<Date<Utc>>,
+    date: Option<NaiveDate>,
     evlrs: Vec<Vlr>,
     file_source_id: u16,
     generating_software: String,
@@ -306,7 +306,7 @@ impl Header {
     /// use las::Header;
     /// let date = Header::default().date().unwrap();
     /// ```
-    pub fn date(&self) -> Option<Date<Utc>> {
+    pub fn date(&self) -> Option<NaiveDate> {
         self.date
     }
 
@@ -687,7 +687,7 @@ impl Default for Header {
     fn default() -> Header {
         Header {
             bounds: Default::default(),
-            date: Some(Utc::today()),
+            date: Some(Utc::now().date_naive()),
             evlrs: Vec::new(),
             file_source_id: 0,
             generating_software: format!("las-rs {}", env!("CARGO_PKG_VERSION")),

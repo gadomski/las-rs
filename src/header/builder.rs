@@ -1,4 +1,4 @@
-use chrono::{Date, Utc};
+use chrono::NaiveDate;
 use header::Error;
 use point::Format;
 use std::{cmp::Ordering, collections::HashMap};
@@ -9,7 +9,7 @@ use {raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
 #[derive(Clone, Debug, Default)]
 pub struct Builder {
     /// The date of file creation.
-    pub date: Option<Date<Utc>>,
+    pub date: Option<NaiveDate>,
 
     /// The file source id, sometimes the flight line.
     pub file_source_id: u16,
@@ -71,7 +71,6 @@ impl Builder {
     /// let builder = Builder::new(Default::default()).unwrap();
     /// ```
     pub fn new(raw_header: raw::Header) -> Result<Builder> {
-        use chrono::TimeZone;
         use utils::AsLasStr;
 
         let number_of_points = if raw_header.number_of_point_records > 0 {
@@ -105,12 +104,10 @@ impl Builder {
             Ordering::Greater => point_format.extra_bytes = raw_header.point_data_record_length - n,
         }
         Ok(Builder {
-            date: Utc
-                .yo_opt(
-                    i32::from(raw_header.file_creation_year),
-                    u32::from(raw_header.file_creation_day_of_year),
-                )
-                .single(),
+            date: NaiveDate::from_yo_opt(
+                i32::from(raw_header.file_creation_year),
+                u32::from(raw_header.file_creation_day_of_year),
+            ),
             point_padding: Vec::new(),
             evlrs: Vec::new(),
             file_source_id: raw_header.file_source_id,
