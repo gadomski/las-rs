@@ -46,11 +46,11 @@ use std::io::{BufReader, Seek, SeekFrom};
 use std::path::Path;
 
 #[cfg(feature = "laz")]
-use compression::CompressedPointReader;
+use crate::compression::CompressedPointReader;
 
+use crate::{raw, Builder, Header, Point, Result, Vlr};
 use std::{cmp::Ordering, fmt::Debug};
 use thiserror::Error;
-use {raw, Builder, Header, Point, Result, Vlr};
 
 /// Error while reading.
 #[derive(Error, Clone, Copy, Debug)]
@@ -216,7 +216,7 @@ impl<'a> Reader<'a> {
         let mut builder = Builder::new(raw_header)?;
 
         if !cfg!(feature = "laz") && builder.point_format.is_compressed {
-            return Err(::Error::Laszip);
+            return Err(crate::Error::Laszip);
         }
 
         for _ in 0..number_of_variable_length_records {
@@ -327,14 +327,14 @@ impl<'a> Reader<'a> {
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<'a>> {
         File::open(path)
-            .map_err(::Error::from)
+            .map_err(crate::Error::from)
             .and_then(|file| Reader::new(BufReader::new(file)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use {Write, Writer};
+    use crate::{Write, Writer};
 
     use super::*;
 

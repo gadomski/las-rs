@@ -1,5 +1,5 @@
 use std::fmt;
-use Result;
+use crate::Result;
 
 /// A scale and an offset that transforms xyz coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -37,7 +37,7 @@ impl Transform {
     /// ```
     pub fn inverse(&self, n: f64) -> Result<i32> {
         use std::i32;
-        use Error;
+        use crate::Error;
 
         let n = ((n - self.offset) / self.scale).round();
         if n > f64::from(i32::MAX) || n < f64::from(i32::MIN) {

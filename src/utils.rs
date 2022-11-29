@@ -1,6 +1,6 @@
 use num_traits::Zero;
 use std::str;
-use {Error, Result};
+use crate::{Error, Result};
 
 pub trait AsLasStr {
     fn as_las_str(&self) -> Result<&str>;

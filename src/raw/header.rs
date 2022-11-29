@@ -1,10 +1,10 @@
 //! Raw file metadata.
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use feature::{Evlrs, LargeFiles, Waveforms};
-use raw::LASF;
+use crate::feature::{Evlrs, LargeFiles, Waveforms};
+use crate::raw::LASF;
 use std::io::{Read, Write};
-use {Result, Version};
+use crate::{Result, Version};
 
 /// A las header.
 ///
@@ -253,8 +253,8 @@ impl Header {
     /// let header = Header::read_from(&mut file).unwrap();
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
-        use header::Error;
-        use utils;
+        use crate::header::Error;
+        use crate::utils;
 
         let mut header = Header::default();
         read.read_exact(&mut header.file_signature)?;
@@ -401,7 +401,7 @@ impl Header {
 
 impl Default for Header {
     fn default() -> Header {
-        use point::Format;
+        use crate::point::Format;
         let version = Version::new(1, 2);
         let point_format = Format::new(0).unwrap();
         Header {

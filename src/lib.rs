@@ -177,19 +177,19 @@ mod utils;
 mod vector;
 mod version;
 
-pub use bounds::Bounds;
-pub use color::Color;
-pub use error::Error;
-pub use feature::Feature;
-pub use gps_time_type::GpsTimeType;
-pub use header::{Builder, Header};
-pub use point::Point;
-pub use reader::{Read, Reader};
-pub use transform::Transform;
-pub use vector::Vector;
-pub use version::Version;
-pub use vlr::Vlr;
-pub use writer::{Write, Writer};
+pub use crate::bounds::Bounds;
+pub use crate::color::Color;
+pub use crate::error::Error;
+pub use crate::feature::Feature;
+pub use crate::gps_time_type::GpsTimeType;
+pub use crate::header::{Builder, Header};
+pub use crate::point::Point;
+pub use crate::reader::{Read, Reader};
+pub use crate::transform::Transform;
+pub use crate::vector::Vector;
+pub use crate::version::Version;
+pub use crate::vlr::Vlr;
+pub use crate::writer::{Write, Writer};
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;
