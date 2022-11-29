@@ -37,11 +37,11 @@ use std::io::{BufWriter, Cursor, Seek, SeekFrom};
 use std::path::Path;
 
 #[cfg(feature = "laz")]
-use compression::CompressedPointWriter;
+use crate::compression::CompressedPointWriter;
 
-use point::Format;
+use crate::point::Format;
+use crate::{Header, Point, Result};
 use thiserror::Error;
-use {Header, Point, Result};
 
 /// Writer errors.
 #[derive(Error, Debug)]
@@ -385,7 +385,7 @@ impl Writer<BufWriter<File>> {
 
         header.point_format_mut().is_compressed = compress;
         File::create(path)
-            .map_err(::Error::from)
+            .map_err(crate::Error::from)
             .and_then(|file| Writer::new(BufWriter::new(file), header))
     }
 }
@@ -408,9 +408,9 @@ impl<W: 'static + Seek + std::io::Write + Debug + Send> Drop for Writer<W> {
 mod tests {
     use std::io::Cursor;
 
-    use header::Builder;
-    use point::Format;
-    use Version;
+    use crate::header::Builder;
+    use crate::point::Format;
+    use crate::Version;
 
     use super::*;
 
@@ -474,8 +474,8 @@ mod tests {
 
     #[test]
     fn write_not_at_start() {
+        use crate::{Read, Reader};
         use byteorder::WriteBytesExt;
-        use {Read, Reader};
 
         let mut cursor = Cursor::new(Vec::new());
         cursor.write_u8(42).unwrap();

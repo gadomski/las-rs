@@ -1,7 +1,7 @@
-use point::Format;
+use crate::point::Format;
 use std::fmt;
-use Feature;
-use {Error, Result};
+use crate::Feature;
+use crate::{Error, Result};
 
 /// LAS version.
 ///
@@ -162,7 +162,7 @@ mod tests {
         ($name:ident, $major:expr, $minor:expr, $supports:expr, $max_point_format:expr) => {
             mod $name {
                 use super::*;
-                use feature::*;
+                use crate::feature::*;
 
                 #[test]
                 fn features() {

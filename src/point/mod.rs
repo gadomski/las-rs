@@ -20,10 +20,10 @@ pub use self::classification::Classification;
 pub use self::format::Format;
 pub use self::scan_direction::ScanDirection;
 
-use raw;
-use raw::point::Waveform;
+use crate::raw;
+use crate::raw::point::Waveform;
 use thiserror::Error;
-use {Color, Result, Transform, Vector};
+use crate::{Color, Result, Transform, Vector};
 
 /// Point-specific errors
 #[derive(Debug, Clone, Copy, Error)]
@@ -51,7 +51,7 @@ pub enum Error {
     #[allow(missing_docs)]
     ReturnNumber {
         return_number: u8,
-        version: Option<::Version>,
+        version: Option<crate::Version>,
     },
 
     /// This is not a valid scanner channel
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn overlap() {
-        use raw::point::Flags;
+        use crate::raw::point::Flags;
 
         let raw_point = raw::Point {
             flags: Flags::TwoByte(0, 12),

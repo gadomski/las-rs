@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["lidar", "pointcloud", "las", "gis", "ASPRS"]
 license = "MIT"
 categories = ["science", "data-structures"]
+edition = "2018"
 
 [dependencies]
 byteorder = "1.4"

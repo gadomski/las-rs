@@ -1,9 +1,9 @@
 use chrono::NaiveDate;
-use header::Error;
-use point::Format;
+use crate::header::Error;
+use crate::point::Format;
 use std::{cmp::Ordering, collections::HashMap};
 use uuid::Uuid;
-use {raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
+use crate::{raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
 
 /// Builds headers.
 #[derive(Clone, Debug, Default)]
@@ -71,7 +71,7 @@ impl Builder {
     /// let builder = Builder::new(Default::default()).unwrap();
     /// ```
     pub fn new(raw_header: raw::Header) -> Result<Builder> {
-        use utils::AsLasStr;
+        use crate::utils::AsLasStr;
 
         let number_of_points = if raw_header.number_of_point_records > 0 {
             u64::from(raw_header.number_of_point_records)
@@ -169,8 +169,8 @@ impl Builder {
     /// let header = Builder::new(Default::default()).unwrap().into_header().unwrap();
     /// ```
     pub fn into_header(mut self) -> Result<Header> {
-        use feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers};
-        use raw::POINT_DATA_START_SIGNATURE;
+        use crate::feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers};
+        use crate::raw::POINT_DATA_START_SIGNATURE;
 
         let n = self.vlr_padding.len();
         if self.version.requires_point_data_start_signature()

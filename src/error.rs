@@ -1,7 +1,7 @@
 use std::io;
 use std::str;
 use thiserror::Error;
-use {header, point, reader, vlr, writer, Transform, Version};
+use crate::{header, point, reader, vlr, writer, Transform, Version};
 
 /// Crate-specific error enum.
 #[derive(Error, Debug)]

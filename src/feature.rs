@@ -16,7 +16,7 @@
 //! assert!(las_1_4.verify_support_for::<Waveforms>().is_ok());
 //! ```
 
-use Version;
+use crate::Version;
 
 const MAJOR: u8 = 1;
 

@@ -44,7 +44,7 @@ macro_rules! roundtrip_point {
             $modify_point(&mut point);
             let mut builder = Builder::from(version);
             builder.point_format = point_format;
-            ::roundtrip(builder, &point, should_succeed);
+            crate::roundtrip(builder, &point, should_succeed);
         }
     };
 }
@@ -62,7 +62,7 @@ macro_rules! roundtrip_builder {
             let should_succeed = version >= Version::new(1, $min_version_minor);
             let mut builder = Builder::from(version);
             $modify_builder(&mut builder);
-            ::roundtrip(builder, &Point::default(), should_succeed);
+            crate::roundtrip(builder, &Point::default(), should_succeed);
         }
     };
 }

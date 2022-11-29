@@ -1,6 +1,6 @@
 use std::f64;
 
-use {Point, Result, Transform, Vector};
+use crate::{Point, Result, Transform, Vector};
 
 /// Minimum and maximum bounds in three dimensions.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -113,7 +113,7 @@ impl Default for Bounds {
 mod tests {
 
     use super::*;
-    use Point;
+    use crate::Point;
 
     #[test]
     fn grow() {

@@ -30,7 +30,7 @@
 //! ```
 
 use thiserror::Error;
-use {raw, Result};
+use crate::{raw, Result};
 
 const REGULAR_HEADER_SIZE: usize = 54;
 const EXTENDED_HEADER_SIZE: usize = 60;
@@ -73,7 +73,7 @@ impl Vlr {
     /// let vlr = Vlr::new(raw_vlr);
     /// ```
     pub fn new(raw_vlr: raw::Vlr) -> Vlr {
-        use utils::AsLasStr;
+        use crate::utils::AsLasStr;
         Vlr {
             user_id: raw_vlr.user_id.as_ref().as_las_string_lossy(),
             record_id: raw_vlr.record_id,
@@ -92,7 +92,7 @@ impl Vlr {
     /// let raw_evlr =  Vlr::default().into_raw(true).unwrap();
     /// ```
     pub fn into_raw(self, is_extended: bool) -> Result<raw::Vlr> {
-        use utils::FromLasStr;
+        use crate::utils::FromLasStr;
 
         let mut user_id = [0; 16];
         user_id.as_mut().from_las_str(&self.user_id)?;

@@ -1,7 +1,7 @@
 //! Variable length records, both extended and regular.
 
 use std::io::{Read, Write};
-use Result;
+use crate::Result;
 
 /// A raw variable length record.
 #[derive(Debug, Default, PartialEq)]

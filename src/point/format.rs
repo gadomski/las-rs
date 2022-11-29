@@ -1,7 +1,7 @@
 use std::fmt;
 
-use point::Error;
-use Result;
+use crate::point::Error;
+use crate::Result;
 
 const TIME_FORMATS: &[u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &[u8] = &[2, 3, 5, 7, 8, 10];
@@ -249,7 +249,7 @@ mod tests {
     macro_rules! format {
         ($name:ident, $n:expr, $expected:expr, $len:expr) => {
             mod $name {
-                use point::Format;
+                use crate::point::Format;
 
                 #[test]
                 fn new() {

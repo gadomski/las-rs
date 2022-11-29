@@ -54,9 +54,9 @@ use chrono::{Datelike, NaiveDate, Utc};
 use thiserror::Error;
 use uuid::Uuid;
 
-use point::Format;
-use utils::FromLasStr;
-use {raw, Bounds, GpsTimeType, Point, Result, Transform, Vector, Version, Vlr};
+use crate::point::Format;
+use crate::utils::FromLasStr;
+use crate::{raw, Bounds, GpsTimeType, Point, Result, Transform, Vector, Version, Vlr};
 
 pub use self::builder::Builder;
 
@@ -591,7 +591,7 @@ impl Header {
     }
 
     fn number_of_points_raw(&self) -> Result<u32> {
-        use feature::LargeFiles;
+        use crate::feature::LargeFiles;
         use std::u32;
 
         if self.number_of_points > u64::from(u32::MAX) {
@@ -610,14 +610,14 @@ impl Header {
     }
 
     fn number_of_points_by_return_raw(&self) -> Result<[u32; 5]> {
-        use feature::LargeFiles;
+        use crate::feature::LargeFiles;
         use std::u32;
 
         let mut number_of_points_by_return = [0; 5];
         for (&i, &n) in &self.number_of_points_by_return {
             if i > 5 {
                 if !self.version.supports::<LargeFiles>() {
-                    return Err(::point::Error::ReturnNumber {
+                    return Err(crate::point::Error::ReturnNumber {
                         return_number: i,
                         version: Some(self.version),
                     }
@@ -663,7 +663,7 @@ impl Header {
         let mut number_of_points_by_return = [0; 15];
         for (&i, &n) in &self.number_of_points_by_return {
             if i > 15 {
-                return Err(::point::Error::ReturnNumber {
+                return Err(crate::point::Error::ReturnNumber {
                     return_number: i,
                     version: Some(self.version),
                 }
