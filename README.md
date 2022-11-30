@@ -8,5 +8,13 @@ las-rs
 Read and write [ASPRS las files](http://www.asprs.org/Committee-General/LASer-LAS-File-Format-Exchange-Activities.html) natively with rust.
 
 ```toml
-las = "0.7"
+[dependencies]
+las = "0.8"
+```
+
+To include [laz](https://laszip.org/) support:
+
+```toml
+[dependencies]
+las = { version = "0.8", features = ["laz"] }
 ```
