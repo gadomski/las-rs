@@ -1,0 +1,3 @@
+sign-tag = true
+allow-branch = ["main"]
+enable-all-features = true
