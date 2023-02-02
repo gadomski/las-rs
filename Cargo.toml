@@ -19,7 +19,11 @@ log = "0.4"
 num-traits = "0.2"
 thiserror = "1.0"
 uuid = "1"
+# laz = { version = "0.7" }
 laz = { version = "0.7", optional = true }
+futures = "0.3.26"
+byteorder_async = { version = "1.1.0", features = ["futures_async"], path = "../byteorder_async" }
+async-trait = "0.1.64"
 
 [dev-dependencies]
 criterion = "0.4"

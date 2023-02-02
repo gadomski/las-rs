@@ -35,6 +35,9 @@
 //! Vlr::read_from(&mut cursor, false).unwrap();
 //! ```
 
+pub mod async_header;
+pub mod async_point;
+pub mod async_vlr;
 pub mod header;
 pub mod point;
 pub mod vlr;

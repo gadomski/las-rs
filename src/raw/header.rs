@@ -1,10 +1,10 @@
 //! Raw file metadata.
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use crate::feature::{Evlrs, LargeFiles, Waveforms};
 use crate::raw::LASF;
-use std::io::{Read, Write};
 use crate::{Result, Version};
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Read, Write};
 
 /// A las header.
 ///
@@ -449,7 +449,7 @@ impl Evlr {
         })
     }
 
-    fn into_option(self) -> Option<Evlr> {
+    pub(crate) fn into_option(self) -> Option<Evlr> {
         if self.start_of_first_evlr > 0 && self.number_of_evlrs > 0 {
             Some(self)
         } else {

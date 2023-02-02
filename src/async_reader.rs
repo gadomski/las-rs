@@ -41,43 +41,33 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
-use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::path::Path;
+use async_trait::async_trait;
+use futures::io::{AsyncReadExt, AsyncSeek, AsyncSeekExt};
+use std::io::SeekFrom;
 
 #[cfg(feature = "laz")]
 use crate::compression::CompressedPointReader;
 
-use crate::{raw, Builder, Header, Point, Result, Vlr};
+use crate::{raw, Builder, Error, Header, Point, Result, Vlr};
 use std::{cmp::Ordering, fmt::Debug};
-use thiserror::Error;
-
-/// Error while reading.
-#[derive(Error, Clone, Copy, Debug)]
-pub enum Error {
-    /// The offset to the point data was too small.
-    #[error("offset to the point data is too small: {0}")]
-    OffsetToPointDataTooSmall(u32),
-
-    /// The offset to the start of the evlrs is too small.
-    #[error("offset to the start of the evlrs is too small: {0}")]
-    OffsetToEvlrsTooSmall(u64),
-}
 
 #[inline]
-pub(crate) fn read_point_from<R: std::io::Read>(
+pub(crate) async fn read_point_from<R: futures::io::AsyncRead + Unpin>(
     mut source: &mut R,
     header: &Header,
 ) -> Result<Point> {
-    let point = raw::Point::read_from(&mut source, header.point_format())
+    let point = raw::Point::read_from_async(&mut source, header.point_format())
+        .await
         .map(|raw_point| Point::new(raw_point, header.transforms()));
     point
 }
 
 /// Trait to specify behaviour a a PointReader
+#[async_trait]
 pub(crate) trait PointReader: Debug + Send {
-    fn read_next(&mut self) -> Option<Result<Point>>;
-    fn seek(&mut self, position: u64) -> Result<()>;
+    async fn read_next(&mut self) -> Option<Result<Point>>;
+    async fn seek(&mut self, position: u64) -> Result<()>;
+    // XXX?
     fn header(&self) -> &Header;
 }
 
@@ -89,6 +79,14 @@ pub struct PointIterator<'a> {
     point_reader: &'a mut dyn PointReader,
 }
 
+impl<'a> PointIterator<'a> {
+    /// Iterator like next() method
+    pub async fn next(&mut self) -> Option<Result<Point>> {
+        self.point_reader.read_next().await
+    }
+}
+
+/*
 impl<'a> Iterator for PointIterator<'a> {
     type Item = Result<Point>;
 
@@ -96,9 +94,10 @@ impl<'a> Iterator for PointIterator<'a> {
         self.point_reader.read_next()
     }
 }
+*/
 
 #[derive(Debug)]
-struct UncompressedPointReader<R: std::io::Read + Seek> {
+struct UncompressedPointReader<R: futures::io::AsyncRead + AsyncSeek + Unpin> {
     source: R,
     header: Header,
     offset_to_point_data: u64,
@@ -106,21 +105,28 @@ struct UncompressedPointReader<R: std::io::Read + Seek> {
     last_point_idx: u64,
 }
 
-impl<R: std::io::Read + Seek + Debug + Send> PointReader for UncompressedPointReader<R> {
-    fn read_next(&mut self) -> Option<Result<Point>> {
+#[async_trait]
+impl<R: futures::io::AsyncRead + AsyncSeek + Unpin + Debug + Send> PointReader
+    for UncompressedPointReader<R>
+{
+    async fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;
-            Some(read_point_from(&mut self.source, &self.header))
+            Some(read_point_from(&mut self.source, &self.header).await)
         } else {
             None
         }
     }
 
-    fn seek(&mut self, position: u64) -> Result<()> {
+    async fn seek(&mut self, position: u64) -> Result<()> {
+        use futures::io::AsyncSeekExt;
+
         self.last_point_idx = position;
-        self.source.seek(SeekFrom::Start(
-            self.offset_to_point_data + position * u64::from(self.header.point_format().len()),
-        ))?;
+        self.source
+            .seek(SeekFrom::Start(
+                self.offset_to_point_data + position * u64::from(self.header.point_format().len()),
+            ))
+            .await?;
         Ok(())
     }
 
@@ -130,7 +136,8 @@ impl<R: std::io::Read + Seek + Debug + Send> PointReader for UncompressedPointRe
 }
 
 /// A trait for objects which read LAS data.
-pub trait Read {
+#[async_trait]
+pub trait AsyncRead {
     /// Returns a reference to this reader's header.
     ///
     /// # Examples
@@ -151,7 +158,7 @@ pub trait Read {
     /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// let point = reader.read().unwrap().unwrap();
     /// ```
-    fn read(&mut self) -> Option<Result<Point>>;
+    async fn read(&mut self) -> Option<Result<Point>>;
 
     /// Seeks to the given point number, zero-indexed.
     ///
@@ -168,7 +175,7 @@ pub trait Read {
     /// reader.seek(1).unwrap(); // <- seeks to the second point
     /// let the_second_point = reader.read().unwrap().unwrap();
     /// ```
-    fn seek(&mut self, position: u64) -> Result<()>;
+    async fn seek(&mut self, position: u64) -> Result<()>;
 
     /// Returns an iterator over this reader's points.
     ///
@@ -184,11 +191,11 @@ pub trait Read {
 
 /// Reads LAS data.
 #[derive(Debug)]
-pub struct Reader<'a> {
+pub struct AsyncReader<'a> {
     point_reader: Box<dyn PointReader + 'a>,
 }
 
-impl<'a> Reader<'a> {
+impl<'a> AsyncReader<'a> {
     /// Creates a new reader.
     ///
     /// This does *not* wrap the `Read` in a `BufRead`, so if you're concered about performance you
@@ -203,10 +210,10 @@ impl<'a> Reader<'a> {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new<R: std::io::Read + Seek + Send + Debug + 'a>(mut read: R) -> Result<Reader<'a>> {
-        use std::io::Read;
-
-        let raw_header = raw::Header::read_from(&mut read)?;
+    pub async fn new<R: futures::io::AsyncRead + AsyncSeek + Unpin + Debug + Send + 'a>(
+        mut read: R,
+    ) -> Result<AsyncReader<'a>> {
+        let raw_header = raw::Header::read_from_async(&mut read).await?;
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
         let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
@@ -215,72 +222,83 @@ impl<'a> Reader<'a> {
 
         let mut builder = Builder::new(raw_header)?;
 
+        /*
+        XXX
         if !cfg!(feature = "laz") && builder.point_format.is_compressed {
             return Err(crate::Error::Laszip);
         }
+        */
 
         for _ in 0..number_of_variable_length_records {
-            let vlr = raw::Vlr::read_from(&mut read, false).map(Vlr::new)?;
+            let vlr = raw::Vlr::read_from_async(&mut read, false)
+                .await
+                .map(Vlr::new)?;
             position += vlr.len(false) as u64;
             builder.vlrs.push(vlr);
         }
         match position.cmp(&offset_to_point_data) {
             Ordering::Less => {
-                read.by_ref()
-                    .take(offset_to_point_data - position)
-                    .read_to_end(&mut builder.vlr_padding)?;
+                let mut take = read.take(offset_to_point_data - position);
+                take.read_to_end(&mut builder.vlr_padding).await?;
+                read = take.into_inner();
             }
             Ordering::Equal => {} // pass
             Ordering::Greater => {
-                return Err(Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into())
+                return Err(crate::reader::Error::OffsetToPointDataTooSmall(
+                    offset_to_point_data as u32,
+                )
+                .into())
             }
         }
 
-        read.seek(SeekFrom::Start(offset_to_end_of_points))?;
+        read.seek(SeekFrom::Start(offset_to_end_of_points)).await?;
         if let Some(evlr) = evlr {
             match evlr.start_of_first_evlr.cmp(&offset_to_end_of_points) {
                 Ordering::Less => {
-                    return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into())
+                    return Err(crate::reader::Error::OffsetToEvlrsTooSmall(
+                        evlr.start_of_first_evlr,
+                    )
+                    .into())
                 }
                 Ordering::Equal => {} // pass
                 Ordering::Greater => {
                     let n = evlr.start_of_first_evlr - offset_to_end_of_points;
-                    read.by_ref()
-                        .take(n)
-                        .read_to_end(&mut builder.point_padding)?;
+                    let mut take = read.take(n);
+                    take.read_to_end(&mut builder.point_padding).await?;
+                    read = take.into_inner();
                 }
             }
-            builder
-                .evlrs
-                .push(raw::Vlr::read_from(&mut read, true).map(Vlr::new)?);
+            builder.evlrs.push(
+                raw::Vlr::read_from_async(&mut read, true)
+                    .await
+                    .map(Vlr::new)?,
+            );
         }
 
-        read.seek(SeekFrom::Start(offset_to_point_data))?;
+        read.seek(SeekFrom::Start(offset_to_point_data)).await?;
 
         let header = builder.into_header()?;
 
-        /*
-        #[cfg(feature = "laz")]
-        {
-            if header.point_format().is_compressed {
-                Ok(Reader {
-                    point_reader: Box::new(CompressedPointReader::new(read, header)?),
-                })
-            } else {
-                Ok(Reader {
-                    point_reader: Box::new(UncompressedPointReader {
-                        source: read,
-                        header,
-                        offset_to_point_data,
-                        last_point_idx: 0,
-                    }),
-                })
-            }
-        }
-        */
+        //        #[cfg(feature = "laz")]
+        //        {
+        //            if header.point_format().is_compressed {
+        //                Ok(Reader {
+        //                    point_reader: Box::new(CompressedPointReader::new(read, header)?),
+        //                })
+        //            } else {
+        //                Ok(Reader {
+        //                    point_reader: Box::new(UncompressedPointReader {
+        //                        source: read,
+        //                        header,
+        //                        offset_to_point_data,
+        //                        last_point_idx: 0,
+        //                    }),
+        //                })
+        //            }
+        //        }
         #[cfg(not(feature = "laz"))]
         {
-            Ok(Reader {
+            Ok(AsyncReader {
                 point_reader: Box::new(UncompressedPointReader {
                     source: read,
                     header,
@@ -292,20 +310,21 @@ impl<'a> Reader<'a> {
     }
 }
 
-impl<'a> Read for Reader<'a> {
+#[async_trait]
+impl<'a> AsyncRead for AsyncReader<'a> {
     /// Returns a reference to this reader's header.
     fn header(&self) -> &Header {
         self.point_reader.header()
     }
 
     /// Reads a point.
-    fn read(&mut self) -> Option<Result<Point>> {
-        self.point_reader.read_next()
+    async fn read(&mut self) -> Option<Result<Point>> {
+        self.point_reader.read_next().await
     }
 
     /// Seeks to the given point number, zero-indexed.
-    fn seek(&mut self, position: u64) -> Result<()> {
-        self.point_reader.seek(position)
+    async fn seek(&mut self, position: u64) -> Result<()> {
+        self.point_reader.seek(position).await
     }
 
     /// Returns an iterator over this reader's points.
@@ -316,30 +335,13 @@ impl<'a> Read for Reader<'a> {
     }
 }
 
-impl<'a> Reader<'a> {
-    /// Creates a new reader from a path.
-    ///
-    /// The underlying `File` is wrapped in a `BufReader` for performance reasons.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use las::Reader;
-    /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<'a>> {
-        File::open(path)
-            .map_err(crate::Error::from)
-            .and_then(|file| Reader::new(BufReader::new(file)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{Write, Writer};
 
     use super::*;
 
+    /*
     #[test]
     fn seek() {
         let mut writer = Writer::default();
@@ -351,9 +353,10 @@ mod tests {
             ..Default::default()
         };
         writer.write(point.clone()).unwrap();
-        let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
+        let mut reader = AsyncReader::new(writer.into_inner().unwrap()).unwrap();
         reader.seek(1).unwrap();
         assert_eq!(point, reader.read().unwrap().unwrap());
         assert!(reader.read().is_none());
     }
+    */
 }

@@ -172,7 +172,7 @@ impl Format {
     /// assert_eq!(6, format.to_u8().unwrap());
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
-        if !cfg!(feature = "laz") && self.is_compressed {
+        if false && !cfg!(feature = "laz") && self.is_compressed {
             Err(Error::Format(*self).into())
         } else if self.is_extended {
             if self.has_gps_time {

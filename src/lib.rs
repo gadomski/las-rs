@@ -160,6 +160,7 @@ extern crate laz;
 #[cfg(feature = "laz")]
 mod compression;
 
+pub mod async_reader;
 pub mod feature;
 pub mod header;
 pub mod point;
@@ -177,6 +178,7 @@ mod utils;
 mod vector;
 mod version;
 
+pub use crate::async_reader::{AsyncRead, AsyncReader};
 pub use crate::bounds::Bounds;
 pub use crate::color::Color;
 pub use crate::error::Error;
