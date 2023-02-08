@@ -254,7 +254,6 @@ impl Header {
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
         use crate::header::Error;
-        use crate::utils;
 
         let mut header = Header::default();
         read.read_exact(&mut header.file_signature)?;
@@ -292,29 +291,61 @@ impl Header {
         header.min_y = read.read_f64::<LittleEndian>()?;
         header.max_z = read.read_f64::<LittleEndian>()?;
         header.min_z = read.read_f64::<LittleEndian>()?;
-        header.start_of_waveform_data_packet_record = if header.version.supports::<Waveforms>() {
+
+        Ok(header)
+    }
+
+    /// Finish reading variable part of the header
+    pub fn finish_parsing<R: Read>(&mut self, mut read: R) -> Result<()> {
+        use crate::utils;
+
+        self.start_of_waveform_data_packet_record = if self.version.supports::<Waveforms>() {
             utils::some_or_none_if_zero(read.read_u64::<LittleEndian>()?)
         } else {
             None
         };
-        header.evlr = if header.version.supports::<Evlrs>() {
+        self.evlr = if self.version.supports::<Evlrs>() {
             Evlr::read_from(&mut read)?.into_option()
         } else {
             None
         };
-        header.large_file = if header.version.supports::<LargeFiles>() {
+        self.large_file = if self.version.supports::<LargeFiles>() {
             Some(LargeFile::read_from(&mut read)?)
         } else {
             None
         };
-        header.padding = if header.header_size > header.version.header_size() {
-            let mut bytes = vec![0; (header.header_size - header.version.header_size()) as usize];
+        self.padding = if self.header_size > self.version.header_size() {
+            let mut bytes = vec![0; (self.header_size - self.version.header_size()) as usize];
             read.read_exact(&mut bytes)?;
             bytes
         } else {
             Vec::new()
         };
-        Ok(header)
+
+        Ok(())
+    }
+
+    /// Calculate remaining amount of bytes to read to finish parsing.
+    pub fn remaining_bytes_to_read(&self) -> usize {
+        let mut res = 0;
+
+        if self.version.supports::<Waveforms>() {
+            res += 8;
+        };
+
+        if self.version.supports::<Evlrs>() {
+            res += 8 + 4;
+        };
+
+        if self.version.supports::<LargeFiles>() {
+            //
+        };
+
+        if self.header_size > self.version.header_size() {
+            res += (self.header_size - self.version.header_size()) as usize;
+        };
+
+        res
     }
 
     /// Returns the total file offset to the first byte *after* all of the points.
@@ -543,7 +574,9 @@ mod tests {
                     let mut cursor = Cursor::new(Vec::new());
                     header.write_to(&mut cursor).unwrap();
                     cursor.set_position(0);
-                    assert_eq!(header, Header::read_from(cursor).unwrap());
+                    let mut res_header = Header::read_from(&mut cursor).unwrap();
+                    res_header.finish_parsing(&mut cursor).unwrap();
+                    assert_eq!(header, res_header);
                 }
             }
         };

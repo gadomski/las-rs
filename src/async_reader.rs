@@ -213,7 +213,17 @@ impl<'a> AsyncReader<'a> {
     pub async fn new<R: futures::io::AsyncRead + AsyncSeek + Unpin + Debug + Send + 'a>(
         mut read: R,
     ) -> Result<AsyncReader<'a>> {
-        let raw_header = raw::Header::read_from_async(&mut read).await?;
+        use std::io::Cursor;
+
+        // Read fixed part
+        let mut buf = [0; 227];
+        read.read_exact(&mut buf).await?;
+
+        let mut raw_header = raw::Header::read_from(Cursor::new(buf))?;
+        let tail_length = raw_header.remaining_bytes_to_read();
+        let tail = Vec::with_capacity(tail_length);
+        raw_header.finish_parsing(Cursor::new(tail))?;
+
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
         let offset_to_point_data = u64::from(raw_header.offset_to_point_data);

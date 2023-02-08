@@ -206,7 +206,9 @@ impl<'a> Reader<'a> {
     pub fn new<R: std::io::Read + Seek + Send + Debug + 'a>(mut read: R) -> Result<Reader<'a>> {
         use std::io::Read;
 
-        let raw_header = raw::Header::read_from(&mut read)?;
+        let mut raw_header = raw::Header::read_from(&mut read)?;
+        raw_header.finish_parsing(&mut read)?;
+
         let mut position = u64::from(raw_header.header_size);
         let number_of_variable_length_records = raw_header.number_of_variable_length_records;
         let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
