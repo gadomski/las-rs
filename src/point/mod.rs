@@ -13,6 +13,7 @@
 //! scale and offset from the header are applied.
 
 mod classification;
+pub mod extra_bytes;
 mod format;
 mod scan_direction;
 
@@ -22,8 +23,8 @@ pub use self::scan_direction::ScanDirection;
 
 use crate::raw;
 use crate::raw::point::Waveform;
-use thiserror::Error;
 use crate::{Color, Result, Transform, Vector};
+use thiserror::Error;
 
 /// Point-specific errors
 #[derive(Debug, Clone, Copy, Error)]
