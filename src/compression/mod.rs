@@ -69,10 +69,11 @@ impl<'a, R: Read + Seek + Send> PointReader for CompressedPointReader<'a, R> {
     fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;
-            self.decompressor
-                .decompress_one(&mut self.decompressor_output.get_mut())
-                .unwrap();
-            if let Err(e) = self.decompressor_output.seek(SeekFrom::Start(0)) {
+            let res = self.decompressor
+                .decompress_one(&mut self.decompressor_output.get_mut());
+            if let Err(e) = res {
+                Some(Err(e.into()))
+            } else if let Err(e) = self.decompressor_output.seek(SeekFrom::Start(0)) {
                 Some(Err(e.into()))
             } else {
                 Some(read_point_from(&mut self.decompressor_output, &self.header))
