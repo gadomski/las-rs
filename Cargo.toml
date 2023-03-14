@@ -1,6 +1,6 @@
 [package]
 name = "las"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
 description = "Read and write point clouds stored in the ASPRS las file format."
 documentation = "https://docs.rs/las"
@@ -19,7 +19,7 @@ log = "0.4"
 num-traits = "0.2"
 thiserror = "1.0"
 uuid = "1"
-laz = { version = "0.7", optional = true }
+laz = { version = "0.8", optional = true }
 
 [dev-dependencies]
 criterion = "0.4"

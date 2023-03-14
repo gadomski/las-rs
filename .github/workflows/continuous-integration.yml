@@ -2,9 +2,9 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,12 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features: ["--no-default-features", "", "--all-features"]
+        features: ["", "--features laz"]
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose ${{ matrix.features }}
-    - name: Clippy
-      run: cargo clippy --verbose ${{ matrix.features }}
-    - name: Run tests
-      run: cargo test --verbose ${{ matrix.features }}
+      - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --verbose ${{ matrix.features }}
+      - name: Clippy
+        run: cargo clippy --verbose ${{ matrix.features }}
+      - name: Run tests
+        run: cargo test --verbose ${{ matrix.features }}
