@@ -1,9 +1,11 @@
 las-rs
 ======
 
-![Continuous Integration](https://github.com/gadomski/las-rs/actions/workflows/continuous-integration.yml/badge.svg)
-![Crates.io version](https://img.shields.io/crates/v/las)
-[![Documentation](https://docs.rs/las/badge.svg)](http://docs.rs/las)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/gadomski/las-rs/continuous-integration.yml?branch=main&style=for-the-badge)](https://github.com/gadomski/las-rs/actions/workflows/continuous-integration.yml)
+[![Crates.io](https://img.shields.io/crates/v/las?style=for-the-badge)](https://crates.io/crates/las)
+[![docs.rs](https://img.shields.io/docsrs/las?style=for-the-badge)](https://docs.rs/stac/latest/las/)
+![Crates.io](https://img.shields.io/crates/l/las?style=for-the-badge)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=for-the-badge)](./CODE_OF_CONDUCT)
 
 Read and write [ASPRS las files](http://www.asprs.org/Committee-General/LASer-LAS-File-Format-Exchange-Activities.html) natively with rust.
 
