@@ -22,7 +22,7 @@ uuid = "1"
 laz = { version = "0.8", optional = true }
 
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5"
 
 [[bench]]
 name = "roundtrip"
