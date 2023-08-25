@@ -267,6 +267,9 @@ impl Header {
         let version_major = read.read_u8()?;
         let version_minor = read.read_u8()?;
         header.version = Version::new(version_major, version_minor);
+        if version_minor == 1 {
+            header.version = Version::new(version_major, 2);
+        }
         read.read_exact(&mut header.system_identifier)?;
         read.read_exact(&mut header.generating_software)?;
         header.file_creation_day_of_year = read.read_u16::<LittleEndian>()?;
