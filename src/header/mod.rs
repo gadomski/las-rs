@@ -127,6 +127,7 @@ pub struct Header {
     gps_time_type: GpsTimeType,
     guid: Uuid,
     has_synthetic_return_numbers: bool,
+    has_wkt_crs: bool,
     number_of_points: u64,
     number_of_points_by_return: HashMap<u8, u64>,
     padding: Vec<u8>,
@@ -244,6 +245,19 @@ impl Header {
     /// assert!(!Header::default().has_synthetic_return_numbers());
     pub fn has_synthetic_return_numbers(&self) -> bool {
         self.has_synthetic_return_numbers
+    }
+
+    /// Returns true if the coordinate reference system is Well Known Text (WKT).
+    ///
+    /// Only supported in las 1.4.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    /// assert!(!Header::default().has_wkt_crs());
+    pub fn has_wkt_crs(&self) -> bool {
+        self.has_wkt_crs
     }
 
     /// Returns this header's guid.
@@ -534,7 +548,7 @@ impl Header {
         if self.has_synthetic_return_numbers {
             bits |= 8;
         }
-        if self.point_format.is_extended {
+        if self.has_wkt_crs || self.point_format.is_extended {
             bits |= 16;
         }
         bits
@@ -694,6 +708,7 @@ impl Default for Header {
             gps_time_type: GpsTimeType::Week,
             guid: Default::default(),
             has_synthetic_return_numbers: false,
+            has_wkt_crs: false,
             number_of_points: 0,
             number_of_points_by_return: HashMap::new(),
             padding: Vec::new(),
@@ -870,9 +885,13 @@ mod tests {
         let mut header = Header::from((1, 4));
         let raw_header = header.clone().into_raw().unwrap();
         assert_eq!(0, raw_header.global_encoding);
+        header.has_wkt_crs = true;
+        let raw_header = header.clone().into_raw().unwrap();
+        assert_eq!(16, raw_header.global_encoding);
+        header.has_wkt_crs = false;
         header.point_format = Format::new(6).unwrap();
         let raw_header = header.into_raw().unwrap();
-        assert_eq!(0b10000, raw_header.global_encoding);
+        assert_eq!(16, raw_header.global_encoding);
     }
 
     #[test]

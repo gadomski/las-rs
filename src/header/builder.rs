@@ -1,9 +1,9 @@
-use chrono::NaiveDate;
 use crate::header::Error;
 use crate::point::Format;
+use crate::{raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
+use chrono::NaiveDate;
 use std::{cmp::Ordering, collections::HashMap};
 use uuid::Uuid;
-use crate::{raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
 
 /// Builds headers.
 #[derive(Clone, Debug, Default)]
@@ -25,6 +25,9 @@ pub struct Builder {
 
     /// Are the return numbers in this file syntheetic?
     pub has_synthetic_return_numbers: bool,
+
+    /// Does this file has a WKT CRS?
+    pub has_wkt_crs: bool,
 
     /// Bytes after the header but before the vlrs.
     pub padding: Vec<u8>,
@@ -119,6 +122,7 @@ impl Builder {
             gps_time_type: raw_header.global_encoding.into(),
             guid: Uuid::from_bytes(raw_header.guid),
             has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
+            has_wkt_crs: raw_header.global_encoding & 16 == 16,
             padding: raw_header.padding,
             point_format,
             system_identifier: raw_header
@@ -226,6 +230,7 @@ impl Builder {
             gps_time_type: self.gps_time_type,
             guid: self.guid,
             has_synthetic_return_numbers: self.has_synthetic_return_numbers,
+            has_wkt_crs: self.has_wkt_crs || self.point_format.is_extended,
             number_of_points: self.number_of_points,
             number_of_points_by_return: self.number_of_points_by_return,
             padding: self.padding,
@@ -261,6 +266,7 @@ impl From<Header> for Builder {
             gps_time_type: header.gps_time_type,
             guid: header.guid,
             has_synthetic_return_numbers: header.has_synthetic_return_numbers,
+            has_wkt_crs: header.has_wkt_crs,
             number_of_points: header.number_of_points,
             number_of_points_by_return: header.number_of_points_by_return,
             padding: header.padding,
