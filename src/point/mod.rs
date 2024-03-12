@@ -22,8 +22,8 @@ pub use self::scan_direction::ScanDirection;
 
 use crate::raw;
 use crate::raw::point::Waveform;
-use thiserror::Error;
 use crate::{Color, Result, Transform, Vector};
+use thiserror::Error;
 
 /// Point-specific errors
 #[derive(Debug, Clone, Copy, Error)]

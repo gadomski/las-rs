@@ -68,7 +68,6 @@ fn test_seek_past_last_point_works_on_laz() {
     test_seek_past_last_point_works_on("tests/data/autzen.laz");
 }
 
-
 #[test]
 fn test_seek_to_last_point_works_on_las() {
     test_seek_to_last_point_works_on("tests/data/autzen.las");

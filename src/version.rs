@@ -1,7 +1,7 @@
 use crate::point::Format;
-use std::fmt;
 use crate::Feature;
 use crate::{Error, Result};
+use std::fmt;
 
 /// LAS version.
 ///

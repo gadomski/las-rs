@@ -1,10 +1,10 @@
 //! Raw file metadata.
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use crate::feature::{Evlrs, LargeFiles, Waveforms};
 use crate::raw::LASF;
-use std::io::{Read, Write};
 use crate::{Result, Version};
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Read, Write};
 
 /// A las header.
 ///
