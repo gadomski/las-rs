@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2024-03-12
+
+### Fixed
+
+- WKT CRSes for all point formats ([#67](https://github.com/gadomski/las-rs/pull/67))
+
 ## [0.8.1] - 2023-03-14
 
 ### Fixed
