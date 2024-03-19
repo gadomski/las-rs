@@ -74,9 +74,15 @@ pub(crate) fn read_point_from<R: std::io::Read>(
     point
 }
 
-/// Trait to specify behaviour a a PointReader
+/// Trait to specify behaviour of a PointReader
 pub(crate) trait PointReader: Debug + Send {
     fn read_next(&mut self) -> Option<Result<Point>>;
+    fn read_into_vec(&mut self, points: &mut Vec<Point>, n: u64) -> Result<u64>;
+    fn read_next_points(&mut self, n: u64) -> Result<Vec<Point>> {
+        let mut points = Vec::with_capacity(n as usize);
+        self.read_into_vec(&mut points, n)?;
+        Ok(points)
+    }
     fn seek(&mut self, position: u64) -> Result<()>;
     fn header(&self) -> &Header;
 }
@@ -116,6 +122,18 @@ impl<R: std::io::Read + Seek + Debug + Send> PointReader for UncompressedPointRe
         }
     }
 
+    fn read_into_vec(&mut self, points: &mut Vec<Point>, n: u64) -> Result<u64> {
+        let points_left = self.header().number_of_points() - self.last_point_idx;
+        let num_points_to_read = points_left.min(n);
+        points.reserve(num_points_to_read as usize);
+        for _ in 0..num_points_to_read {
+            let point = read_point_from(&mut self.source, &self.header)?;
+            self.last_point_idx += 1;
+            points.push(point);
+        }
+        Ok(num_points_to_read)
+    }
+
     fn seek(&mut self, position: u64) -> Result<()> {
         self.last_point_idx = position;
         self.source.seek(SeekFrom::Start(
@@ -152,6 +170,15 @@ pub trait Read {
     /// let point = reader.read().unwrap().unwrap();
     /// ```
     fn read(&mut self) -> Option<Result<Point>>;
+
+    /// Reads n points.
+    fn read_n(&mut self, n: u64) -> Result<Vec<Point>>;
+
+    /// Reads n points into the vec
+    fn read_n_into(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64>;
+
+    /// Reads all points left into the vec
+    fn read_all_points(&mut self, points: &mut Vec<Point>) -> Result<u64>;
 
     /// Seeks to the given point number, zero-indexed.
     ///
@@ -299,6 +326,19 @@ impl<'a> Read for Reader<'a> {
     /// Reads a point.
     fn read(&mut self) -> Option<Result<Point>> {
         self.point_reader.read_next()
+    }
+
+    fn read_n(&mut self, n: u64) -> Result<Vec<Point>> {
+        self.point_reader.read_next_points(n)
+    }
+
+    fn read_n_into(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64> {
+        self.point_reader.read_into_vec(points, n)
+    }
+
+    fn read_all_points(&mut self, points: &mut Vec<Point>) -> Result<u64> {
+        let point_count = self.point_reader.header().number_of_points();
+        self.point_reader.read_into_vec(points, point_count)
     }
 
     /// Seeks to the given point number, zero-indexed.

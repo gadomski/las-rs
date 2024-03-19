@@ -74,14 +74,34 @@ impl<'a, R: Read + Seek + Send> PointReader for CompressedPointReader<'a, R> {
                 .decompress_one(&mut self.decompressor_output.get_mut());
             if let Err(e) = res {
                 Some(Err(e.into()))
-            } else if let Err(e) = self.decompressor_output.seek(SeekFrom::Start(0)) {
-                Some(Err(e.into()))
             } else {
+                self.decompressor_output.set_position(0);
                 Some(read_point_from(&mut self.decompressor_output, &self.header))
             }
         } else {
             None
         }
+    }
+
+    fn read_into_vec(&mut self, points: &mut Vec<Point>, n: u64) -> Result<u64> {
+        let points_left = self.header().number_of_points() - self.last_point_idx;
+        let num_points_to_read = points_left.min(n);
+
+        self.decompressor_output.get_mut().resize(
+            num_points_to_read as usize * self.header.point_format().len() as usize,
+            0u8,
+        );
+        self.decompressor
+            .decompress_many(self.decompressor_output.get_mut())?;
+        self.decompressor_output.set_position(0);
+        points.reserve(num_points_to_read as usize);
+
+        for _ in 0..num_points_to_read {
+            let point = read_point_from(&mut self.decompressor_output, &self.header)?;
+            self.last_point_idx += 1;
+            points.push(point);
+        }
+        Ok(num_points_to_read)
     }
 
     fn seek(&mut self, position: u64) -> Result<()> {
