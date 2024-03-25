@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2024-03-25
+
+### Added
+
+- Interface for reading many points ([#68](https://github.com/gadomski/las-rs/pull/68))
+
 ## [0.8.2] - 2024-03-12
 
 ### Fixed
@@ -31,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Benchmarks now use [criterion](https://github.com/bheisler/criterion.rs) ([#52](https://github.com/gadomski/las-rs/pull/52))
 - Edition is now 2021 ([#52](https://github.com/gadomski/las-rs/pull/52))
 
-[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/gadomski/las-rs/releases/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/gadomski/las-rs/releases/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/gadomski/las-rs/releases/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/gadomski/las-rs/releases/compare/v0.7.8...v0.8.0
