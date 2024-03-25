@@ -267,8 +267,18 @@ impl Header {
         let version_major = read.read_u8()?;
         let version_minor = read.read_u8()?;
         header.version = Version::new(version_major, version_minor);
+        if version_minor == 1 {
+            header.version = Version::new(version_major, 2);
+        }
         read.read_exact(&mut header.system_identifier)?;
         read.read_exact(&mut header.generating_software)?;
+        for i in 0..header.generating_software.len() {
+            if header.generating_software[i] == b'0' {
+                for j in i+1..header.generating_software.len() {
+                    header.generating_software[j] = b'0';
+                }
+            }
+        }
         header.file_creation_day_of_year = read.read_u16::<LittleEndian>()?;
         header.file_creation_year = read.read_u16::<LittleEndian>()?;
         header.header_size = read.read_u16::<LittleEndian>()?;
