@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features: ["", "--features laz"]
+        features: ["", "--features laz", "--features laz-parallel"]
     steps:
       - uses: actions/checkout@v2
       - uses: Swatinem/rust-cache@v2
