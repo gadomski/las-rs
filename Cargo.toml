@@ -19,10 +19,14 @@ log = "0.4"
 num-traits = "0.2"
 thiserror = "1.0"
 uuid = "1"
-laz = { version = "0.9", optional = true }
+laz = { version = "0.9.1", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
+
+[features]
+laz = ["dep:laz"]
+laz-parallel = ["dep:laz", "laz/parallel"]
 
 [[bench]]
 name = "roundtrip"
