@@ -29,25 +29,26 @@ fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
 /// 1) call the decompressor that reads & decompress the next point
 /// and put its data in an in-memory buffer
 /// 2) read the buffer to get the decompress point
-pub(crate) struct CompressedPointReader<'a, R: Read + Seek + Send> {
+pub(crate) struct CompressedPointReader<Decompressor> {
     /// decompressor that does the actual job
-    decompressor: laz::las::laszip::LasZipDecompressor<'a, R>,
+    decompressor: Decompressor,
     header: Header,
     /// in-memory buffer where the decompressor writes decompression result
     decompressor_output: Cursor<Vec<u8>>,
     last_point_idx: u64,
 }
 
-impl<'a, R: Read + Seek + Send> CompressedPointReader<'a, R> {
+#[cfg(not(feature = "laz-parallel"))]
+impl<'a, R: Read + Seek + Send> CompressedPointReader<laz::LasZipDecompressor<'a, R>> {
     pub(crate) fn new(source: R, header: Header) -> Result<Self> {
         let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
             None => return Err(Error::LasZipVlrNotFound),
-            Some(vlr) => laz::las::laszip::LazVlr::from_buffer(&vlr.data)?,
+            Some(vlr) => LazVlr::from_buffer(&vlr.data)?,
         };
         let decompressor_output = Cursor::new(vec![0u8; header.point_format().len() as usize]);
 
         Ok(Self {
-            decompressor: laz::las::laszip::LasZipDecompressor::new(source, laszip_vlr)?,
+            decompressor: laz::LasZipDecompressor::new(source, laszip_vlr)?,
             header,
             decompressor_output,
             last_point_idx: 0,
@@ -55,7 +56,25 @@ impl<'a, R: Read + Seek + Send> CompressedPointReader<'a, R> {
     }
 }
 
-impl<'a, R: Read + Seek + Send> Debug for CompressedPointReader<'a, R> {
+#[cfg(feature = "laz-parallel")]
+impl<R: Read + Seek + Send> CompressedPointReader<laz::ParLasZipDecompressor<R>> {
+    pub(crate) fn new(source: R, header: Header) -> Result<Self> {
+        let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
+            None => return Err(Error::LasZipVlrNotFound),
+            Some(vlr) => LazVlr::from_buffer(&vlr.data)?,
+        };
+        let decompressor_output = Cursor::new(vec![0u8; header.point_format().len() as usize]);
+
+        Ok(Self {
+            decompressor: laz::ParLasZipDecompressor::new(source, laszip_vlr)?,
+            header,
+            decompressor_output,
+            last_point_idx: 0,
+        })
+    }
+}
+
+impl<Decompressor> Debug for CompressedPointReader<Decompressor> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -65,7 +84,10 @@ impl<'a, R: Read + Seek + Send> Debug for CompressedPointReader<'a, R> {
     }
 }
 
-impl<'a, R: Read + Seek + Send> PointReader for CompressedPointReader<'a, R> {
+impl<Decompressor> PointReader for CompressedPointReader<Decompressor>
+where
+    Decompressor: laz::LazDecompressor + Send,
+{
     fn read_next(&mut self) -> Option<Result<Point>> {
         if self.last_point_idx < self.header.number_of_points() {
             self.last_point_idx += 1;

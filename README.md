@@ -20,3 +20,11 @@ To include [laz](https://laszip.org/) support:
 [dependencies]
 las = { version = "0.8", features = ["laz"] }
 ```
+
+To include `laz` support with parallel compression/decompression
+to enhance speed:
+
+```toml
+[dependencies]
+las = { version = "0.8", features = ["laz-parallel"] }
+```
