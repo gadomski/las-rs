@@ -22,7 +22,7 @@ las = { version = "0.8", features = ["laz"] }
 ```
 
 To include `laz` support with parallel compression/decompression
-to enhance speed:
+to enhance speed (`laz-parallel` implies `laz` so you don't need to specify both):
 
 ```toml
 [dependencies]
