@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2024-04-07
+
 ### Fixed
 
 - Allow zero GPS Time values ([#75](https://github.com/gadomski/las-rs/pull/75))
