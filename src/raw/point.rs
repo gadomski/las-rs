@@ -377,7 +377,7 @@ impl Point {
         };
         point.point_source_id = read.read_u16::<LittleEndian>()?;
         point.gps_time = if format.has_gps_time {
-            utils::some_or_none_if_zero(read.read_f64::<LittleEndian>()?)
+            Some(read.read_f64::<LittleEndian>()?)
         } else {
             None
         };
@@ -849,6 +849,9 @@ mod tests {
                     point.extra_bytes = vec![42];
                     if format.has_color {
                         point.color = Some(Color::new(0, 0, 0));
+                    }
+                    if format.has_gps_time {
+                        point.gps_time = Some(0.0);
                     }
                     if format.has_waveform {
                         point.waveform = Some(Waveform::default());
