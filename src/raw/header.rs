@@ -317,7 +317,37 @@ impl Header {
         Ok(header)
     }
 
-    /// Returns the total file offset to the first byte *after* all of the points.
+    fn number_of_point_records(&self) -> u64 {
+        // In LAS 1.4 R15, number_of_point_records is a legacy header field.
+        // This code needs to handle the case where the legacy field is 0 but the non-legacy field is specified.
+        // From https://www.asprs.org/wp-content/uploads/2019/07/LAS_1_4_r15.pdf
+        //
+        // """"
+        // A LAS 1.4 file writer who wishes to maintain backward compatibility must maintain both the
+        // legacy fields and the equivalent non-legacy fields in synchronization. However, this is not possible
+        // if the number of points exceeds UINT32_MAX, in which case the legacy fields must be set to zero.
+        // If a file writer is not maintaining backward compatibility, the legacy fields must always be set to
+        // zero.
+        // If there is a discrepancy between a non-zero legacy field and the equivalent LAS 1.4 field, the LAS
+        // 1.4 reader should use the legacy value to maintain the same behavior as a LAS 1.1 through LAS
+        // 1.3 reader. Best practice is to also throw an informative error so that the file can be repaired.
+        // """"
+        //
+        let legacy_number_of_point_records = u64::from(self.number_of_point_records);
+        self.large_file
+            .map(|lf| {
+                // TODO: Consider returning an error or logging a warning if
+                // legacy_number_of_point_records != 0 && legacy_number_of_point_records != lf.number_of_point_records
+                if legacy_number_of_point_records != 0 {
+                    legacy_number_of_point_records
+                } else {
+                    lf.number_of_point_records
+                }
+            })
+            .unwrap_or(legacy_number_of_point_records)
+    }
+
+    /// Returns the uncompressed total file offset to the first byte *after* all of the points.
     ///
     /// # Examples
     ///
@@ -327,7 +357,7 @@ impl Header {
     /// ```
     pub fn offset_to_end_of_points(&self) -> u64 {
         u64::from(self.offset_to_point_data)
-            + u64::from(self.number_of_point_records) * u64::from(self.point_data_record_length)
+            + self.number_of_point_records() * u64::from(self.point_data_record_length)
     }
 
     /// Writes a raw header to a `Write`.
