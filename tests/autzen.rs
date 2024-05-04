@@ -68,6 +68,12 @@ fn test_seek_past_last_point_works_on_laz() {
     test_seek_past_last_point_works_on("tests/data/autzen.laz");
 }
 
+#[cfg(feature = "laz")]
+#[test]
+fn test_seek_past_last_point_works_on_copc() {
+    test_seek_past_last_point_works_on("tests/data/autzen.copc.laz");
+}
+
 #[test]
 fn test_seek_to_last_point_works_on_las() {
     test_seek_to_last_point_works_on("tests/data/autzen.las");
@@ -79,6 +85,13 @@ fn test_seek_to_last_point_works_on_laz() {
     test_seek_to_last_point_works_on("tests/data/autzen.laz");
 }
 
+// TODO: This test hangs in LasZipDecompressor::seek
+// #[cfg(feature = "laz")]
+// #[test]
+// fn test_seek_to_last_point_works_on_copc() {
+//     test_seek_to_last_point_works_on("tests/data/autzen.copc.laz");
+// }
+
 #[test]
 fn test_seek_0_works_on_las() {
     test_seek_0_works_on("tests/data/autzen.las");
@@ -89,6 +102,13 @@ fn test_seek_0_works_on_las() {
 fn test_seek_0_works_on_laz() {
     test_seek_0_works_on("tests/data/autzen.laz");
 }
+
+// TODO: This test hangs in LasZipDecompressor::seek
+// #[cfg(feature = "laz")]
+// #[test]
+// fn test_seek_0_works_on_copc() {
+//     test_seek_0_works_on("tests/data/autzen.copc.laz");
+// }
 
 fn test_read_n_on(path: &str) {
     use las::{Point, Read, Reader};
@@ -148,6 +168,12 @@ fn test_laz_read_n() {
     test_read_n_on("tests/data/autzen.laz");
 }
 
+#[cfg(feature = "laz")]
+#[test]
+fn test_copc_read_n() {
+    test_read_n_on("tests/data/autzen.copc.laz");
+}
+
 #[test]
 fn test_las_read_n_into() {
     test_read_n_into_on("tests/data/autzen.las");
@@ -157,6 +183,12 @@ fn test_las_read_n_into() {
 #[test]
 fn test_laz_read_n_into() {
     test_read_n_into_on("tests/data/autzen.laz");
+}
+
+#[cfg(feature = "laz")]
+#[test]
+fn test_copc_read_n_into() {
+    test_read_n_into_on("tests/data/autzen.copc.laz");
 }
 
 fn test_read_all_points_on(path: &str) {
@@ -185,4 +217,10 @@ fn test_las_read_all_points() {
 #[test]
 fn test_laz_read_all_points() {
     test_read_all_points_on("tests/data/autzen.laz");
+}
+
+#[cfg(feature = "laz")]
+#[test]
+fn test_copc_read_all_points() {
+    test_read_all_points_on("tests/data/autzen.copc.laz");
 }
