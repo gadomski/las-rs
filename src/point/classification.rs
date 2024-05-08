@@ -29,9 +29,10 @@ use crate::Result;
 /// use las::point::Classification;
 /// assert!(Classification::new(12).is_err());
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[allow(missing_docs)]
 pub enum Classification {
+    #[default]
     CreatedNeverClassified,
     Unclassified,
     Ground,
@@ -116,11 +117,5 @@ impl From<Classification> for u8 {
             Classification::HighNoise => 18,
             Classification::Reserved(n) | Classification::UserDefinable(n) => n,
         }
-    }
-}
-
-impl Default for Classification {
-    fn default() -> Classification {
-        Classification::CreatedNeverClassified
     }
 }

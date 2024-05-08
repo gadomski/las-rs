@@ -60,7 +60,7 @@ pub enum Error {
 
     /// Wrapper around `las::writer::Error`.
     #[error(transparent)]
-    Writer(#[from] writer::Error),
+    Writer(#[from] Box<writer::Error>),
 
     /// Wrapper around `las::vlr::Error`.
     #[error(transparent)]

@@ -224,7 +224,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
     pub fn new(mut dest: W, mut header: Header) -> Result<Self> {
-        let start = dest.seek(SeekFrom::Current(0))?;
+        let start = dest.stream_position()?;
         header.clear();
 
         #[cfg(feature = "laz")]
@@ -268,7 +268,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
     /// ```
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
-            return Err(Error::Closed.into());
+            return Err(Box::new(Error::Closed).into());
         }
 
         self.point_writer.done()?;
@@ -295,7 +295,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
         self.header()
             .clone()
             .into_raw()
-            .and_then(|raw_header| raw_header.write_to(&mut self.point_writer.get_mut()))?;
+            .and_then(|raw_header| raw_header.write_to(self.point_writer.get_mut()))?;
         let _ = self
             .point_writer
             .get_mut()
@@ -314,13 +314,13 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
     /// Writes a point.
     fn write(&mut self, point: Point) -> Result<()> {
         if self.closed {
-            return Err(Error::Closed.into());
+            return Err(Box::new(Error::Closed).into());
         }
         if !point.matches(self.header().point_format()) {
-            return Err(Error::PointAttributes {
+            return Err(Box::new(Error::PointAttributes {
                 format: *self.header().point_format(),
                 point,
-            }
+            })
             .into());
         }
         self.point_writer.write_next(point)
