@@ -2,16 +2,16 @@ use crate::{Error, Result};
 use num_traits::Zero;
 use std::str;
 
-pub trait AsLasStr {
+pub(crate) trait AsLasStr {
     fn as_las_str(&self) -> Result<&str>;
     fn as_las_string_lossy(&self) -> String;
 }
 
-pub trait FromLasStr {
+pub(crate) trait FromLasStr {
     fn from_las_str(&mut self, s: &str) -> Result<()>;
 }
 
-pub fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
+pub(crate) fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
     if n.is_zero() {
         None
     } else {
@@ -19,7 +19,7 @@ pub fn some_or_none_if_zero<T: Zero>(n: T) -> Option<T> {
     }
 }
 
-impl<'a> AsLasStr for &'a [u8] {
+impl AsLasStr for &'_ [u8] {
     fn as_las_str(&self) -> Result<&str> {
         let s = if let Some(position) = self.iter().position(|c| *c == 0) {
             if self[position..].iter().any(|c| *c != 0) {
@@ -45,7 +45,7 @@ impl<'a> AsLasStr for &'a [u8] {
     }
 }
 
-impl<'a> FromLasStr for &'a mut [u8] {
+impl FromLasStr for &'_ mut [u8] {
     fn from_las_str(&mut self, s: &str) -> Result<()> {
         if self.len() < s.bytes().count() {
             return Err(Error::StringTooLong {

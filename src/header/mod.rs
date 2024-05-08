@@ -491,7 +491,7 @@ impl Header {
     /// builder.evlrs.push(Vlr::default());
     /// let header = builder.into_header().unwrap();
     /// assert_eq!(2, header.all_vlrs().count());
-    pub fn all_vlrs(&self) -> Vlrs {
+    pub fn all_vlrs(&self) -> Vlrs<'_> {
         Vlrs(self.vlrs.iter().chain(&self.evlrs))
     }
 
@@ -805,7 +805,7 @@ mod tests {
         use std::u32;
         let mut header = Header::from((1, 4));
         header.number_of_points = u64::from(u32::MAX) + 1;
-        header.number_of_points_by_return.insert(6, 42);
+        let _ = header.number_of_points_by_return.insert(6, 42);
         let raw_header = header.into_raw().unwrap();
         assert_eq!(0, raw_header.number_of_point_records);
         assert_eq!(
@@ -863,13 +863,13 @@ mod tests {
         use std::u32;
 
         let mut header = Header::from((1, 2));
-        header
+        let _ = header
             .number_of_points_by_return
             .insert(1, u32::MAX as u64 + 1);
         assert!(header.into_raw().is_err());
 
         let mut header = Header::from((1, 4));
-        header
+        let _ = header
             .number_of_points_by_return
             .insert(1, u32::MAX as u64 + 1);
         let raw_header = header.into_raw().unwrap();

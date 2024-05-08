@@ -15,7 +15,6 @@ edition = "2021"
 [dependencies]
 byteorder = "1.4"
 chrono = "0.4"
-log = "0.4"
 num-traits = "0.2"
 thiserror = "1.0"
 uuid = "1"

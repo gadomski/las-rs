@@ -233,7 +233,7 @@ impl Format {
 }
 
 impl fmt::Display for Format {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Ok(n) = self.to_u8() {
             write!(f, "point format {}", n)
         } else {

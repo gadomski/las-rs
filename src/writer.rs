@@ -288,14 +288,16 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
             raw_evlr?.write_to(&mut self.point_writer.get_mut())?;
         }
 
-        self.point_writer
+        let _ = self
+            .point_writer
             .get_mut()
             .seek(SeekFrom::Start(self.start))?;
         self.header()
             .clone()
             .into_raw()
             .and_then(|raw_header| raw_header.write_to(&mut self.point_writer.get_mut()))?;
-        self.point_writer
+        let _ = self
+            .point_writer
             .get_mut()
             .seek(SeekFrom::Start(self.start))?;
         self.closed = true;
@@ -350,7 +352,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
         let point_writer =
             std::mem::replace(&mut self.point_writer, Box::new(UnreachablePointWriter {}));
         let mut inner = point_writer.into_inner();
-        inner.seek(SeekFrom::Start(self.start))?;
+        let _ = inner.seek(SeekFrom::Start(self.start))?;
         Ok(inner)
     }
 }
