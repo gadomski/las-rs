@@ -36,10 +36,23 @@ impl Transform {
     /// assert_eq!(1, transform.inverse(2.9).unwrap());
     /// ```
     pub fn inverse(&self, n: f64) -> Result<i32> {
+        self.inverse_with_rounding_mode(n, RoundingMode::Round)
+    }
+
+    pub(crate) fn inverse_with_rounding_mode(&self, n: f64, r: RoundingMode) -> Result<i32> {
         use crate::Error;
         use std::i32;
 
-        let n = ((n - self.offset) / self.scale).round();
+        fn round(n: f64, r: RoundingMode) -> f64 {
+            match r {
+                RoundingMode::Round => n.round(),
+                RoundingMode::Ceil => n.ceil(),
+                RoundingMode::Floor => n.floor(),
+            }
+        }
+
+        let n = round((n - self.offset) / self.scale, r);
+
         if n > f64::from(i32::MAX) || n < f64::from(i32::MIN) {
             Err(Error::InverseTransform {
                 n,
@@ -64,6 +77,12 @@ impl fmt::Display for Transform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "`{} * x + {}`", self.scale, self.offset)
     }
+}
+
+pub(crate) enum RoundingMode {
+    Round,
+    Ceil,
+    Floor,
 }
 
 #[cfg(test)]
