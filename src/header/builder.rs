@@ -91,7 +91,7 @@ impl Builder {
                 raw_header
                     .large_file
                     .map(|f| number_of_points_hash_map(&f.number_of_points_by_return))
-                    .unwrap_or_else(HashMap::new)
+                    .unwrap_or_default()
             };
         let mut point_format = Format::new(raw_header.point_data_record_format)?;
         let n = point_format.len();

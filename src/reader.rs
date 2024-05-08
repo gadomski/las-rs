@@ -65,11 +65,8 @@ pub enum Error {
 }
 
 #[inline]
-pub(crate) fn read_point_from<R: std::io::Read>(
-    mut source: &mut R,
-    header: &Header,
-) -> Result<Point> {
-    let point = raw::Point::read_from(&mut source, header.point_format())
+pub(crate) fn read_point_from<R: std::io::Read>(source: &mut R, header: &Header) -> Result<Point> {
+    let point = raw::Point::read_from(source, header.point_format())
         .map(|raw_point| Point::new(raw_point, header.transforms()));
     point
 }

@@ -41,7 +41,7 @@ pub(crate) struct CompressedPointReader<Decompressor> {
 #[cfg(not(feature = "laz-parallel"))]
 impl<R: Read + Seek + Send> CompressedPointReader<laz::LasZipDecompressor<'_, R>> {
     pub(crate) fn new(source: R, header: Header) -> Result<Self> {
-        let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
+        let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(vlr)) {
             None => return Err(Error::LasZipVlrNotFound),
             Some(vlr) => LazVlr::from_buffer(&vlr.data)?,
         };
@@ -59,7 +59,7 @@ impl<R: Read + Seek + Send> CompressedPointReader<laz::LasZipDecompressor<'_, R>
 #[cfg(feature = "laz-parallel")]
 impl<R: Read + Seek + Send> CompressedPointReader<laz::ParLasZipDecompressor<R>> {
     pub(crate) fn new(source: R, header: Header) -> Result<Self> {
-        let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(*vlr)) {
+        let laszip_vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(vlr)) {
             None => return Err(Error::LasZipVlrNotFound),
             Some(vlr) => LazVlr::from_buffer(&vlr.data)?,
         };
@@ -93,7 +93,7 @@ where
             self.last_point_idx += 1;
             let res = self
                 .decompressor
-                .decompress_one(&mut self.decompressor_output.get_mut());
+                .decompress_one(self.decompressor_output.get_mut());
             if let Err(e) = res {
                 Some(Err(e.into()))
             } else {

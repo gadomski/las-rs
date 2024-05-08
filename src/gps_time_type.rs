@@ -1,7 +1,8 @@
 /// The meaning of GPS time in the point records.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum GpsTimeType {
     /// GPS Week Time (the same as previous versions of LAS).
+    #[default]
     Week,
     /// Standard GPS Time minus 1e9.
     Standard,
@@ -41,11 +42,5 @@ impl From<u16> for GpsTimeType {
             1 => GpsTimeType::Standard,
             _ => unreachable!(),
         }
-    }
-}
-
-impl Default for GpsTimeType {
-    fn default() -> GpsTimeType {
-        GpsTimeType::Week
     }
 }

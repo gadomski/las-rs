@@ -8,6 +8,7 @@ pub(crate) trait AsLasStr {
 }
 
 pub(crate) trait FromLasStr {
+    #[allow(clippy::wrong_self_convention)]
     fn from_las_str(&mut self, s: &str) -> Result<()>;
 }
 
@@ -47,7 +48,7 @@ impl AsLasStr for &'_ [u8] {
 
 impl FromLasStr for &'_ mut [u8] {
     fn from_las_str(&mut self, s: &str) -> Result<()> {
-        if self.len() < s.bytes().count() {
+        if self.len() < s.len() {
             return Err(Error::StringTooLong {
                 string: s.to_string(),
                 len: self.len(),
