@@ -511,7 +511,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         header.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        Header::read_from(cursor)?;
+        let _ = Header::read_from(cursor)?;
         Ok(())
     }
 

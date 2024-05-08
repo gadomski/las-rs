@@ -909,10 +909,10 @@ mod tests {
 
     #[test]
     fn scan_angle() {
-        assert_eq!(-90i8, ScanAngle::Scaled(-15_000).into());
-        assert_eq!(90i8, ScanAngle::Scaled(15_000).into());
-        assert_eq!(-15_000i16, ScanAngle::Rank(-90).into());
-        assert_eq!(15_000i16, ScanAngle::Rank(90).into());
+        assert_eq!(-90i8, i8::from(ScanAngle::Scaled(-15_000)));
+        assert_eq!(90i8, i8::from(ScanAngle::Scaled(15_000)));
+        assert_eq!(-15_000i16, i16::from(ScanAngle::Rank(-90)));
+        assert_eq!(15_000i16, i16::from(ScanAngle::Rank(90)));
     }
 
     #[test]

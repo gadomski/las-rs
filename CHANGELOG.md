@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Deny more things ([#78](https://github.com/gadomski/las-rs/pull/78))
+
 ## [0.8.6] - 2024-05-06
 
 ### Fixed

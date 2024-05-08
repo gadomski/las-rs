@@ -74,13 +74,13 @@ pub(crate) fn read_point_from<R: std::io::Read>(
     point
 }
 
-/// Trait to specify behaviour of a PointReader
+/// Trait to specify behavior of a PointReader
 pub(crate) trait PointReader: Debug + Send {
     fn read_next(&mut self) -> Option<Result<Point>>;
     fn read_into_vec(&mut self, points: &mut Vec<Point>, n: u64) -> Result<u64>;
     fn read_next_points(&mut self, n: u64) -> Result<Vec<Point>> {
         let mut points = Vec::with_capacity(n as usize);
-        self.read_into_vec(&mut points, n)?;
+        let _ = self.read_into_vec(&mut points, n)?;
         Ok(points)
     }
     fn seek(&mut self, position: u64) -> Result<()>;
@@ -95,7 +95,7 @@ pub struct PointIterator<'a> {
     point_reader: &'a mut dyn PointReader,
 }
 
-impl<'a> Iterator for PointIterator<'a> {
+impl Iterator for PointIterator<'_> {
     type Item = Result<Point>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -136,7 +136,7 @@ impl<R: std::io::Read + Seek + Debug + Send> PointReader for UncompressedPointRe
 
     fn seek(&mut self, position: u64) -> Result<()> {
         self.last_point_idx = position;
-        self.source.seek(SeekFrom::Start(
+        let _ = self.source.seek(SeekFrom::Start(
             self.offset_to_point_data + position * u64::from(self.header.point_format().len()),
         ))?;
         Ok(())
@@ -206,7 +206,7 @@ pub trait Read {
     /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
     /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
     /// ```
-    fn points(&mut self) -> PointIterator;
+    fn points(&mut self) -> PointIterator<'_>;
 }
 
 /// Reads LAS data.
@@ -253,7 +253,8 @@ impl<'a> Reader<'a> {
         }
         match position.cmp(&offset_to_point_data) {
             Ordering::Less => {
-                read.by_ref()
+                let _ = read
+                    .by_ref()
                     .take(offset_to_point_data - position)
                     .read_to_end(&mut builder.vlr_padding)?;
             }
@@ -263,7 +264,7 @@ impl<'a> Reader<'a> {
             }
         }
 
-        read.seek(SeekFrom::Start(offset_to_end_of_points))?;
+        let _ = read.seek(SeekFrom::Start(offset_to_end_of_points))?;
         if let Some(evlr) = evlr {
             // Account for any padding between the end of the point data and the start of the ELVRs
             //
@@ -285,19 +286,20 @@ impl<'a> Reader<'a> {
                     Ordering::Equal => {} // pass
                     Ordering::Greater => {
                         let n = evlr.start_of_first_evlr - offset_to_end_of_points;
-                        read.by_ref()
+                        let _ = read
+                            .by_ref()
                             .take(n)
                             .read_to_end(&mut builder.point_padding)?;
                     }
                 }
             }
-            read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
+            let _ = read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
             builder
                 .evlrs
                 .push(raw::Vlr::read_from(&mut read, true).map(Vlr::new)?);
         }
 
-        read.seek(SeekFrom::Start(offset_to_point_data))?;
+        let _ = read.seek(SeekFrom::Start(offset_to_point_data))?;
 
         let header = builder.into_header()?;
 
@@ -332,7 +334,7 @@ impl<'a> Reader<'a> {
     }
 }
 
-impl<'a> Read for Reader<'a> {
+impl Read for Reader<'_> {
     /// Returns a reference to this reader's header.
     fn header(&self) -> &Header {
         self.point_reader.header()
@@ -362,7 +364,7 @@ impl<'a> Read for Reader<'a> {
     }
 
     /// Returns an iterator over this reader's points.
-    fn points(&mut self) -> PointIterator {
+    fn points(&mut self) -> PointIterator<'_> {
         PointIterator {
             point_reader: &mut *self.point_reader,
         }

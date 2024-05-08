@@ -135,27 +135,38 @@
 //! writer.write(point).unwrap();
 //! ```
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![deny(
-    missing_docs,
+    elided_lifetimes_in_paths,
+    explicit_outlives_requirements,
+    keyword_idents,
+    macro_use_extern_crate,
+    meta_variable_misuse,
+    missing_abi,
     missing_debug_implementations,
-    missing_copy_implementations,
+    missing_docs,
+    non_ascii_idents,
+    noop_method_call,
+    pointer_structural_match,
+    rust_2021_incompatible_closure_captures,
+    rust_2021_incompatible_or_patterns,
+    rust_2021_prefixes_incompatible_syntax,
+    rust_2021_prelude_collisions,
+    single_use_lifetimes,
     trivial_casts,
     trivial_numeric_casts,
+    unreachable_pub,
     unsafe_code,
-    unstable_features,
+    unsafe_op_in_unsafe_fn,
+    unused_crate_dependencies,
+    unused_extern_crates,
     unused_import_braces,
-    unused_qualifications
+    unused_lifetimes,
+    unused_qualifications,
+    unused_results,
+    warnings
 )]
 #![recursion_limit = "128"]
-
-extern crate byteorder;
-extern crate chrono;
-extern crate num_traits;
-extern crate thiserror;
-extern crate uuid;
-
-#[cfg(feature = "laz")]
-extern crate laz;
 
 #[cfg(feature = "laz")]
 mod compression;
@@ -193,3 +204,6 @@ pub use crate::writer::{Write, Writer};
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+use criterion as _;
