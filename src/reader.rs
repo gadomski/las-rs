@@ -19,7 +19,7 @@
 //! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! ```
 //!
-//! Ccompressed files are supported when using the feature "laz":
+//! Compressed files are supported when using the feature "laz":
 //!
 //! ```
 //! use las::Reader;
@@ -215,8 +215,9 @@ pub struct Reader<'a> {
 impl<'a> Reader<'a> {
     /// Creates a new reader.
     ///
-    /// This does *not* wrap the `Read` in a `BufRead`, so if you're concered about performance you
-    /// should do that wrapping yourself (or use `from_path`).
+    /// This does *not* wrap the `Read` in a `BufRead`, so if you're concerned
+    /// about performance you should do that wrapping yourself (or use
+    /// `from_path`).
     ///
     /// # Examples
     ///
