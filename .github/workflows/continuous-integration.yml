@@ -1,26 +1,58 @@
-name: Continuous Integration
+name: Continuous integration
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_TERM_VERBOSE: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  test:
     strategy:
       matrix:
-        features: ["", "--features laz", "--features laz-parallel"]
+        features: 
+          - ""
+          - "--features laz"
+          - "--features laz-parallel"
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: cargo build --verbose ${{ matrix.features }}
+      - name: Test
+        run: cargo test ${{ matrix.features }}
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust nightly
+        run: |
+          rustup update --no-self-update nightly
+          rustup component add --toolchain nightly rustfmt
+          rustup default nightly
+      - name: Format
+        run: cargo fmt --check
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v2
       - name: Clippy
-        run: cargo clippy --verbose ${{ matrix.features }}
-      - name: Run tests
-        run: cargo test --verbose ${{ matrix.features }}
+        run: cargo clippy --all-features
+  doc:
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v2
+      - name: Doc
+        run: cargo doc --all-features
