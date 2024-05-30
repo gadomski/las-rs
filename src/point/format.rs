@@ -22,8 +22,8 @@ fn point_format_id_uncompressed_to_compressed(point_format_id: u8) -> u8 {
 
 /// Point formats are defined by the las spec.
 ///
-/// As of las 1.4, there are eleven point formats (0-10). A new `Format` can be created from its
-/// code and converted back into it:
+/// As of las 1.4, there are eleven point formats (0-10). A new [Format] can be
+/// created from its code and converted back into it:
 ///
 /// ```
 /// use las::point::Format;
@@ -122,6 +122,7 @@ impl Format {
     /// format.extend();
     /// assert!(format.has_gps_time);
     /// assert!(format.is_extended);
+    /// ```
     pub fn extend(&mut self) {
         self.has_gps_time = true;
         self.is_extended = true;

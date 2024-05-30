@@ -4,6 +4,7 @@ pub enum GpsTimeType {
     /// GPS Week Time (the same as previous versions of LAS).
     #[default]
     Week,
+
     /// Standard GPS Time minus 1e9.
     Standard,
 }

@@ -8,7 +8,7 @@ use crate::{
     Version, Vlr,
 };
 
-/// Builds headers.
+/// Use this structure to build a [Header].
 #[derive(Clone, Debug, Default)]
 pub struct Builder {
     /// The date of file creation.
@@ -26,7 +26,7 @@ pub struct Builder {
     /// A globally unique identifier.
     pub guid: Uuid,
 
-    /// Are the return numbers in this file syntheetic?
+    /// Are the return numbers in this file synthetic?
     pub has_synthetic_return_numbers: bool,
 
     /// Does this file has a WKT CRS?
@@ -167,7 +167,7 @@ impl Builder {
         })
     }
 
-    /// Converts this builder into a `Header`.
+    /// Builds a [Header].
     ///
     /// # Examples
     ///

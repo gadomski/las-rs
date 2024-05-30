@@ -4,6 +4,7 @@ pub enum ScanDirection {
     /// The scan is moving from the right to the left.
     #[default]
     RightToLeft,
+
     /// The scan is moving from the left to the right.
     LeftToRight,
 }

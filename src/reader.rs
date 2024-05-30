@@ -52,7 +52,7 @@ use std::{
 use thiserror::Error;
 
 #[cfg(feature = "laz")]
-use crate::compression::CompressedPointReader;
+use crate::laz::CompressedPointReader;
 use crate::{raw, Builder, Header, Point, Result, Vlr};
 
 /// Error while reading.

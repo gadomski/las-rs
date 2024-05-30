@@ -7,6 +7,7 @@ use crate::Result;
 pub struct Transform {
     /// The scale.
     pub scale: f64,
+
     /// The offset.
     pub offset: f64,
 }

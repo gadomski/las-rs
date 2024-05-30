@@ -11,6 +11,7 @@ pub struct Version {
     ///
     /// Should always be 1.
     pub major: u8,
+
     /// The minor version.
     ///
     /// Should be between 0 and 4.

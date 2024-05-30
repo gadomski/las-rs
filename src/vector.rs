@@ -3,8 +3,10 @@
 pub struct Vector<T> {
     /// X
     pub x: T,
+
     /// Y
     pub y: T,
+
     /// Z
     pub z: T,
 }
