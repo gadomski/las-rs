@@ -1,7 +1,8 @@
 //! Variable length records, both extended and regular.
 
-use crate::Result;
 use std::io::{Read, Write};
+
+use crate::Result;
 
 /// A raw variable length record.
 #[derive(Debug, Default, PartialEq)]
@@ -137,8 +138,9 @@ impl Default for RecordLength {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     #[test]
     fn roundtrip() {

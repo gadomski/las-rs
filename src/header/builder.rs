@@ -1,9 +1,12 @@
-use crate::header::Error;
-use crate::point::Format;
-use crate::{raw, Bounds, GpsTimeType, Header, Result, Transform, Vector, Version, Vlr};
-use chrono::NaiveDate;
 use std::{cmp::Ordering, collections::HashMap};
+
+use chrono::NaiveDate;
 use uuid::Uuid;
+
+use crate::{
+    header::Error, point::Format, raw, Bounds, GpsTimeType, Header, Result, Transform, Vector,
+    Version, Vlr,
+};
 
 /// Builds headers.
 #[derive(Clone, Debug, Default)]
@@ -173,8 +176,10 @@ impl Builder {
     /// let header = Builder::new(Default::default()).unwrap().into_header().unwrap();
     /// ```
     pub fn into_header(mut self) -> Result<Header> {
-        use crate::feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers};
-        use crate::raw::POINT_DATA_START_SIGNATURE;
+        use crate::{
+            feature::{Evlrs, FileSourceId, GpsStandardTime, SyntheticReturnNumbers},
+            raw::POINT_DATA_START_SIGNATURE,
+        };
 
         let n = self.vlr_padding.len();
         if self.version.requires_point_data_start_signature()

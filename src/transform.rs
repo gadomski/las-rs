@@ -1,5 +1,6 @@
-use crate::Result;
 use std::fmt;
+
+use crate::Result;
 
 /// A scale and an offset that transforms xyz coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,8 +41,9 @@ impl Transform {
     }
 
     pub(crate) fn inverse_with_rounding_mode(&self, n: f64, r: RoundingMode) -> Result<i32> {
-        use crate::Error;
         use std::i32;
+
+        use crate::Error;
 
         fn round(n: f64, r: RoundingMode) -> f64 {
             match r {
@@ -87,8 +89,9 @@ pub(crate) enum RoundingMode {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::i32;
+
+    use super::*;
 
     #[test]
     fn too_large() {

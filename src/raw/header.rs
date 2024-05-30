@@ -1,10 +1,14 @@
 //! Raw file metadata.
 
-use crate::feature::{Evlrs, LargeFiles, Waveforms};
-use crate::raw::LASF;
-use crate::{Result, Version};
-use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Read, Write};
+
+use byteorder::{LittleEndian, ReadBytesExt};
+
+use crate::{
+    feature::{Evlrs, LargeFiles, Waveforms},
+    raw::LASF,
+    Result, Version,
+};
 
 /// A las header.
 ///
@@ -253,8 +257,7 @@ impl Header {
     /// let header = Header::read_from(&mut file).unwrap();
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
-        use crate::header::Error;
-        use crate::utils;
+        use crate::{header::Error, utils};
 
         let mut header = Header::default();
         read.read_exact(&mut header.file_signature)?;
@@ -504,8 +507,9 @@ impl LargeFile {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     fn write_read(header: Header) -> Result<()> {
         let mut cursor = Cursor::new(Vec::new());
@@ -559,8 +563,9 @@ mod tests {
             mod $name {
                 #[test]
                 fn roundtrip() {
-                    use super::*;
                     use std::io::Cursor;
+
+                    use super::*;
 
                     let version = Version::new(1, $minor);
                     let mut header = Header {

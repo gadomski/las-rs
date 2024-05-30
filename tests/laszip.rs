@@ -13,8 +13,9 @@ fn detect_laszip() {
 
 #[cfg(feature = "laz")]
 mod laz_compression_test {
-    use las::{Read, Write};
     use std::io::Cursor;
+
+    use las::{Read, Write};
 
     /// Read file, write it compressed, read the compressed data written
     /// compare that points are the same

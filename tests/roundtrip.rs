@@ -4,8 +4,9 @@ extern crate chrono;
 extern crate las;
 extern crate uuid;
 
-use las::{Builder, Point, Read, Reader, Write, Writer};
 use std::io::Cursor;
+
+use las::{Builder, Point, Read, Reader, Write, Writer};
 
 pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
     let header = if should_succeed {
@@ -33,8 +34,7 @@ macro_rules! roundtrip_point {
     ($name:ident, $modify_point:expr, $min_version_minor:expr, $modify_point_format:expr) => {
         #[test]
         fn $name() {
-            use las::point::Format;
-            use las::{Builder, Point, Version};
+            use las::{point::Format, Builder, Point, Version};
 
             let version = super::version();
             let should_succeed = version >= Version::new(1, $min_version_minor);
@@ -77,8 +77,10 @@ macro_rules! version {
             }
 
             mod point {
-                use las::point::{Classification, ScanDirection};
-                use las::Color;
+                use las::{
+                    point::{Classification, ScanDirection},
+                    Color,
+                };
 
                 roundtrip_point!(xyz, |p: &mut Point| {
                     p.x = 1.;
