@@ -302,6 +302,16 @@ impl<'a> Reader<'a> {
 
         let _ = read.seek(SeekFrom::Start(offset_to_point_data))?;
 
+        if let Some(version) = builder.minimum_supported_version() {
+            if version > builder.version {
+                log::warn!(
+                    "upgrading las version to {} (from {})",
+                    version,
+                    builder.version
+                );
+                builder.version = version;
+            }
+        }
         let header = builder.into_header()?;
 
         #[cfg(feature = "laz")]

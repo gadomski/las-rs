@@ -249,6 +249,28 @@ impl Builder {
         };
         Ok(header)
     }
+
+    /// Returns the minimum supported version for this builder, as determined by its features.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Builder, Version};
+    ///
+    /// assert_eq!(Builder::default().minimum_supported_version().unwrap(), Version::new(1, 0));
+    /// ```
+    pub fn minimum_supported_version(&self) -> Option<Version> {
+        // TODO can we make a validity check that doesn't involve a full
+        // conversion into a header, without duplicating a lot of logic?
+        for minor in [0, 1, 2, 3, 4] {
+            let mut builder = self.clone();
+            builder.version.minor = minor;
+            if builder.into_header().is_ok() {
+                return Some(Version::new(1, minor));
+            }
+        }
+        None
+    }
 }
 
 impl<V: Into<Version>> From<V> for Builder {
