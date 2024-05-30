@@ -38,7 +38,7 @@ pub enum Error {
     #[error("invalid format number: {0}")]
     FormatNumber(u8),
 
-    /// Overlap points are handled by an attribute on `las::Point`, not by a classification.
+    /// Overlap points are handled by an attribute on [Point], not by a classification.
     #[error("overlap points are handled by the `is_overlap` member of `las::Point`, not by classifications")]
     OverlapClassification,
 
@@ -73,6 +73,7 @@ pub struct Point {
     /// there is no way to indicate the "optionalness" of the intensity value and since zero could
     /// be valid intensity, we don't wrap this in an `Option`.
     pub intensity: u16,
+
     /// The pulse return number for a given output pulse.
     pub return_number: u8,
 

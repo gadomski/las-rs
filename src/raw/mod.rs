@@ -1,9 +1,10 @@
 //! Raw structures that map directly to their definitions in the las format specifications.
 //!
 //! In general, these structures are "dumb", meaning that they do the least amount of validity
-//! checking possible without losing information. Users should prefer to use the non-raw versions,
-//! e.g. `las::Header` over `las::raw::Header`, in order to ensure that they are following The
-//! Rules. `into_raw` can be used to create the raw versions:
+//! checking possible without losing information. Users should prefer to use the
+//! non-raw versions, e.g. [Header] should be preferred over
+//! [raw::Header](crate::raw::Header), in order to ensure that they are
+//! following The Rules. `into_raw` can be used to create the raw versions:
 //!
 //! ```
 //! use las::{Vlr, Header, Point};
@@ -12,8 +13,8 @@
 //! let raw_point = Point::default().into_raw(&Default::default()).unwrap();
 //! ```
 //!
-//! Raw structures all have `write_to` and `read_from` methods that can be used to put and extract
-//! them from streams of bytes:
+//! Raw structures all have `write_to` and `read_from` methods that can be used
+//! to put and extract them from streams of bytes:
 //!
 //! ```
 //! use las::point::Format;

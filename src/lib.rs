@@ -3,14 +3,14 @@
 //!
 //! # Reading
 //!
-//! Create a `Reader` from a `Path`:
+//! Create a [Reader] from a [Path](std::path::Path):
 //!
 //! ```
 //! use las::Reader;
 //! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! ```
 //!
-//! Or anything that implements `Read`:
+//! Or anything that implements [Read](std::io::Read):
 //!
 //! ```
 //! use std::io::BufReader;
@@ -20,14 +20,15 @@
 //! let reader = Reader::new(read).unwrap();
 //! ```
 //!
-//! ## Prefer `BufRead`
+//! ## Prefer [BufRead](std::io::BufRead)
 //!
-//! Your performance will be better if your `Read` is actually a `BufRead`. `Reader::from_path`
-//! takes care of this for you, but `Reader::new` doesn't.
+//! Your performance will be better if your [Read](std::io::Read) is actually a
+//! [BufRead](std::io::BufRead). [Reader::from_path] takes care of this for you,
+//! but [Reader::new] doesn't.
 //!
 //! ## Read points
 //!
-//! Read points one-by-one with `Reader::read`:
+//! Read points one-by-one with [Reader::read]:
 //!
 //! ```
 //! use las::{Read, Reader};
@@ -35,7 +36,7 @@
 //! let point = reader.read().unwrap().unwrap();
 //! ```
 //!
-//! Or iterate over all points with `Reader::points`:
+//! Or iterate over all points with [Reader::points]:
 //!
 //! ```
 //! use las::{Read, Reader};
@@ -55,7 +56,7 @@
 //!
 //! # Writing
 //!
-//! Create a `Writer` from a `Write` and a `Header`:
+//! Create a [Writer] from a [Write](std::io::Write) and a [Header]:
 //!
 //! ```
 //! use std::io::Cursor;
@@ -65,14 +66,14 @@
 //! let writer = Writer::new(write, header).unwrap();
 //! ```
 //!
-//! You can also write out to a path (automatically buffered with `BufWriter`):
+//! You can also write out to a path (automatically buffered with [BufWriter](std::io::BufWriter)):
 //!
 //! ```
 //! use las::Writer;
 //! let writer = Writer::from_path("/dev/null", Default::default());
 //! ```
 //!
-//! Use a `Builder` to customize the las data:
+//! Use a [Builder] to customize the las data:
 //!
 //! ```
 //! use std::io::Cursor;
@@ -87,41 +88,10 @@
 //! let writer = Writer::new(write, header).unwrap();
 //! ```
 //!
-//! If compiled with laz you can compress the data written
+//! ## Prefer [BufWriter](std::io::BufWriter)
 //!
-//! ```
-//! use std::io::Cursor;
-//! use las::{Writer, Builder};
-//! use las::point::Format;
-//!
-//! let mut builder = Builder::from((1, 4));
-//! builder.point_format = Format::new(2).unwrap();
-//! // asking to compress data
-//! builder.point_format.is_compressed = true;
-//! let header = builder.into_header().unwrap();
-//!
-//! let write = Cursor::new(Vec::new());
-//! let is_compiled_with_laz = cfg!(feature = "laz");
-//!
-//!
-//! let result =  Writer::new(write, header);
-//! if is_compiled_with_laz {
-//!     assert_eq!(result.is_ok(), true);
-//! } else {
-//!    assert_eq!(result.is_err(), true);
-//! }
-//!
-//! ```
-//!
-//! The [from_path](writer/struct.Writer.html#method.from_path) will use the extension of the output
-//! file to determine wether the data should be compressed or not
-//! 'laz' => compressed
-//! 'las' => not compressed
-//!
-//! ## Prefer `BufWrite`
-//!
-//! Just like the `Reader`, your performance will improve greatly if you use a `BufWrite` instead
-//! of just a `Write`.
+//! Just like the [Reader], your performance will improve greatly if you use a
+//! [BufWriter](std::io::BufWriter) instead of just a [Write](std::io::Write).
 //!
 //! ## Write points
 //!
@@ -134,6 +104,42 @@
 //! let point = Point { x: 1., y: 2., z: 3., ..Default::default() };
 //! writer.write(point).unwrap();
 //! ```
+//!
+//! # Compression
+//!
+//! The [laz](https://laszip.org/) compression format is the de-facto standard for compression las data.
+//! To enable laz support, enable the `laz` or `laz-parallel` feature:
+//!
+//! ```toml
+//! [dependencies]
+//! las = { version = "0.8", features = ["laz"] }  # or laz-parallel
+//! ```
+//!
+//! Then, you can compress the data when writing:
+//!
+//! ```
+//! use std::io::Cursor;
+//! use las::{Writer, Builder};
+//! use las::point::Format;
+//!
+//! let mut builder = Builder::from((1, 4));
+//! builder.point_format = Format::new(2).unwrap();
+//! builder.point_format.is_compressed = true;
+//! let header = builder.into_header().unwrap();
+//! let write = Cursor::new(Vec::new());
+//! let result =  Writer::new(write, header);
+//! if cfg!(feature = "laz") {
+//!     assert!(result.is_ok());
+//! } else {
+//!     assert!(result.is_err());
+//! }
+//! ```
+//!
+//! [Writer::from_path] will use the extension of the output file to determine
+//! wether the data should be compressed or not:
+//!
+//! - `.laz`: compressed
+//! - `.las`: not compressed
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![deny(
@@ -169,7 +175,7 @@
 #![recursion_limit = "128"]
 
 #[cfg(feature = "laz")]
-mod compression;
+mod laz;
 
 pub mod feature;
 pub mod header;

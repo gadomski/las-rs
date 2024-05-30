@@ -1,7 +1,8 @@
-//! Programatically determine whether a las version supports a feature.
+//! Programmatically determine whether a las version supports a feature.
 //!
-//! Features are structures that implement the `Feature` trait. The most common way to use features
-//! is via `Version::supports` or `Version::verify_support_for`:
+//! Features are structures that implement the [Feature] trait. The most common
+//! way to use features is via [Version::supports] or
+//! [Version::verify_support_for]:
 //!
 //! ```
 //! use las::feature::Waveforms;

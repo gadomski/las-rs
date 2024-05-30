@@ -1,8 +1,8 @@
-//! A `Header` describes the configuration and properties of las data.
+//! A [Header] describes the configuration and properties of las data.
 //!
 //! # Reading
 //!
-//! A `Reader` uses a `Header` to expose metadata:
+//! A [Reader](crate::Reader) uses a [Header] to expose metadata:
 //!
 //! ```
 //! use las::{Read, Reader};
@@ -13,21 +13,34 @@
 //!
 //! # Writing
 //!
-//! A `Writer` uses a header to configure how it will write points.  To create a las file, you can
-//! use a `Header` from another file, use the default `Header`, or create one with a `Builder`:
+//! A [Writer](crate::Writer) uses a [Header] to configure how it will write
+//! points.  To create a las file, you can use a [Header] from another file, use
+//! the default [Header], or create one with a [Builder]:
+//!
+//! The default configuration writes to a [Cursor](std::io::Cursor):
+//!
+//! ```
+//! use las::Writer;
+//!
+//! let writer = Writer::default();
+//! ```
+//!
+//! You can copy configuration from an existing file:
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Write, Writer, Builder, Read, Reader, Header};
+//! use las::{Writer, Reader, Read};
 //!
-//! // Copy the configuration from an existing file.
 //! let header = Reader::from_path("tests/data/autzen.las").unwrap().header().clone();
 //! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
+//! ```
 //!
-//! // Use the default configuration, which writes to a `Cursor<Vec<u8>>`.
-//! let writer = Writer::default();
+//! Use a [Builder] to set your own configuration:
 //!
-//! // Set your own configuration with a `Builder`.
+//! ```
+//! use std::io::Cursor;
+//! use las::{Writer, Builder};
+//!
 //! let mut builder = Builder::from((1, 4));
 //! builder.system_identifier = "Synthetic points".to_string();
 //! let header = builder.into_header().unwrap();
@@ -36,8 +49,8 @@
 //!
 //! # Into raw bytes
 //!
-//! A `Header` has a method to turn it into a `raw::Header`, which maps directly onto the bytes of
-//! the las spec:
+//! A [Header] has a method to turn it into a [raw::Header], which maps directly
+//! onto the bytes of the las spec:
 //!
 //! ```
 //! use las::Header;
@@ -140,7 +153,7 @@ pub struct Header {
 
 /// An iterator over a header's variable length records.
 ///
-/// Get this iterator via `vlrs` or `evlrs` methods on `Header`.
+/// Get this iterator via [Header::vlrs] or [Header::evlrs].
 #[derive(Debug)]
 pub struct Vlrs<'a>(Chain<Iter<'a, Vlr>, Iter<'a, Vlr>>);
 
@@ -217,9 +230,10 @@ impl Header {
 
     /// Returns the gps time type.
     ///
-    /// This affects what the gps time values on points means. `GpsTimeType::Week` means that the
-    /// time values are seconds from the start of the week. `GpsTimeType::Standard` means that the
-    /// time values are standard GPS time (satellite gps time) minus 10e9.
+    /// This affects what the gps time values on points means.
+    /// [GpsTimeType::Week] means that the time values are seconds from the
+    /// start of the week. [GpsTimeType::Standard] means that the time values
+    /// are standard GPS time (satellite gps time) minus 10e9.
     ///
     /// # Examples
     ///
@@ -457,7 +471,6 @@ impl Header {
         &self.vlrs
     }
 
-    /// Used by the CompressedPointWriter to add the Laszip Vlr
     #[cfg(feature = "laz")]
     pub(crate) fn vlrs_mut(&mut self) -> &mut Vec<Vlr> {
         &mut self.vlrs

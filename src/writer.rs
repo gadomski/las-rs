@@ -41,7 +41,7 @@ use std::{
 use thiserror::Error;
 
 #[cfg(feature = "laz")]
-use crate::compression::CompressedPointWriter;
+use crate::laz::CompressedPointWriter;
 use crate::{point::Format, Header, Point, Result};
 
 /// Writer errors.

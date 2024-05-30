@@ -7,6 +7,7 @@ use crate::{transform::RoundingMode, Point, Result, Transform, Vector};
 pub struct Bounds {
     /// The minimum values.
     pub min: Vector<f64>,
+
     /// The maximum values.
     pub max: Vector<f64>,
 }
