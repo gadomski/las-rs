@@ -31,17 +31,18 @@
 //! assert!(writer.write(point).is_err()); // the point's color would be lost
 //! ```
 
-use std::fmt::Debug;
-use std::fs::File;
-use std::io::{BufWriter, Cursor, Seek, SeekFrom};
-use std::path::Path;
+use std::{
+    fmt::Debug,
+    fs::File,
+    io::{BufWriter, Cursor, Seek, SeekFrom},
+    path::Path,
+};
+
+use thiserror::Error;
 
 #[cfg(feature = "laz")]
 use crate::compression::CompressedPointWriter;
-
-use crate::point::Format;
-use crate::{Header, Point, Result};
-use thiserror::Error;
+use crate::{point::Format, Header, Point, Result};
 
 /// Writer errors.
 #[derive(Error, Debug)]
@@ -410,11 +411,8 @@ impl<W: 'static + Seek + std::io::Write + Debug + Send> Drop for Writer<W> {
 mod tests {
     use std::io::Cursor;
 
-    use crate::header::Builder;
-    use crate::point::Format;
-    use crate::Version;
-
     use super::*;
+    use crate::{header::Builder, point::Format, Version};
 
     fn writer(format: Format, version: Version) -> Writer<Cursor<Vec<u8>>> {
         let mut builder = Builder::default();
@@ -476,8 +474,9 @@ mod tests {
 
     #[test]
     fn write_not_at_start() {
-        use crate::{Read, Reader};
         use byteorder::WriteBytesExt;
+
+        use crate::{Read, Reader};
 
         let mut cursor = Cursor::new(Vec::new());
         cursor.write_u8(42).unwrap();

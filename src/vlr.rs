@@ -29,8 +29,9 @@
 //! assert_eq!(1, header.vlrs().len());
 //! ```
 
-use crate::{raw, Result};
 use thiserror::Error;
+
+use crate::{raw, Result};
 
 const REGULAR_HEADER_SIZE: usize = 54;
 const EXTENDED_HEADER_SIZE: usize = 60;

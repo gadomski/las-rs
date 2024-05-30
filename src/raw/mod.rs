@@ -39,9 +39,7 @@ pub mod header;
 pub mod point;
 pub mod vlr;
 
-pub use self::header::Header;
-pub use self::point::Point;
-pub use self::vlr::Vlr;
+pub use self::{header::Header, point::Point, vlr::Vlr};
 
 /// The file magic number used for all las files.
 pub const LASF: [u8; 4] = *b"LASF";

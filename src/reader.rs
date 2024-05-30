@@ -41,16 +41,19 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
-use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::path::Path;
+use std::{
+    cmp::Ordering,
+    fmt::Debug,
+    fs::File,
+    io::{BufReader, Seek, SeekFrom},
+    path::Path,
+};
+
+use thiserror::Error;
 
 #[cfg(feature = "laz")]
 use crate::compression::CompressedPointReader;
-
 use crate::{raw, Builder, Header, Point, Result, Vlr};
-use std::{cmp::Ordering, fmt::Debug};
-use thiserror::Error;
 
 /// Error while reading.
 #[derive(Error, Clone, Copy, Debug)]
@@ -389,9 +392,8 @@ impl<'a> Reader<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Write, Writer};
-
     use super::*;
+    use crate::{Write, Writer};
 
     #[test]
     fn seek() {

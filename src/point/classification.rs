@@ -1,5 +1,4 @@
-use crate::point::Error;
-use crate::Result;
+use crate::{point::Error, Result};
 
 /// The ASPRS classification table.
 ///
