@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2024-05-30
+
+### Added
+
+- `Builder::minimum_supported_version` ([#83](https://github.com/gadomski/las-rs/pull/83))
+
+### Changed
+
+- `Reader` now upgrades the las version rather than erroring when a certain feature or format is not supported ([#83](https://github.com/gadomski/las-rs/pull/83))
+
 ## [0.8.7] - 2024-05-13
 
 ### Fixed
@@ -62,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Benchmarks now use [criterion](https://github.com/bheisler/criterion.rs) ([#52](https://github.com/gadomski/las-rs/pull/52))
 - Edition is now 2021 ([#52](https://github.com/gadomski/las-rs/pull/52))
 
-[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.8.7...HEAD
+[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.8.8...HEAD
+[0.8.8]: https://github.com/gadomski/las-rs/releases/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/gadomski/las-rs/releases/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/gadomski/las-rs/releases/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/gadomski/las-rs/releases/compare/v0.8.4...v0.8.5
