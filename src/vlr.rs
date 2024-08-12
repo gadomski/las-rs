@@ -157,20 +157,16 @@ impl Vlr {
     /// vlr.data = vec![0; u16::MAX as usize + 1 ];
     /// assert!(vlr.has_large_data());
     pub fn has_large_data(&self) -> bool {
-        use std::u16;
         self.data.len() > u16::MAX as usize
     }
 
     fn record_length_after_header(&self, is_extended: bool) -> Result<raw::vlr::RecordLength> {
         if is_extended {
             Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))
+        } else if self.data.len() > u16::MAX as usize {
+            Err(Error::TooLong(self.data.len()).into())
         } else {
-            use std::u16;
-            if self.data.len() > u16::MAX as usize {
-                Err(Error::TooLong(self.data.len()).into())
-            } else {
-                Ok(raw::vlr::RecordLength::Vlr(self.data.len() as u16))
-            }
+            Ok(raw::vlr::RecordLength::Vlr(self.data.len() as u16))
         }
     }
 }

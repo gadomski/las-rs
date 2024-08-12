@@ -60,13 +60,13 @@ pub enum Error {
 }
 
 pub(crate) fn write_point_to<W: std::io::Write>(
-    mut dst: &mut W,
+    dst: W,
     point: Point,
     header: &Header,
 ) -> Result<()> {
     point
         .into_raw(header.transforms())
-        .and_then(|raw_point| raw_point.write_to(&mut dst, header.point_format()))?;
+        .and_then(|raw_point| raw_point.write_to(dst, header.point_format()))?;
     Ok(())
 }
 
@@ -139,7 +139,7 @@ impl<W: std::io::Write + Debug + Send> PointWriter<W> for UncompressedPointWrite
 }
 
 pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(
-    mut dest: &mut W,
+    mut dest: W,
     header: &Header,
 ) -> Result<()> {
     header
@@ -284,7 +284,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
         };
 
         for raw_evlr in raw_evlrs {
-            raw_evlr?.write_to(&mut self.point_writer.get_mut())?;
+            raw_evlr?.write_to(self.point_writer.get_mut())?;
         }
 
         let _ = self

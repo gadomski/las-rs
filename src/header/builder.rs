@@ -307,7 +307,6 @@ impl From<Header> for Builder {
 }
 
 fn number_of_points_hash_map<T: Copy + Into<u64>>(slice: &[T]) -> HashMap<u8, u64> {
-    use std::u8;
     assert!(slice.len() < u8::MAX as usize);
     slice
         .iter()

@@ -243,7 +243,7 @@ impl Header {
     ///
     /// - The file signature is not exactly "LASF".
     /// - The point data format is not recognized. Note that version mismatches *are* allowed (e.g.
-    /// color points for las 1.1).
+    ///   color points for las 1.1).
     /// - The point data record length is less than the minimum length of the point data format.
     ///
     /// # Examples

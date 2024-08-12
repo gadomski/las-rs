@@ -42,7 +42,6 @@ impl Transform {
 
     pub(crate) fn inverse_with_rounding_mode(&self, n: f64, r: RoundingMode) -> Result<i32> {
         use crate::Error;
-        use std::i32;
 
         fn round(n: f64, r: RoundingMode) -> f64 {
             match r {
