@@ -530,10 +530,7 @@ mod tests {
 
     #[test]
     fn number_of_evlrs_none() {
-        let mut buff = Cursor::new(vec![
-            0;
-            std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
-        ]);
+        let mut buff = Cursor::new(vec![0; size_of::<u64>() + size_of::<u32>()]);
 
         buff.write_all(&u64::MAX.to_le_bytes()).unwrap();
         buff.write_all(&0_u32.to_le_bytes()).unwrap();
@@ -545,10 +542,7 @@ mod tests {
 
     #[test]
     fn number_of_evlrs_some() {
-        let mut buff = Cursor::new(vec![
-            0;
-            std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
-        ]);
+        let mut buff = Cursor::new(vec![0; size_of::<u64>() + size_of::<u32>()]);
 
         buff.write_all(&u64::MAX.to_le_bytes()).unwrap();
         buff.write_all(&1_u32.to_le_bytes()).unwrap();
