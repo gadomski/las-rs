@@ -1,6 +1,5 @@
-use std::fmt;
-
 use crate::{point::Error, Result};
+use std::fmt;
 
 const TIME_FORMATS: &[u8] = &[1, 3, 4, 5, 6, 7, 8, 9, 10];
 const COLOR_FORMATS: &[u8] = &[2, 3, 5, 7, 8, 10];
