@@ -580,8 +580,6 @@ impl Header {
     }
 
     fn header_size(&self) -> Result<u16> {
-        use std::u16;
-
         let header_size = self.version.header_size() as usize + self.padding.len();
         if header_size > u16::MAX as usize {
             Err(Error::TooLarge(header_size).into())
@@ -591,8 +589,6 @@ impl Header {
     }
 
     fn offset_to_point_data(&self) -> Result<u32> {
-        use std::u32;
-
         let vlr_len = self.vlrs.iter().fold(0, |acc, vlr| acc + vlr.len(false));
         let offset = self.header_size()? as usize + vlr_len + self.vlr_padding.len();
         if offset > u32::MAX as usize {
@@ -603,8 +599,6 @@ impl Header {
     }
 
     fn number_of_variable_length_records(&self) -> Result<u32> {
-        use std::u32;
-
         let n = self.vlrs().len();
         if n > u32::MAX as usize {
             Err(Error::TooManyVlrs(n).into())
@@ -615,7 +609,6 @@ impl Header {
 
     fn number_of_points_raw(&self) -> Result<u32> {
         use crate::feature::LargeFiles;
-        use std::u32;
 
         if self.number_of_points > u64::from(u32::MAX) {
             if self.version.supports::<LargeFiles>() {
@@ -634,7 +627,6 @@ impl Header {
 
     fn number_of_points_by_return_raw(&self) -> Result<[u32; 5]> {
         use crate::feature::LargeFiles;
-        use std::u32;
 
         let mut number_of_points_by_return = [0; 5];
         for (&i, &n) in &self.number_of_points_by_return {
@@ -664,8 +656,6 @@ impl Header {
     }
 
     fn evlr(&self) -> Result<Option<raw::header::Evlr>> {
-        use std::u32;
-
         let n = self.evlrs.len();
         if n == 0 {
             Ok(None)

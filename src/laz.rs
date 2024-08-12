@@ -28,9 +28,10 @@ fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
 /// struct that knows how to decompress LAZ
 ///
 /// Decompression is done in 2 steps:
-/// 1) call the decompressor that reads & decompress the next point
-/// and put its data in an in-memory buffer
-/// 2) read the buffer to get the decompress point
+///
+/// 1. call the decompressor that reads & decompress the next point
+///    and put its data in an in-memory buffer
+/// 2. read the buffer to get the decompress point
 pub(crate) struct CompressedPointReader<Decompressor> {
     /// decompressor that does the actual job
     decompressor: Decompressor,

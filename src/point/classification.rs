@@ -18,8 +18,8 @@ use crate::{point::Error, Result};
 /// Here's how we deal with that change:
 ///
 /// - If the point format doesn't support the overlap bit, the classification is overwritten with
-/// the code for overlap points (12). On ingest, points with an overlap classification are given
-/// the `Unclassified` code and `Point::is_overlap` is set to `true`.
+///   the code for overlap points (12). On ingest, points with an overlap classification are given
+///   the `Unclassified` code and `Point::is_overlap` is set to `true`.
 /// - If the point format does support the overlap bit, that is preferred.
 ///
 /// Because of this change, trying to create a classification with code 12 is an error:
