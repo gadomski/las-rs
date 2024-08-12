@@ -1,12 +1,10 @@
-use std::{cmp::Ordering, collections::HashMap};
-
-use chrono::NaiveDate;
-use uuid::Uuid;
-
 use crate::{
     header::Error, point::Format, raw, Bounds, GpsTimeType, Header, Result, Transform, Vector,
     Version, Vlr,
 };
+use chrono::NaiveDate;
+use std::{cmp::Ordering, collections::HashMap};
+use uuid::Uuid;
 
 /// Use this structure to build a [Header].
 #[derive(Clone, Debug, Default)]

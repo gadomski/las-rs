@@ -1,8 +1,6 @@
-use std::{io, str};
-
-use thiserror::Error;
-
 use crate::{header, point, reader, vlr, writer, Transform, Version};
+use std::{io, str};
+use thiserror::Error;
 
 /// Crate-specific error enum.
 #[derive(Error, Debug)]

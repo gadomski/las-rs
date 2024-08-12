@@ -41,6 +41,9 @@
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
 
+#[cfg(feature = "laz")]
+use crate::laz::CompressedPointReader;
+use crate::{raw, Builder, Header, Point, Result, Vlr};
 use std::{
     cmp::Ordering,
     fmt::Debug,
@@ -48,12 +51,7 @@ use std::{
     io::{BufReader, Seek, SeekFrom},
     path::Path,
 };
-
 use thiserror::Error;
-
-#[cfg(feature = "laz")]
-use crate::laz::CompressedPointReader;
-use crate::{raw, Builder, Header, Point, Result, Vlr};
 
 /// Error while reading.
 #[derive(Error, Clone, Copy, Debug)]

@@ -59,17 +59,15 @@
 //! assert_eq!(b"LASF", &raw_header.file_signature);
 //! ```
 
-use std::{collections::HashMap, iter::Chain, slice::Iter};
-
-use chrono::{Datelike, NaiveDate, Utc};
-use thiserror::Error;
-use uuid::Uuid;
-
 pub use self::builder::Builder;
 use crate::{
     point::Format, raw, utils::FromLasStr, Bounds, GpsTimeType, Point, Result, Transform, Vector,
     Version, Vlr,
 };
+use chrono::{Datelike, NaiveDate, Utc};
+use std::{collections::HashMap, iter::Chain, slice::Iter};
+use thiserror::Error;
+use uuid::Uuid;
 
 mod builder;
 
@@ -616,9 +614,8 @@ impl Header {
     }
 
     fn number_of_points_raw(&self) -> Result<u32> {
-        use std::u32;
-
         use crate::feature::LargeFiles;
+        use std::u32;
 
         if self.number_of_points > u64::from(u32::MAX) {
             if self.version.supports::<LargeFiles>() {
@@ -636,9 +633,8 @@ impl Header {
     }
 
     fn number_of_points_by_return_raw(&self) -> Result<[u32; 5]> {
-        use std::u32;
-
         use crate::feature::LargeFiles;
+        use std::u32;
 
         let mut number_of_points_by_return = [0; 5];
         for (&i, &n) in &self.number_of_points_by_return {

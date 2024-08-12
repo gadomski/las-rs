@@ -1,6 +1,5 @@
-use std::f64;
-
 use crate::{transform::RoundingMode, Point, Result, Transform, Vector};
+use std::f64;
 
 /// Minimum and maximum bounds in three dimensions.
 #[derive(Clone, Copy, Debug, PartialEq)]

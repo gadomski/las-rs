@@ -4,9 +4,8 @@ extern crate chrono;
 extern crate las;
 extern crate uuid;
 
-use std::io::Cursor;
-
 use las::{Builder, Point, Read, Reader, Write, Writer};
+use std::io::Cursor;
 
 pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
     let header = if should_succeed {

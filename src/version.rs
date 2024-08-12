@@ -1,6 +1,5 @@
-use std::fmt;
-
 use crate::{point::Format, Error, Feature, Result};
+use std::fmt;
 
 /// LAS version.
 ///

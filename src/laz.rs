@@ -1,16 +1,14 @@
-use std::fmt::Debug;
-/// Module with functions and structs specific to brigde the las crate and laz crate to allow
-/// writing & reading LAZ data
-use std::io::{Cursor, Read, Seek, SeekFrom, Write};
-
-use laz::las::laszip::LazVlr;
-
 use crate::{
     error::Error,
     reader::{read_point_from, PointReader},
     writer::{write_header_and_vlrs_to, write_point_to, PointWriter},
     Header, Point, Result, Vlr,
 };
+use laz::las::laszip::LazVlr;
+use std::fmt::Debug;
+/// Module with functions and structs specific to brigde the las crate and laz crate to allow
+/// writing & reading LAZ data
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 fn is_laszip_vlr(vlr: &Vlr) -> bool {
     vlr.user_id == LazVlr::USER_ID && vlr.record_id == LazVlr::RECORD_ID

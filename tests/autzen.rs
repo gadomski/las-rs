@@ -5,9 +5,8 @@ extern crate las;
 macro_rules! autzen {
     ($name:ident, $major:expr, $minor:expr) => {
         mod $name {
-            use std::io::Cursor;
-
             use las::{Builder, Read, Reader, Version, Write, Writer};
+            use std::io::Cursor;
 
             #[test]
             fn read_write() {

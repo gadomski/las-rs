@@ -16,10 +16,9 @@ mod classification;
 mod format;
 mod scan_direction;
 
-use thiserror::Error;
-
 pub use self::{classification::Classification, format::Format, scan_direction::ScanDirection};
 use crate::{raw, raw::point::Waveform, Color, Result, Transform, Vector};
+use thiserror::Error;
 
 /// Point-specific errors
 #[derive(Debug, Clone, Copy, Error)]

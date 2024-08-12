@@ -1,11 +1,10 @@
 //! Defines raw las points and some enums required to handle the various point formats.
 
-use std::io::{Read, Write};
-
 use crate::{
     point::{Classification, Error, Format, ScanDirection},
     Color, Result,
 };
+use std::io::{Read, Write};
 
 const SCAN_ANGLE_SCALE_FACTOR: f32 = 0.006;
 const OVERLAP_CLASSIFICATION_CODE: u8 = 12;
@@ -358,9 +357,8 @@ impl Point {
     /// ```
     #[allow(clippy::field_reassign_with_default)]
     pub fn read_from<R: Read>(mut read: R, format: &Format) -> Result<Point> {
-        use byteorder::{LittleEndian, ReadBytesExt};
-
         use crate::utils;
+        use byteorder::{LittleEndian, ReadBytesExt};
 
         let mut point = Point::default();
         point.x = read.read_i32::<LittleEndian>()?;
@@ -844,9 +842,8 @@ mod tests {
             mod $name {
                 #[test]
                 fn roundtrip() {
-                    use std::io::Cursor;
-
                     use super::*;
+                    use std::io::Cursor;
 
                     let mut format = Format::new($format).unwrap();
                     format.extra_bytes = 1;
