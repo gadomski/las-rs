@@ -412,9 +412,9 @@ impl Header {
             )?;
         }
         if self.version.supports::<Evlrs>() {
-            let elvr = self.evlr.unwrap_or_default();
-            write.write_u64::<LittleEndian>(elvr.start_of_first_evlr)?;
-            write.write_u32::<LittleEndian>(elvr.number_of_evlrs)?;
+            let evlr = self.evlr.unwrap_or_default();
+            write.write_u64::<LittleEndian>(evlr.start_of_first_evlr)?;
+            write.write_u32::<LittleEndian>(evlr.number_of_evlrs)?;
         }
         if self.version.supports::<LargeFiles>() {
             let large_file = self.large_file.unwrap_or_default();
