@@ -13,7 +13,7 @@ fn detect_laszip() {
 
 #[cfg(feature = "laz")]
 mod laz_compression_test {
-    use las::{Read, Write};
+    use las::Write;
     use std::io::Cursor;
 
     /// Read file, write it compressed, read the compressed data written

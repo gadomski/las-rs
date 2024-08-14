@@ -141,6 +141,10 @@ impl<R: std::io::Read + Seek + Debug + Send> PointReader for UncompressedPointRe
 }
 
 /// A trait for objects which read LAS data.
+#[deprecated(
+    since = "0.9.0",
+    note = "This interface has been refactored so that importing `Read` is no longer required"
+)]
 pub trait Read {
     /// Returns a reference to this reader's header.
     ///
@@ -338,42 +342,116 @@ impl<'a> Reader<'a> {
             })
         }
     }
-}
 
-impl Read for Reader<'_> {
     /// Returns a reference to this reader's header.
-    fn header(&self) -> &Header {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Read, Reader};
+    /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let header = reader.header();
+    /// ```
+    pub fn header(&self) -> &Header {
         self.point_reader.header()
     }
 
     /// Reads a point.
-    fn read(&mut self) -> Option<Result<Point>> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::{Read, Reader};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let point = reader.read().unwrap().unwrap();
+    /// ```
+    pub fn read(&mut self) -> Option<Result<Point>> {
         self.point_reader.read_next()
     }
 
-    fn read_n(&mut self, n: u64) -> Result<Vec<Point>> {
+    /// Reads n points.
+    pub fn read_n(&mut self, n: u64) -> Result<Vec<Point>> {
         self.point_reader.read_next_points(n)
     }
 
-    fn read_n_into(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64> {
+    /// Reads n points into the vec
+    pub fn read_n_into(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64> {
         self.point_reader.read_into_vec(points, n)
     }
 
-    fn read_all_points(&mut self, points: &mut Vec<Point>) -> Result<u64> {
+    /// Reads all points left into the vec
+    pub fn read_all_points(&mut self, points: &mut Vec<Point>) -> Result<u64> {
         let point_count = self.point_reader.header().number_of_points();
         self.point_reader.read_into_vec(points, point_count)
     }
 
     /// Seeks to the given point number, zero-indexed.
-    fn seek(&mut self, position: u64) -> Result<()> {
+    ///
+    /// Note that seeking on compressed (LAZ) data can be expensive as the reader
+    /// will have to seek to the closest chunk start and decompress all points up until
+    /// the point seeked to.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Read, Reader};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// reader.seek(1).unwrap(); // <- seeks to the second point
+    /// let the_second_point = reader.read().unwrap().unwrap();
+    /// ```
+    pub fn seek(&mut self, position: u64) -> Result<()> {
         self.point_reader.seek(position)
     }
 
     /// Returns an iterator over this reader's points.
-    fn points(&mut self) -> PointIterator<'_> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use las::{Read, Reader};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let points = reader.points().collect::<Result<Vec<_>, _>>().unwrap();
+    /// ```
+    pub fn points(&mut self) -> PointIterator<'_> {
         PointIterator {
             point_reader: &mut *self.point_reader,
         }
+    }
+}
+
+#[allow(deprecated)]
+impl Read for Reader<'_> {
+    /// Returns a reference to this reader's header.
+    fn header(&self) -> &Header {
+        self.header()
+    }
+
+    /// Reads a point.
+    fn read(&mut self) -> Option<Result<Point>> {
+        self.read()
+    }
+
+    fn read_n(&mut self, n: u64) -> Result<Vec<Point>> {
+        self.read_n(n)
+    }
+
+    fn read_n_into(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64> {
+        self.read_n_into(n, points)
+    }
+
+    fn read_all_points(&mut self, points: &mut Vec<Point>) -> Result<u64> {
+        self.read_all_points(points)
+    }
+
+    /// Seeks to the given point number, zero-indexed.
+    fn seek(&mut self, position: u64) -> Result<()> {
+        self.seek(position)
+    }
+
+    /// Returns an iterator over this reader's points.
+    fn points(&mut self) -> PointIterator<'_> {
+        self.points()
     }
 }
 

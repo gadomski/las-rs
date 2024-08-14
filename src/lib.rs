@@ -201,13 +201,15 @@ pub use crate::{
     gps_time_type::GpsTimeType,
     header::{Builder, Header},
     point::Point,
-    reader::{Read, Reader},
+    reader::Reader,
     transform::Transform,
     vector::Vector,
     version::Version,
     vlr::Vlr,
     writer::{Write, Writer},
 };
+#[allow(deprecated)]
+pub use reader::Read;
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;

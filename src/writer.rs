@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn write_not_at_start() {
-        use crate::{Read, Reader};
+        use crate::Reader;
         use byteorder::WriteBytesExt;
 
         let mut cursor = Cursor::new(Vec::new());
