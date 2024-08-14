@@ -126,7 +126,7 @@ fn test_read_n_on(path: &str) {
     let mut all_points = Vec::with_capacity(reader.header().number_of_points() as usize);
     loop {
         let mut points = reader.read_n(n).unwrap();
-        if points.len() == 0 {
+        if points.is_empty() {
             break;
         }
         all_points.append(&mut points);

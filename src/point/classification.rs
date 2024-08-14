@@ -80,7 +80,7 @@ impl Classification {
             9 => Classification::Water,
             10 => Classification::Rail,
             11 => Classification::RoadSurface,
-            12 => return Err(Error::OverlapClassification.into()),
+            12 => return Err(Error::OverlapClassification),
             13 => Classification::WireGuard,
             14 => Classification::WireConductor,
             15 => Classification::TransmissionTower,

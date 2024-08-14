@@ -51,7 +51,7 @@
 
 #[cfg(feature = "laz")]
 use crate::laz::CompressedPointReader;
-use crate::{raw, Builder, Header, Point, Result, Vlr};
+use crate::{raw, Builder, Error, Header, Point, Result, Vlr};
 use std::{
     cmp::Ordering,
     fmt::Debug,
@@ -59,19 +59,6 @@ use std::{
     io::{BufReader, Seek, SeekFrom},
     path::Path,
 };
-use thiserror::Error;
-
-/// Error while reading.
-#[derive(Error, Clone, Copy, Debug)]
-pub enum Error {
-    /// The offset to the point data was too small.
-    #[error("offset to the point data is too small: {0}")]
-    OffsetToPointDataTooSmall(u32),
-
-    /// The offset to the start of the evlrs is too small.
-    #[error("offset to the start of the evlrs is too small: {0}")]
-    OffsetToEvlrsTooSmall(u64),
-}
 
 #[inline]
 pub(crate) fn read_point_from<R: std::io::Read>(source: &mut R, header: &Header) -> Result<Point> {
@@ -250,7 +237,7 @@ impl<'a> Reader<'a> {
         let mut builder = Builder::new(raw_header)?;
 
         if !cfg!(feature = "laz") && builder.point_format.is_compressed {
-            return Err(crate::Error::Laszip);
+            return Err(Error::LaszipNotEnabled);
         }
 
         for _ in 0..number_of_variable_length_records {
@@ -267,7 +254,9 @@ impl<'a> Reader<'a> {
             }
             Ordering::Equal => {} // pass
             Ordering::Greater => {
-                return Err(Error::OffsetToPointDataTooSmall(offset_to_point_data as u32).into())
+                return Err(Error::OffsetToPointDataTooSmall(
+                    offset_to_point_data as u32,
+                ))
             }
         }
 
@@ -288,7 +277,7 @@ impl<'a> Reader<'a> {
             if !builder.point_format.is_compressed {
                 match evlr.start_of_first_evlr.cmp(&offset_to_end_of_points) {
                     Ordering::Less => {
-                        return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr).into());
+                        return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr));
                     }
                     Ordering::Equal => {} // pass
                     Ordering::Greater => {
@@ -401,7 +390,7 @@ impl<'a> Reader<'a> {
     /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Reader<'a>> {
         File::open(path)
-            .map_err(crate::Error::from)
+            .map_err(Error::from)
             .and_then(|file| Reader::new(BufReader::new(file)))
     }
 }

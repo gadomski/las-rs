@@ -1,8 +1,8 @@
 //! Defines raw las points and some enums required to handle the various point formats.
 
 use crate::{
-    point::{Classification, Error, Format, ScanDirection},
-    Color, Result,
+    point::{Classification, Format, ScanDirection},
+    Color, Error, Result,
 };
 use std::io::{Read, Write};
 
@@ -665,18 +665,16 @@ impl Flags {
                     Err(Error::ReturnNumber {
                         return_number: self.return_number(),
                         version: None,
-                    }
-                    .into())
+                    })
                 } else if self.number_of_returns() > 7 {
                     Err(Error::ReturnNumber {
                         return_number: self.number_of_returns(),
                         version: None,
-                    }
-                    .into())
+                    })
                 } else if c > 31 {
-                    Err(Error::Classification(c).into())
+                    Err(Error::InvalidClassification(c))
                 } else if self.scanner_channel() > 0 {
-                    Err(Error::ScannerChannel(self.scanner_channel()).into())
+                    Err(Error::InvalidScannerChannel(self.scanner_channel()))
                 } else {
                     let mut a = (self.number_of_returns() << 3) + self.return_number();
                     if self.scan_direction() == ScanDirection::LeftToRight {

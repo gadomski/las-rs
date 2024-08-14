@@ -6,8 +6,7 @@ use las::{Read, Reader};
 
 fn main() {
     let path = std::env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .expect("Must provide a path to a las file");
     let mut reader = Reader::from_path(path).expect("Unable to open reader");
     let npoints = reader

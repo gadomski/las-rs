@@ -29,19 +29,10 @@
 //! assert_eq!(1, header.vlrs().len());
 //! ```
 
-use crate::{raw, Result};
-use thiserror::Error;
+use crate::{raw, Error, Result};
 
 const REGULAR_HEADER_SIZE: usize = 54;
 const EXTENDED_HEADER_SIZE: usize = 60;
-
-/// Vlr-specific errors.
-#[derive(Error, Debug, Clone, Copy)]
-pub enum Error {
-    /// The vlr data is too long.
-    #[error("the vlr is too long: {0}")]
-    TooLong(usize),
-}
 
 /// A variable length record.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -164,7 +155,7 @@ impl Vlr {
         if is_extended {
             Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))
         } else if self.data.len() > u16::MAX as usize {
-            Err(Error::TooLong(self.data.len()).into())
+            Err(Error::VlrTooLong(self.data.len()))
         } else {
             Ok(raw::vlr::RecordLength::Vlr(self.data.len() as u16))
         }

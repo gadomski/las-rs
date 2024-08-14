@@ -33,31 +33,13 @@
 
 #[cfg(feature = "laz")]
 use crate::laz::CompressedPointWriter;
-use crate::{point::Format, Header, Point, Result};
+use crate::{Error, Header, Point, Result};
 use std::{
     fmt::Debug,
     fs::File,
     io::{BufWriter, Cursor, Seek, SeekFrom},
     path::Path,
 };
-use thiserror::Error;
-
-/// Writer errors.
-#[derive(Error, Debug)]
-pub enum Error {
-    /// The writer is closed.
-    #[error("the writer is closed")]
-    Closed,
-
-    /// The attributes of the point format and point do not match.
-    #[error("the attributes of the point format ({format}) do not match the point: {point:?}")]
-    #[allow(missing_docs)]
-    PointAttributes { format: Format, point: Point },
-
-    /// Wrapper around `std::io::Error`.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-}
 
 pub(crate) fn write_point_to<W: std::io::Write>(
     dst: W,
@@ -267,7 +249,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
     /// ```
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
-            return Err(Box::new(Error::Closed).into());
+            return Err(Error::ClosedWriter);
         }
 
         self.point_writer.done()?;
@@ -313,14 +295,12 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
     /// Writes a point.
     fn write(&mut self, point: Point) -> Result<()> {
         if self.closed {
-            return Err(Box::new(Error::Closed).into());
+            return Err(Error::ClosedWriter);
         }
         if !point.matches(self.header().point_format()) {
-            return Err(Box::new(Error::PointAttributes {
-                format: *self.header().point_format(),
-                point,
-            })
-            .into());
+            return Err(Error::PointAttributesDoNotMatch(
+                *self.header().point_format(),
+            ));
         }
         self.point_writer.write_next(point)
     }
@@ -386,7 +366,7 @@ impl Writer<BufWriter<File>> {
 
         header.point_format_mut().is_compressed = compress;
         File::create(path)
-            .map_err(crate::Error::from)
+            .map_err(Error::from)
             .and_then(|file| Writer::new(BufWriter::new(file), header))
     }
 }
