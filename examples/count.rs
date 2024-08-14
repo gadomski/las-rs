@@ -2,7 +2,7 @@
 
 extern crate las;
 
-use las::{Read, Reader};
+use las::Reader;
 
 fn main() {
     let path = std::env::args()

@@ -5,7 +5,7 @@ extern crate las;
 macro_rules! autzen {
     ($name:ident, $major:expr, $minor:expr) => {
         mod $name {
-            use las::{Builder, Read, Reader, Version, Write, Writer};
+            use las::{Builder, Reader, Version, Write, Writer};
             use std::io::Cursor;
 
             #[test]
@@ -31,7 +31,7 @@ autzen!(las_1_3, 1, 3);
 autzen!(las_1_4, 1, 4);
 
 fn test_seek_0_works_on(path: &str) {
-    use las::{Read, Reader};
+    use las::Reader;
     let mut reader = Reader::from_path(path).unwrap();
     let _p1 = reader.read().unwrap().unwrap();
     reader.seek(0).unwrap();
@@ -39,7 +39,7 @@ fn test_seek_0_works_on(path: &str) {
 }
 
 fn test_seek_to_last_point_works_on(path: &str) {
-    use las::{Read, Reader};
+    use las::Reader;
     let mut reader = Reader::from_path(path).unwrap();
     let _p1 = reader.read().unwrap().unwrap();
     reader.seek(reader.header().number_of_points() - 1).unwrap();
@@ -49,7 +49,7 @@ fn test_seek_to_last_point_works_on(path: &str) {
 }
 
 fn test_seek_past_last_point_works_on(path: &str) {
-    use las::{Read, Reader};
+    use las::Reader;
     let mut reader = Reader::from_path(path).unwrap();
     let _p1 = reader.read().unwrap().unwrap();
     reader.seek(reader.header().number_of_points()).unwrap();
@@ -111,7 +111,7 @@ fn test_seek_0_works_on_laz() {
 // }
 
 fn test_read_n_on(path: &str) {
-    use las::{Point, Read, Reader};
+    use las::{Point, Reader};
 
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
@@ -136,7 +136,7 @@ fn test_read_n_on(path: &str) {
 }
 
 fn test_read_n_into_on(path: &str) {
-    use las::{Point, Read, Reader};
+    use las::{Point, Reader};
 
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
@@ -192,7 +192,7 @@ fn test_copc_read_n_into() {
 }
 
 fn test_read_all_points_on(path: &str) {
-    use las::{Point, Read, Reader};
+    use las::{Point, Reader};
 
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
