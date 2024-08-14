@@ -1,4 +1,3 @@
-
 # Releasing
 
 1. Update the version number in [Cargo.toml](./Cargo.toml)
