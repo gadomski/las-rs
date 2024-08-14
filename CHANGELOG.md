@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- BREAKING: Conslidate errors to a single enum ([#87](https://github.com/gadomski/las-rs/pull/87))
+
 ## [0.8.8] - 2024-05-30
 
 ### Added
@@ -82,3 +86,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.8.2]: https://github.com/gadomski/las-rs/releases/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/gadomski/las-rs/releases/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/gadomski/las-rs/releases/compare/v0.7.8...v0.8.0
+
+<!-- markdownlint-disable-file MD024 -->
