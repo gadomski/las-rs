@@ -98,11 +98,10 @@ impl Builder {
         let n = point_format.len();
         match raw_header.point_data_record_length.cmp(&n) {
             Ordering::Less => {
-                return Err(Error::PointDataRecordLength {
+                return Err(Error::PointDataRecordLengthTooLarge {
                     format: point_format,
                     len: raw_header.point_data_record_length,
-                }
-                .into())
+                })
             }
             Ordering::Equal => {} // pass
             Ordering::Greater => point_format.extra_bytes = raw_header.point_data_record_length - n,
@@ -197,11 +196,10 @@ impl Builder {
         }
         // TODO check waveforms
         if !self.version.supports_point_format(self.point_format) {
-            return Err(Error::Format {
+            return Err(Error::UnsupportedFormat {
                 version: self.version,
                 format: self.point_format,
-            }
-            .into());
+            });
         }
         let mut vlrs = Vec::new();
         let mut evlrs = Vec::new();
@@ -222,7 +220,7 @@ impl Builder {
         if !evlrs.is_empty() {
             self.version.verify_support_for::<Evlrs>()?;
         } else if !self.point_padding.is_empty() {
-            return Err(Error::PointPadding.into());
+            return Err(Error::PointPaddingNotAllowed);
         }
         let header = Header {
             bounds: self.bounds,

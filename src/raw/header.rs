@@ -3,7 +3,7 @@
 use crate::{
     feature::{Evlrs, LargeFiles, Waveforms},
     raw::LASF,
-    Result, Version,
+    utils, Error, Result, Version,
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Read, Write};
@@ -255,12 +255,10 @@ impl Header {
     /// let header = Header::read_from(&mut file).unwrap();
     /// ```
     pub fn read_from<R: Read>(mut read: R) -> Result<Header> {
-        use crate::{header::Error, utils};
-
         let mut header = Header::default();
         read.read_exact(&mut header.file_signature)?;
         if header.file_signature != LASF {
-            return Err(Error::FileSignature(header.file_signature).into());
+            return Err(Error::InvalidFileSignature(header.file_signature));
         }
         header.file_source_id = read.read_u16::<LittleEndian>()?;
         header.global_encoding = read.read_u16::<LittleEndian>()?;

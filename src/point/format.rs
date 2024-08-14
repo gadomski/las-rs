@@ -92,7 +92,7 @@ impl Format {
     pub fn new(n: u8) -> Result<Format> {
         let is_compressed = is_point_format_compressed(n);
         if n > 10 && !is_compressed {
-            Err(Error::FormatNumber(n).into())
+            Err(Error::InvalidPointFormatNumber(n))
         } else {
             let n = point_format_id_compressed_to_uncompressd(n);
             Ok(Format {
@@ -172,7 +172,7 @@ impl Format {
     /// ```
     pub fn to_u8(&self) -> Result<u8> {
         if !cfg!(feature = "laz") && self.is_compressed {
-            Err(Error::Format(*self).into())
+            Err(Error::InvalidPointFormat(*self))
         } else if self.is_extended {
             if self.has_gps_time {
                 if self.has_color {
@@ -183,22 +183,22 @@ impl Format {
                             Ok(8)
                         }
                     } else if self.has_waveform {
-                        Err(Error::Format(*self).into())
+                        Err(Error::InvalidPointFormat(*self))
                     } else {
                         Ok(7)
                     }
                 } else if self.has_nir {
-                    Err(Error::Format(*self).into())
+                    Err(Error::InvalidPointFormat(*self))
                 } else if self.has_waveform {
                     Ok(9)
                 } else {
                     Ok(6)
                 }
             } else {
-                Err(Error::Format(*self).into())
+                Err(Error::InvalidPointFormat(*self))
             }
         } else if self.has_nir {
-            Err(Error::Format(*self).into())
+            Err(Error::InvalidPointFormat(*self))
         } else if self.has_waveform {
             if self.has_gps_time {
                 if self.has_color {
@@ -207,7 +207,7 @@ impl Format {
                     Ok(4)
                 }
             } else {
-                Err(Error::Format(*self).into())
+                Err(Error::InvalidPointFormat(*self))
             }
         } else {
             let mut n = if self.has_gps_time { 1 } else { 0 };

@@ -54,7 +54,7 @@ impl Transform {
         let n = round((n - self.offset) / self.scale, r);
 
         if n > f64::from(i32::MAX) || n < f64::from(i32::MIN) {
-            Err(Error::InverseTransform {
+            Err(Error::InvalidInverseTransform {
                 n,
                 transform: *self,
             })

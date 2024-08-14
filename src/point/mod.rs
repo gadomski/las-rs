@@ -17,42 +17,8 @@ mod format;
 mod scan_direction;
 
 pub use self::{classification::Classification, format::Format, scan_direction::ScanDirection};
-use crate::{raw, raw::point::Waveform, Color, Result, Transform, Vector};
+use crate::{raw, raw::point::Waveform, Color, Error, Result, Transform, Vector};
 use thiserror::Error;
-
-/// Point-specific errors
-#[derive(Debug, Clone, Copy, Error)]
-pub enum Error {
-    /// An invalid classification number.
-    #[error("invalid classification: {0}")]
-    Classification(u8),
-
-    /// This is an invalid format.
-    ///
-    /// It has a combination of options that can't exist.
-    #[error("invalid format: {0}")]
-    Format(Format),
-
-    /// This is an invalid format number.
-    #[error("invalid format number: {0}")]
-    FormatNumber(u8),
-
-    /// Overlap points are handled by an attribute on [Point], not by a classification.
-    #[error("overlap points are handled by the `is_overlap` member of `las::Point`, not by classifications")]
-    OverlapClassification,
-
-    /// This is not a valid return number.
-    #[error("invalid return number {return_number} for version {version:?}")]
-    #[allow(missing_docs)]
-    ReturnNumber {
-        return_number: u8,
-        version: Option<crate::Version>,
-    },
-
-    /// This is not a valid scanner channel
-    #[error("invalid scanner channel: {0}")]
-    ScannerChannel(u8),
-}
 
 /// A three dimensional point.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -219,16 +185,14 @@ impl Point {
             Err(Error::ReturnNumber {
                 return_number: self.return_number,
                 version: None,
-            }
-            .into())
+            })
         } else if self.number_of_returns > 15 {
             Err(Error::ReturnNumber {
                 return_number: self.number_of_returns,
                 version: None,
-            }
-            .into())
+            })
         } else if self.scanner_channel > 3 {
-            Err(Error::ScannerChannel(self.scanner_channel).into())
+            Err(Error::InvalidScannerChannel(self.scanner_channel))
         } else {
             let a = (self.number_of_returns << 4) + self.return_number;
             let mut b = self.scanner_channel << 4;
