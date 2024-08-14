@@ -19,18 +19,6 @@
 //! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! ```
 //!
-//! Compressed files are supported when using the feature "laz":
-//!
-//! ```
-//! use las::Reader;
-//! if cfg!(feature = "laz") {
-//!  assert!(Reader::from_path("tests/data/autzen.laz").is_ok());
-//! } else {
-//!  assert!(Reader::from_path("tests/data/autzen.laz").is_err());
-//! }
-//!
-//! ```
-//!
 //! Use `Reader::read` to read one point, and `Reader::points` to get an iterator over
 //! `Result<Point>`:
 //!
@@ -40,6 +28,26 @@
 //! let first_point = reader.read().unwrap().unwrap();
 //! let the_rest = reader.points().map(|r| r.unwrap()).collect::<Vec<_>>();
 //! ```
+//!
+//! # Compression
+//!
+//! [lazip](https://laszip.org/) is supported by enabling the `laz` feature in your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! las = { version = "*", features = ["laz"] }
+//! ```
+//!
+//! Then:
+//!
+//! ```
+//! # #[cfg(feature = "laz")]
+//! # {
+//! use las::Reader;
+//! let reader = Reader::from_path("tests/data/autzen.laz").unwrap();
+//! # }
+//! ```
+//!
 
 #[cfg(feature = "laz")]
 use crate::laz::CompressedPointReader;
