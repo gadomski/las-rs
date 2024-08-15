@@ -173,7 +173,7 @@
 )]
 
 #[cfg(feature = "laz")]
-mod laz;
+pub mod laz;
 
 pub mod feature;
 pub mod header;

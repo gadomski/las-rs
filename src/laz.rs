@@ -1,125 +1,116 @@
-use crate::{
-    writer::{write_header_and_vlrs_to, write_point_to, PointWriter},
-    Header, Point, Result, Vlr,
-};
-use laz::las::laszip::LazVlr;
-use std::fmt::Debug;
-/// Module with functions and structs specific to brigde the las crate and laz crate to allow
-/// writing & reading LAZ data
-use std::io::{Cursor, Seek, SeekFrom, Write};
+//! Utility functions for working with laszip compressed data.
 
-fn is_laszip_vlr(vlr: &Vlr) -> bool {
+use crate::{Error, Header, Result, Vlr};
+use laz::{LazItemRecordBuilder, LazItemType, LazVlr};
+use std::io::Cursor;
+
+/// Returns true if this [Vlr] is the laszip Vlr.
+///
+/// # Examples
+///
+/// ```
+/// #[cfg(feature = "laz")]
+/// {
+/// use las::{laz, Vlr};
+///
+/// let mut vlr = Vlr::default();
+/// assert!(!laz::is_laszip_vlr(&vlr));
+/// vlr.user_id = "laszip encoded".to_string();
+/// vlr.record_id = 22204;
+/// assert!(laz::is_laszip_vlr(&vlr));
+/// }
+/// ```
+pub fn is_laszip_vlr(vlr: &Vlr) -> bool {
     vlr.user_id == LazVlr::USER_ID && vlr.record_id == LazVlr::RECORD_ID
 }
 
-fn create_laszip_vlr(laszip_vlr: &LazVlr) -> std::io::Result<Vlr> {
-    let mut cursor = Cursor::new(Vec::<u8>::new());
-    laszip_vlr.write_to(&mut cursor)?;
-    Ok(Vlr {
-        user_id: LazVlr::USER_ID.to_owned(),
-        record_id: LazVlr::RECORD_ID,
-        description: LazVlr::DESCRIPTION.to_owned(),
-        data: cursor.into_inner(),
-    })
-}
+impl Header {
+    /// Adds a new laszip vlr to this header.
+    ///
+    /// Ensures that there's only one laszip vlr, as well.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    ///
+    /// let mut header = Header::default();
+    /// #[cfg(feature = "laz")]
+    /// header.add_laz_vlr().unwrap();
+    /// ```
+    pub fn add_laz_vlr(&mut self) -> Result<()> {
+        let point_format = self.point_format();
+        let mut laz_items = LazItemRecordBuilder::new();
+        if !point_format.is_extended {
+            let _ = laz_items.add_item(LazItemType::Point10);
 
-fn laz_vlr_from_point_format(point_format: &crate::point::Format) -> LazVlr {
-    let mut laz_items = laz::las::laszip::LazItemRecordBuilder::new();
-    if !point_format.is_extended {
-        let _ = laz_items.add_item(laz::LazItemType::Point10);
+            if point_format.has_gps_time {
+                let _ = laz_items.add_item(LazItemType::GpsTime);
+            }
 
-        if point_format.has_gps_time {
-            let _ = laz_items.add_item(laz::LazItemType::GpsTime);
-        }
+            if point_format.has_color {
+                let _ = laz_items.add_item(LazItemType::RGB12);
+            }
 
-        if point_format.has_color {
-            let _ = laz_items.add_item(laz::LazItemType::RGB12);
-        }
+            if point_format.extra_bytes > 0 {
+                let _ = laz_items.add_item(LazItemType::Byte(point_format.extra_bytes));
+            }
+        } else {
+            let _ = laz_items.add_item(LazItemType::Point14);
 
-        if point_format.extra_bytes > 0 {
-            let _ = laz_items.add_item(laz::LazItemType::Byte(point_format.extra_bytes));
-        }
-    } else {
-        let _ = laz_items.add_item(laz::LazItemType::Point14);
-
-        if point_format.has_color {
-            // Point format 7 & 8 both have RGB
-            if point_format.has_nir {
-                let _ = laz_items.add_item(laz::LazItemType::RGBNIR14);
-            } else {
-                let _ = laz_items.add_item(laz::LazItemType::RGB14);
+            if point_format.has_color {
+                // Point format 7 & 8 both have RGB
+                if point_format.has_nir {
+                    let _ = laz_items.add_item(LazItemType::RGBNIR14);
+                } else {
+                    let _ = laz_items.add_item(LazItemType::RGB14);
+                }
+            }
+            if point_format.extra_bytes > 0 {
+                let _ = laz_items.add_item(LazItemType::Byte14(point_format.extra_bytes));
             }
         }
-        if point_format.extra_bytes > 0 {
-            let _ = laz_items.add_item(laz::LazItemType::Byte14(point_format.extra_bytes));
-        }
-    }
-    LazVlr::from_laz_items(laz_items.build())
-}
-
-/// struct that knows how to write LAZ
-///
-/// Writing a point compressed is done in 2 steps
-/// 1) write the point to a in-memory buffer
-/// 2) call the laz compressor on this buffer
-pub(crate) struct CompressedPointWriter<'a, W: Write + Seek + Send> {
-    header: Header,
-    /// buffer used to write the uncompressed point
-    compressor_input: Cursor<Vec<u8>>,
-    /// The compressor that actually does the job of compressing the data
-    compressor: laz::las::laszip::LasZipCompressor<'a, W>,
-}
-
-impl<W: Write + Seek + Send> CompressedPointWriter<'_, W> {
-    pub(crate) fn new(mut dest: W, mut header: Header) -> Result<Self> {
-        let laz_vlr = laz_vlr_from_point_format(header.point_format());
-        // Clear any existing laszip vlr as they might not be correct
-        header.vlrs_mut().retain(|vlr| !is_laszip_vlr(vlr));
-        header.vlrs_mut().push(create_laszip_vlr(&laz_vlr)?);
-
-        write_header_and_vlrs_to(&mut dest, &header)?;
-
-        let compressor_input = Cursor::new(vec![0u8; header.point_format().len() as usize]);
-        let compressor = laz::las::laszip::LasZipCompressor::new(dest, laz_vlr)?;
-
-        Ok(Self {
-            header,
-            compressor_input,
-            compressor,
-        })
-    }
-}
-
-impl<W: Write + Seek + Send> PointWriter<W> for CompressedPointWriter<'_, W> {
-    fn write_next(&mut self, point: Point) -> Result<()> {
-        self.header.add_point(&point);
-        let _ = self.compressor_input.seek(SeekFrom::Start(0))?;
-        write_point_to(&mut self.compressor_input, point, &self.header)?;
-        self.compressor
-            .compress_one(self.compressor_input.get_ref())?;
+        let laz_vlr = LazVlr::from_laz_items(laz_items.build());
+        let mut cursor = Cursor::new(Vec::<u8>::new());
+        laz_vlr.write_to(&mut cursor)?;
+        let vlr = Vlr {
+            user_id: LazVlr::USER_ID.to_owned(),
+            record_id: LazVlr::RECORD_ID,
+            description: LazVlr::DESCRIPTION.to_owned(),
+            data: cursor.into_inner(),
+        };
+        self.vlrs.push(vlr);
         Ok(())
     }
 
-    fn into_inner(self: Box<Self>) -> W {
-        self.compressor.into_inner()
-    }
-
-    fn get_mut(&mut self) -> &mut W {
-        self.compressor.get_mut()
-    }
-
-    fn header(&self) -> &Header {
-        &self.header
-    }
-
-    fn done(&mut self) -> Result<()> {
-        self.compressor.done()?;
-        Ok(())
+    /// Returns header's [LazVlr], or `None` if none is found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    ///
+    /// let mut header = Header::default();
+    ///
+    /// #[cfg(feature = "laz")]
+    /// {
+    /// assert!(header.laz_vlr().is_none());
+    /// header.add_laz_vlr();
+    /// assert!(header.laz_vlr().is_some());
+    /// }
+    /// ```
+    pub fn laz_vlr(&self) -> Option<LazVlr> {
+        self.vlrs
+            .iter()
+            .find(|vlr| is_laszip_vlr(vlr))
+            .and_then(|vlr| vlr.try_into().ok())
     }
 }
 
-impl<W: Write + Seek + Send> Debug for CompressedPointWriter<'_, W> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CompressedPointWriter(header: {:?})", self.header)
+impl TryFrom<&Vlr> for LazVlr {
+    type Error = Error;
+
+    fn try_from(vlr: &Vlr) -> Result<LazVlr> {
+        LazVlr::from_buffer(&vlr.data).map_err(Error::from)
     }
 }

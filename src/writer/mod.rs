@@ -31,8 +31,10 @@
 //! assert!(writer.write(point).is_err()); // the point's color would be lost
 //! ```
 
+mod las;
 #[cfg(feature = "laz")]
-use crate::laz::CompressedPointWriter;
+mod laz;
+
 use crate::{Error, Header, Point, Result};
 use std::{
     fmt::Debug,
@@ -41,102 +43,33 @@ use std::{
     path::Path,
 };
 
-pub(crate) fn write_point_to<W: std::io::Write>(
-    dst: W,
-    point: Point,
-    header: &Header,
-) -> Result<()> {
-    point
-        .into_raw(header.transforms())
-        .and_then(|raw_point| raw_point.write_to(dst, header.point_format()))?;
-    Ok(())
-}
-
-/// Trait that defines a PointWriter, s
-pub(crate) trait PointWriter<W: std::io::Write>: Send {
-    fn write_next(&mut self, point: Point) -> Result<()>;
+trait WritePoint<W: std::io::Write>: Send {
+    fn write_point(&mut self, point: Point) -> Result<()>;
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
     fn get_mut(&mut self) -> &mut W;
     fn header(&self) -> &Header;
-    // Needed because the compressed point writer needs to be told when its done encoding data
     fn done(&mut self) -> Result<()>;
 }
 
-/// This struct is used to be able to get the inner stream of the writer when
-/// calling `into_inner`
-#[derive(Debug)]
-struct UnreachablePointWriter {}
+struct ClosedPointWriter;
 
-impl<W: std::io::Write> PointWriter<W> for UnreachablePointWriter {
-    fn write_next(&mut self, _point: Point) -> Result<()> {
+impl<W: std::io::Write> WritePoint<W> for ClosedPointWriter {
+    fn write_point(&mut self, _point: Point) -> Result<()> {
         unreachable!()
     }
-
     fn into_inner(self: Box<Self>) -> W {
         unreachable!()
     }
-
     fn get_mut(&mut self) -> &mut W {
         unreachable!()
     }
-
     fn header(&self) -> &Header {
         unreachable!()
     }
-
     fn done(&mut self) -> Result<()> {
         unreachable!()
     }
-}
-
-struct UncompressedPointWriter<W: std::io::Write> {
-    dest: W,
-    header: Header,
-}
-
-impl<W: std::io::Write + Send> PointWriter<W> for UncompressedPointWriter<W> {
-    fn write_next(&mut self, point: Point) -> Result<()> {
-        self.header.add_point(&point);
-        write_point_to(&mut self.dest, point, &self.header)?;
-        Ok(())
-    }
-
-    fn into_inner(self: Box<Self>) -> W {
-        self.dest
-    }
-
-    fn get_mut(&mut self) -> &mut W {
-        &mut self.dest
-    }
-
-    fn header(&self) -> &Header {
-        &self.header
-    }
-
-    fn done(&mut self) -> Result<()> {
-        Ok(())
-    }
-}
-
-pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(
-    mut dest: W,
-    header: &Header,
-) -> Result<()> {
-    header
-        .clone()
-        .into_raw()
-        .and_then(|raw_header| raw_header.write_to(&mut dest))?;
-    for vlr in header.vlrs() {
-        (*vlr)
-            .clone()
-            .into_raw(false)
-            .and_then(|raw_vlr| raw_vlr.write_to(&mut dest))?;
-    }
-    if !header.vlr_padding().is_empty() {
-        dest.write_all(header.vlr_padding())?;
-    }
-    Ok(())
 }
 
 /// Writes LAS data.
@@ -152,7 +85,7 @@ pub trait Write {
     /// # Examples
     ///
     /// ```
-    /// use las::{Write, Writer};
+    /// use las::Writer;
     /// let writer = Writer::default();
     /// let header = writer.header();
     /// ```
@@ -164,7 +97,7 @@ pub trait Write {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// use las::{Write, Writer};
+    /// use las::Writer;
     ///
     /// let mut writer = Writer::default();
     /// writer.write(Default::default()).unwrap();
@@ -191,7 +124,7 @@ pub trait Write {
 pub struct Writer<W: 'static + std::io::Write + Seek + Send> {
     closed: bool,
     start: u64,
-    point_writer: Box<dyn PointWriter<W> + Send>,
+    point_writer: Box<dyn WritePoint<W> + Send>,
 }
 
 impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
@@ -207,34 +140,30 @@ impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
     /// use las::Writer;
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
-    pub fn new(mut dest: W, mut header: Header) -> Result<Self> {
-        let start = dest.stream_position()?;
+    pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
+        let start = write.stream_position()?;
         header.clear();
-
-        #[cfg(feature = "laz")]
-        {
-            if header.point_format().is_compressed {
-                Ok(Self {
+        if header.point_format().is_compressed {
+            #[cfg(feature = "laz")]
+            {
+                header.add_laz_vlr()?;
+                header.write_to(&mut write)?;
+                Ok(Writer {
                     closed: false,
                     start,
-                    point_writer: Box::new(CompressedPointWriter::new(dest, header)?),
-                })
-            } else {
-                write_header_and_vlrs_to(&mut dest, &header)?;
-                Ok(Self {
-                    closed: false,
-                    start,
-                    point_writer: Box::new(UncompressedPointWriter { dest, header }),
+                    point_writer: Box::new(laz::PointWriter::new(write, header)?),
                 })
             }
-        }
-        #[cfg(not(feature = "laz"))]
-        {
-            write_header_and_vlrs_to(&mut dest, &header)?;
+            #[cfg(not(feature = "laz"))]
+            {
+                Err(Error::LaszipNotEnabled)
+            }
+        } else {
+            header.write_to(&mut write)?;
             Ok(Writer {
                 closed: false,
                 start,
-                point_writer: Box::new(UncompressedPointWriter { dest, header }),
+                point_writer: Box::new(las::PointWriter::new(write, header)),
             })
         }
     }
@@ -310,9 +239,9 @@ impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
     /// use las::Writer;
     ///
     /// let mut writer = Writer::default();
-    /// writer.write(Default::default()).unwrap();
+    /// writer.write_point(Default::default()).unwrap();
     /// ```
-    pub fn write(&mut self, point: Point) -> Result<()> {
+    pub fn write_point(&mut self, point: Point) -> Result<()> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
@@ -321,7 +250,13 @@ impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
                 *self.header().point_format(),
             ));
         }
-        self.point_writer.write_next(point)
+        self.point_writer.write_point(point)
+    }
+
+    /// Writes a point.
+    #[deprecated(since = "0.9.0", note = "Use write_point() instead")]
+    pub fn write(&mut self, point: Point) -> Result<()> {
+        self.write_point(point)
     }
 }
 
@@ -358,8 +293,7 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
         // if the method does no checks for self.closed before, which should not be
         // a problem as this function moves the writer, meaning the user won't have
         // access to it anymore
-        let point_writer =
-            std::mem::replace(&mut self.point_writer, Box::new(UnreachablePointWriter {}));
+        let point_writer = std::mem::replace(&mut self.point_writer, Box::new(ClosedPointWriter));
         let mut inner = point_writer.into_inner();
         let _ = inner.seek(SeekFrom::Start(self.start))?;
         Ok(inner)
@@ -433,7 +367,7 @@ mod tests {
         let mut writer = Writer::default();
         writer.close().unwrap();
         assert!(writer.close().is_err());
-        assert!(writer.write(Default::default()).is_err());
+        assert!(writer.write_point(Default::default()).is_err());
     }
 
     #[test]
@@ -443,21 +377,21 @@ mod tests {
             ..Default::default()
         };
         let mut writer = writer(format, Version::new(1, 4));
-        assert!(writer.write(Default::default()).is_err());
+        assert!(writer.write_point(Default::default()).is_err());
     }
 
     #[test]
     fn missing_gps_time() {
         let format = Format::new(1).unwrap();
         let mut writer = writer(format, Version::new(1, 2));
-        assert!(writer.write(Default::default()).is_err());
+        assert!(writer.write_point(Default::default()).is_err());
     }
 
     #[test]
     fn missing_color() {
         let format = Format::new(2).unwrap();
         let mut writer = writer(format, Version::new(1, 2));
-        assert!(writer.write(Default::default()).is_err());
+        assert!(writer.write_point(Default::default()).is_err());
     }
 
     #[test]
@@ -469,14 +403,14 @@ mod tests {
             color: Some(Default::default()),
             ..Default::default()
         };
-        assert!(writer.write(point).is_err());
+        assert!(writer.write_point(point).is_err());
     }
 
     #[test]
     fn missing_waveform() {
         let format = Format::new(4).unwrap();
         let mut writer = writer(format, Version::new(1, 4));
-        assert!(writer.write(Default::default()).is_err());
+        assert!(writer.write_point(Default::default()).is_err());
     }
 
     #[test]
@@ -488,7 +422,7 @@ mod tests {
         cursor.write_u8(42).unwrap();
         let mut writer = Writer::new(cursor, Default::default()).unwrap();
         let point = Point::default();
-        writer.write(point.clone()).unwrap();
+        writer.write_point(point.clone()).unwrap();
         let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
         assert_eq!(point, reader.read_point().unwrap().unwrap());
     }

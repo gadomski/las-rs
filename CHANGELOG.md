@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Reader::read_points`
   - `Reader::read_points_into`
   - `Reader::read_all_points_into`
+- `Writer::write_point`, `Header::write_to`, `laz` module, a few laz-specific methods on `Header` ([#90](https://github.com/gadomski/las-rs/pull/90))
 
 ### Changed
 
@@ -23,11 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Deprecated
 
 - `Read` trait ([#88](https://github.com/gadomski/las-rs/pull/88))
+- `Write` trait ([#90](https://github.com/gadomski/las-rs/pull/90))
 - Many methods on `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
   - `read` in favor of `read_point`
   - `read_n` in favor of `read_points`
   - `read_n_into` in favor of `read_points_into`
   - `read_all_points` in favor of `read_all_points_into`
+- `Writer::write` ([#90](https://github.com/gadomski/las-rs/pull/90))
 
 ## [0.8.8] - 2024-05-30
 

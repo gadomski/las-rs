@@ -16,7 +16,7 @@ macro_rules! autzen {
                 let mut writer =
                     Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap();
                 for point in reader.points() {
-                    writer.write(point.unwrap()).unwrap();
+                    writer.write_point(point.unwrap()).unwrap();
                 }
                 writer.close().unwrap();
             }

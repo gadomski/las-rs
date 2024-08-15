@@ -7,7 +7,7 @@ use las::{Point, Reader, Writer};
 fn roundtrip(npoints: usize) {
     let mut writer = Writer::default();
     for _ in 0..npoints {
-        writer.write(Point::default()).unwrap();
+        writer.write_point(Point::default()).unwrap();
     }
     let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
     for point in reader.points() {

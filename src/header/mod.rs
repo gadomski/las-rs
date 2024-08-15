@@ -65,7 +65,7 @@ use crate::{
     Vector, Version, Vlr,
 };
 use chrono::{Datelike, NaiveDate, Utc};
-use std::{collections::HashMap, iter::Chain, slice::Iter};
+use std::{collections::HashMap, io::Write, iter::Chain, slice::Iter};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -95,7 +95,7 @@ pub struct Header {
     transforms: Vector<Transform>,
     version: Version,
     vlr_padding: Vec<u8>,
-    vlrs: Vec<Vlr>,
+    pub(crate) vlrs: Vec<Vlr>,
 }
 
 /// An iterator over a header's variable length records.
@@ -418,11 +418,6 @@ impl Header {
         &self.vlrs
     }
 
-    #[cfg(feature = "laz")]
-    pub(crate) fn vlrs_mut(&mut self) -> &mut Vec<Vlr> {
-        &mut self.vlrs
-    }
-
     /// Returns a reference to header's extended variable length records.
     ///
     /// # Examples
@@ -499,6 +494,34 @@ impl Header {
             large_file: self.large_file()?,
             padding: self.padding,
         })
+    }
+
+    /// Writes this header to a [Write].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    /// use las::Header;
+    ///
+    /// let header = Header::default();
+    /// let cursor = Cursor::new(Vec::new());
+    /// header.write_to(cursor).unwrap();
+    /// ```
+    pub fn write_to<W: Write>(&self, mut write: W) -> Result<()> {
+        self.clone()
+            .into_raw()
+            .and_then(|raw_header| raw_header.write_to(&mut write))?;
+        for vlr in self.vlrs() {
+            (*vlr)
+                .clone()
+                .into_raw(false)
+                .and_then(|raw_vlr| raw_vlr.write_to(&mut write))?;
+        }
+        if !self.vlr_padding().is_empty() {
+            write.write_all(self.vlr_padding())?;
+        }
+        Ok(())
     }
 
     fn global_encoding(&self) -> u16 {
