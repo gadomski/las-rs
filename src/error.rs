@@ -143,6 +143,10 @@ pub enum Error {
     #[error("too many variable length records: {0}")]
     TooManyVlrs(usize),
 
+    /// [std::num::TryFromIntError]
+    #[error(transparent)]
+    TryFromIntError(#[from] std::num::TryFromIntError),
+
     /// Feature is not supported by version.
     #[error("feature {feature} is not supported by version {version}")]
     UnsupportedFeature {

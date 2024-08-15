@@ -31,7 +31,7 @@
 //! Read points one-by-one with [Reader::read]:
 //!
 //! ```
-//! use las::{Read, Reader};
+//! use las::Reader;
 //! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let point = reader.read().unwrap().unwrap();
 //! ```
@@ -39,7 +39,7 @@
 //! Or iterate over all points with [Reader::points]:
 //!
 //! ```
-//! use las::{Read, Reader};
+//! use las::Reader;
 //! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! for wrapped_point in reader.points() {
 //!     let point = wrapped_point.unwrap();
@@ -171,7 +171,6 @@
     unused_results,
     warnings
 )]
-#![recursion_limit = "128"]
 
 #[cfg(feature = "laz")]
 mod laz;
