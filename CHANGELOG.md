@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Several methods in `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
-  - `Reader::read_points`, which returns a `Result<Option<Point>>`
+  - `Reader::read_point`, which returns a `Result<Option<Point>>`
   - `Reader::read_points`
   - `Reader::read_points_into`
   - `Reader::read_all_points_into`

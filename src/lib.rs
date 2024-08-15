@@ -205,10 +205,10 @@ pub use crate::{
     vector::Vector,
     version::Version,
     vlr::Vlr,
-    writer::{Write, Writer},
+    writer::Writer,
 };
 #[allow(deprecated)]
-pub use reader::Read;
+pub use {reader::Read, writer::Write};
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;
