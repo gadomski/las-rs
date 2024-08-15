@@ -49,6 +49,7 @@ trait WritePoint<W: std::io::Write>: Send {
     fn into_inner(self: Box<Self>) -> W;
     fn get_mut(&mut self) -> &mut W;
     fn header(&self) -> &Header;
+    fn header_mut(&mut self) -> &mut Header;
     fn done(&mut self) -> Result<()>;
 }
 
@@ -65,6 +66,9 @@ impl<W: std::io::Write> WritePoint<W> for ClosedPointWriter {
         unreachable!()
     }
     fn header(&self) -> &Header {
+        unreachable!()
+    }
+    fn header_mut(&mut self) -> &mut Header {
         unreachable!()
     }
     fn done(&mut self) -> Result<()> {
@@ -188,6 +192,11 @@ impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
 
         let point_padding = self.header().point_padding().clone();
         self.point_writer.get_mut().write_all(&point_padding)?;
+
+        let start_of_first_evlr = self.point_writer.get_mut().stream_position()?;
+        self.point_writer
+            .header_mut()
+            .set_start_of_first_evlr(start_of_first_evlr);
         let raw_evlrs: Vec<Result<crate::raw::Vlr>> = {
             self.point_writer
                 .header()
@@ -258,20 +267,7 @@ impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
     pub fn write(&mut self, point: Point) -> Result<()> {
         self.write_point(point)
     }
-}
 
-#[allow(deprecated)]
-impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
-    fn header(&self) -> &Header {
-        self.header()
-    }
-
-    fn write(&mut self, point: Point) -> Result<()> {
-        self.write(point)
-    }
-}
-
-impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
     /// Closes this writer and returns its inner `Write`, seeked to the beginning of the las data.
     ///
     /// # Examples
@@ -297,6 +293,17 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
         let mut inner = point_writer.into_inner();
         let _ = inner.seek(SeekFrom::Start(self.start))?;
         Ok(inner)
+    }
+}
+
+#[allow(deprecated)]
+impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
+    fn header(&self) -> &Header {
+        self.header()
+    }
+
+    fn write(&mut self, point: Point) -> Result<()> {
+        self.write(point)
     }
 }
 

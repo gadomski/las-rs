@@ -33,6 +33,10 @@ impl<W: Write + Seek + Send> WritePoint<W> for PointWriter<W> {
         &self.header
     }
 
+    fn header_mut(&mut self) -> &mut Header {
+        &mut self.header
+    }
+
     fn done(&mut self) -> Result<()> {
         Ok(())
     }
