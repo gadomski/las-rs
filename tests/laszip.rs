@@ -30,7 +30,7 @@ mod laz_compression_test {
         let mut writer = las::Writer::new(cursor, header).unwrap();
 
         for point in &points {
-            writer.write(point.clone()).unwrap();
+            writer.write_point(point.clone()).unwrap();
         }
         writer.close().unwrap();
         let cursor = writer.into_inner().unwrap();

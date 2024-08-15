@@ -257,7 +257,7 @@ impl Reader {
             #[cfg(feature = "laz")]
             {
                 Ok(Reader {
-                    point_reader: Box::new(laz::PointReader::new(header, read)?),
+                    point_reader: Box::new(laz::PointReader::new(read, header)?),
                 })
             }
             #[cfg(not(feature = "laz"))]
@@ -266,7 +266,7 @@ impl Reader {
             }
         } else {
             Ok(Reader {
-                point_reader: Box::new(las::PointReader::new(header, read)?),
+                point_reader: Box::new(las::PointReader::new(read, header)?),
             })
         }
     }
@@ -472,14 +472,14 @@ mod tests {
     #[test]
     fn seek() {
         let mut writer = Writer::default();
-        writer.write(Default::default()).unwrap();
+        writer.write_point(Default::default()).unwrap();
         let point = Point {
             x: 1.,
             y: 2.,
             z: 3.,
             ..Default::default()
         };
-        writer.write(point.clone()).unwrap();
+        writer.write_point(point.clone()).unwrap();
         let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
         reader.seek(1).unwrap();
         assert_eq!(point, reader.read_point().unwrap().unwrap());

@@ -10,7 +10,7 @@ pub(crate) struct PointReader<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> PointReader<R> {
-    pub(crate) fn new(header: Header, mut read: R) -> Result<PointReader<R>> {
+    pub(crate) fn new(mut read: R, header: Header) -> Result<PointReader<R>> {
         Ok(PointReader {
             start: read.stream_position()?,
             read,
