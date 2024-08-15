@@ -28,6 +28,9 @@ criterion = "0.5"
 laz = ["dep:laz"]
 laz-parallel = ["dep:laz", "laz/parallel"]
 
+[lib]
+bench = false
+
 [[bench]]
 name = "roundtrip"
 harness = false
