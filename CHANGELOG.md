@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-beta.0] - 2024-08-15
+
 ### Added
 
 - Several methods in `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
@@ -101,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Benchmarks now use [criterion](https://github.com/bheisler/criterion.rs) ([#52](https://github.com/gadomski/las-rs/pull/52))
 - Edition is now 2021 ([#52](https://github.com/gadomski/las-rs/pull/52))
 
-[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.8.8...HEAD
+[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.9.0-beta.0...HEAD
+[0.9.0-beta.0]: https://github.com/gadomski/las-rs/releases/compare/v0.8.8...v0.9.0-beta.0
 [0.8.8]: https://github.com/gadomski/las-rs/releases/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/gadomski/las-rs/releases/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/gadomski/las-rs/releases/compare/v0.8.5...v0.8.6
