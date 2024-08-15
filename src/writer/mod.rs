@@ -53,7 +53,7 @@ pub(crate) fn write_point_to<W: std::io::Write>(
 }
 
 /// Trait that defines a PointWriter, s
-pub(crate) trait PointWriter<W: std::io::Write>: Debug + Send {
+pub(crate) trait PointWriter<W: std::io::Write>: Send {
     fn write_next(&mut self, point: Point) -> Result<()>;
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
@@ -90,13 +90,12 @@ impl<W: std::io::Write> PointWriter<W> for UnreachablePointWriter {
     }
 }
 
-#[derive(Debug)]
-struct UncompressedPointWriter<W: std::io::Write + Debug> {
+struct UncompressedPointWriter<W: std::io::Write> {
     dest: W,
     header: Header,
 }
 
-impl<W: std::io::Write + Debug + Send> PointWriter<W> for UncompressedPointWriter<W> {
+impl<W: std::io::Write + Send> PointWriter<W> for UncompressedPointWriter<W> {
     fn write_next(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
         write_point_to(&mut self.dest, point, &self.header)?;
@@ -143,6 +142,10 @@ pub(crate) fn write_header_and_vlrs_to<W: std::io::Write>(
 /// Writes LAS data.
 ///
 /// See StdWriter for a concrete implementation.
+#[deprecated(
+    since = "0.9.0",
+    note = "This interface has been refactored so that importing Write is no longer required"
+)]
 pub trait Write {
     /// Returns a reference to this writer's header.
     ///
@@ -184,14 +187,14 @@ pub trait Write {
 ///     writer.close().unwrap();
 /// } // <- `close` is not called
 /// ```
-#[derive(Debug)]
-pub struct Writer<W: 'static + std::io::Write + Seek + Debug + Send> {
+#[allow(missing_debug_implementations)]
+pub struct Writer<W: 'static + std::io::Write + Seek + Send> {
     closed: bool,
     start: u64,
     point_writer: Box<dyn PointWriter<W> + Send>,
 }
 
-impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
     /// Creates a new writer.
     ///
     /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
@@ -284,16 +287,32 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Writer<W> {
         self.closed = true;
         Ok(())
     }
-}
 
-impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
     /// Returns a reference to this writer's header.
-    fn header(&self) -> &Header {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Writer;
+    ///
+    /// let writer = Writer::default();
+    /// let header = writer.header();
+    /// ```
+    pub fn header(&self) -> &Header {
         self.point_writer.header()
     }
 
     /// Writes a point.
-    fn write(&mut self, point: Point) -> Result<()> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Writer;
+    ///
+    /// let mut writer = Writer::default();
+    /// writer.write(Default::default()).unwrap();
+    /// ```
+    pub fn write(&mut self, point: Point) -> Result<()> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
@@ -303,6 +322,17 @@ impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
             ));
         }
         self.point_writer.write_next(point)
+    }
+}
+
+#[allow(deprecated)]
+impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
+    fn header(&self) -> &Header {
+        self.header()
+    }
+
+    fn write(&mut self, point: Point) -> Result<()> {
+        self.write(point)
     }
 }
 
@@ -377,7 +407,7 @@ impl Default for Writer<Cursor<Vec<u8>>> {
     }
 }
 
-impl<W: 'static + Seek + std::io::Write + Debug + Send> Drop for Writer<W> {
+impl<W: 'static + Seek + std::io::Write + Send> Drop for Writer<W> {
     fn drop(&mut self) {
         if !self.closed {
             self.close().expect("Error when dropping the writer");

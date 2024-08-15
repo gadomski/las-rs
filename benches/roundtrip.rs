@@ -2,7 +2,7 @@ extern crate criterion;
 extern crate las;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use las::{Point, Reader, Write, Writer};
+use las::{Point, Reader, Writer};
 
 fn roundtrip(npoints: usize) {
     let mut writer = Writer::default();

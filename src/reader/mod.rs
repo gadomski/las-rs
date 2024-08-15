@@ -467,7 +467,7 @@ impl Read for Reader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Write, Writer};
+    use crate::Writer;
 
     #[test]
     fn seek() {
