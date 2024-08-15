@@ -207,6 +207,7 @@ impl Builder {
             if self.version.supports::<Evlrs>() || evlr.has_large_data() {
                 evlrs.push(evlr);
             } else {
+                log::warn!("moving Evlr to Vlr because version does not support Evlrs: user_id={}, record_id={}, description={}", evlr.user_id, evlr.record_id, evlr.description);
                 vlrs.push(evlr);
             }
         }
@@ -237,6 +238,7 @@ impl Builder {
             padding: self.padding,
             point_format: self.point_format,
             point_padding: self.point_padding,
+            start_of_first_evlr: None,
             system_identifier: self.system_identifier,
             transforms: self.transforms,
             version: self.version,

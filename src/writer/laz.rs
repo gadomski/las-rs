@@ -49,8 +49,46 @@ impl<W: Write + Seek + Send> WritePoint<W> for PointWriter<'_, W> {
         &self.header
     }
 
+    fn header_mut(&mut self) -> &mut Header {
+        &mut self.header
+    }
+
     fn done(&mut self) -> Result<()> {
         self.compressor.done()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Builder, Point, Reader, Vlr, Writer};
+    use std::io::Cursor;
+
+    #[test]
+    fn evlr() {
+        let mut vlr = Vlr::default();
+        vlr.user_id = "@gadomski".to_string();
+        vlr.record_id = 42;
+        vlr.description = "A great vlr".to_string();
+        vlr.data = b"some data".to_vec();
+        let mut builder = Builder::default();
+        builder.version.minor = 4;
+        builder.point_format.is_compressed = true;
+        builder.evlrs.push(vlr);
+        let header = builder.into_header().unwrap();
+        let cursor = Cursor::new(Vec::new());
+        let mut writer = Writer::new(cursor, header).unwrap();
+        for i in 0..5 {
+            let mut point = Point::default();
+            point.return_number = i;
+            writer.write_point(point).unwrap();
+        }
+        let cursor = writer.into_inner().unwrap();
+        let reader = Reader::new(cursor).unwrap();
+        let evlr = &reader.header().evlrs()[0];
+        assert_eq!(evlr.user_id, "@gadomski");
+        assert_eq!(evlr.record_id, 42);
+        assert_eq!(evlr.description, "A great vlr");
+        assert_eq!(evlr.data, b"some data");
     }
 }

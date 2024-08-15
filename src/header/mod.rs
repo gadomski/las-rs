@@ -91,6 +91,7 @@ pub struct Header {
     padding: Vec<u8>,
     point_format: Format,
     point_padding: Vec<u8>,
+    start_of_first_evlr: Option<u64>,
     system_identifier: String,
     transforms: Vector<Transform>,
     version: Version,
@@ -524,6 +525,10 @@ impl Header {
         Ok(())
     }
 
+    pub(crate) fn set_start_of_first_evlr(&mut self, start_of_first_evlr: u64) {
+        self.start_of_first_evlr = Some(start_of_first_evlr);
+    }
+
     fn global_encoding(&self) -> u16 {
         let mut bits = self.gps_time_type.into();
         if self.has_synthetic_return_numbers {
@@ -631,9 +636,13 @@ impl Header {
         } else if n > u32::MAX as usize {
             Err(Error::TooManyEvlrs(n))
         } else {
-            let start_of_first_evlr = self.point_data_len()
-                + self.point_padding.len() as u64
-                + u64::from(self.offset_to_point_data()?);
+            let start_of_first_evlr = if let Some(start_of_fist_evlr) = self.start_of_first_evlr {
+                start_of_fist_evlr
+            } else {
+                self.point_data_len()
+                    + self.point_padding.len() as u64
+                    + u64::from(self.offset_to_point_data()?)
+            };
             Ok(Some(raw::header::Evlr {
                 start_of_first_evlr,
                 number_of_evlrs: n as u32,
@@ -681,6 +690,7 @@ impl Default for Header {
             padding: Vec::new(),
             point_format: Default::default(),
             point_padding: Vec::new(),
+            start_of_first_evlr: None,
             system_identifier: "las-rs".to_string(),
             transforms: Default::default(),
             version: Default::default(),

@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reorganize reading, including removing the lifetime specifier on `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
 - Conslidate errors to a single enum ([#87](https://github.com/gadomski/las-rs/pull/87))
 
+### Fixed
+
+- Start of first EVLR ([#91](https://github.com/gadomski/las-rs/pull/91))
+
 ## Deprecated
 
 - `Read` trait ([#88](https://github.com/gadomski/las-rs/pull/88))
