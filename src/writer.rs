@@ -460,6 +460,6 @@ mod tests {
         let point = Point::default();
         writer.write(point.clone()).unwrap();
         let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
-        assert_eq!(point, reader.read().unwrap().unwrap());
+        assert_eq!(point, reader.read_point().unwrap().unwrap());
     }
 }

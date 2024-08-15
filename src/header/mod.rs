@@ -5,7 +5,7 @@
 //! A [Reader](crate::Reader) uses a [Header] to expose metadata:
 //!
 //! ```
-//! use las::{Read, Reader};
+//! use las::Reader;
 //! let reader = Reader::from_path("tests/data/autzen.las").unwrap();
 //! let header = reader.header();
 //! println!("The file has {} points.", header.number_of_points());
@@ -29,7 +29,7 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Writer, Reader, Read};
+//! use las::{Writer, Reader};
 //!
 //! let header = Reader::from_path("tests/data/autzen.las").unwrap().header().clone();
 //! let writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();

@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Several methods in `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
+  - `Reader::read_points`, which returns a `Result<Option<Point>>`
+  - `Reader::read_points`
+  - `Reader::read_points_into`
+  - `Reader::read_all_points_into`
+
 ### Changed
 
-- BREAKING: Conslidate errors to a single enum ([#87](https://github.com/gadomski/las-rs/pull/87))
+- Reorganize reading, including removing the lifetime specifier on `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
+- Conslidate errors to a single enum ([#87](https://github.com/gadomski/las-rs/pull/87))
+
+## Deprecated
+
+- `Read` trait ([#88](https://github.com/gadomski/las-rs/pull/88))
+- Many methods on `Reader` ([#89](https://github.com/gadomski/las-rs/pull/89))
+  - `read` in favor of `read_point`
+  - `read_n` in favor of `read_points`
+  - `read_n_into` in favor of `read_points_into`
+  - `read_all_points` in favor of `read_all_points_into`
 
 ## [0.8.8] - 2024-05-30
 
