@@ -11,14 +11,14 @@ Read and write [ASPRS las files](http://www.asprs.org/Committee-General/LASer-LA
 
 ```toml
 [dependencies]
-las = "0.8"
+las = "0.9"
 ```
 
 To include [laz](https://laszip.org/) support:
 
 ```toml
 [dependencies]
-las = { version = "0.8", features = ["laz"] }
+las = { version = "0.9", features = ["laz"] }
 ```
 
 To include `laz` support with parallel compression/decompression
@@ -26,5 +26,5 @@ to enhance speed (`laz-parallel` implies `laz` so you don't need to specify both
 
 ```toml
 [dependencies]
-las = { version = "0.8", features = ["laz-parallel"] }
+las = { version = "0.9", features = ["laz-parallel"] }
 ```

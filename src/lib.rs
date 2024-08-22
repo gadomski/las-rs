@@ -112,7 +112,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! las = { version = "0.8", features = ["laz"] }  # or laz-parallel
+//! las = { version = "0.9", features = ["laz"] }  # or laz-parallel
 //! ```
 //!
 //! Then, you can compress the data when writing:
