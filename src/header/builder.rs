@@ -117,19 +117,14 @@ impl Builder {
             generating_software: raw_header
                 .generating_software
                 .as_ref()
-                .as_las_str()?
-                .to_string(),
+                .as_las_string_lossy(),
             gps_time_type: raw_header.global_encoding.into(),
             guid: Uuid::from_bytes(raw_header.guid),
             has_synthetic_return_numbers: raw_header.global_encoding & 8 == 8,
             has_wkt_crs: raw_header.global_encoding & 16 == 16,
             padding: raw_header.padding,
             point_format,
-            system_identifier: raw_header
-                .system_identifier
-                .as_ref()
-                .as_las_str()?
-                .to_string(),
+            system_identifier: raw_header.system_identifier.as_ref().as_las_string_lossy(),
             transforms: Vector {
                 x: Transform {
                     scale: raw_header.x_scale_factor,
