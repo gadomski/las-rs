@@ -191,29 +191,23 @@ mod tests {
     #[test]
     fn allow_non_ascii_user_id() {
         let raw_vlr = raw::Vlr {
-            user_id: [0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            user_id: [194, 174, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0],
             ..Default::default()
         };
         let vlr = Vlr::new(raw_vlr);
-        assert_eq!(
-            "\u{0}*\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
-            vlr.user_id
-        );
+        assert_eq!("®", vlr.user_id);
     }
 
     #[test]
     fn allow_non_ascii_description() {
         let raw_vlr = raw::Vlr {
             description: [
-                0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0,
+                194, 174, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
             ],
             ..Default::default()
         };
         let vlr = Vlr::new(raw_vlr);
-        assert_eq!(
-            "\u{0}*\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}*\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
-            vlr.description
-        );
+        assert_eq!("®", vlr.description);
     }
 }
