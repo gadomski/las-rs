@@ -41,7 +41,10 @@ impl AsLasStr for &'_ [u8] {
     fn as_las_string_lossy(&self) -> String {
         match self.as_las_str() {
             Ok(s) => s.to_string(),
-            Err(_) => String::from_utf8_lossy(self).to_string(),
+            Err(_) => {
+                let len = self.iter().position(|c| *c == 0).unwrap_or(self.len());
+                String::from_utf8_lossy(&self[..len]).to_string()
+            }
         }
     }
 }
@@ -100,5 +103,11 @@ mod tests {
     fn from_too_long() {
         let mut bytes = [0; 5];
         assert!(bytes.as_mut().from_las_str("Beer!!").is_err());
+    }
+
+    #[test]
+    fn lossy_from_not_null_filled() {
+        let bytes = [65, 66, 67, 0, 68];
+        assert_eq!("ABC", bytes.as_ref().as_las_string_lossy());
     }
 }
