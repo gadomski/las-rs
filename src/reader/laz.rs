@@ -1,5 +1,5 @@
 use super::ReadPoints;
-use crate::{raw, Error, Header, Point, Result};
+use crate::{raw, Header, Point, Result};
 use laz::LazDecompressor;
 use std::io::{Cursor, Read, Seek};
 

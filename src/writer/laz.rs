@@ -12,7 +12,7 @@ pub(crate) struct PointWriter<'a, W: Write + Seek + Send> {
 impl<'a, W: Write + Seek + Send> PointWriter<'a, W> {
     pub(crate) fn new(write: W, header: Header) -> Result<PointWriter<'a, W>> {
         let buffer = Cursor::new(vec![0u8; header.point_format().len() as usize]);
-        let vlr = header.laz_vlr().ok_or(Error::LasZipVlrNotFound)?;
+        let vlr = header.laz_vlr()?;
         let compressor = LasZipCompressor::new(write, vlr)?;
 
         Ok(Self {
