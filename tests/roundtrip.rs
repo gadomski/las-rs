@@ -24,13 +24,13 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
 }
 
 macro_rules! roundtrip_point {
-    ($name:ident, $modify_point:expr) => {
+    ($name:ident, $modify_point:expr_2021) => {
         roundtrip_point!($name, $modify_point, 0);
     };
-    ($name:ident, $modify_point:expr, $min_version_minor:expr) => {
+    ($name:ident, $modify_point:expr_2021, $min_version_minor:expr_2021) => {
         roundtrip_point!($name, $modify_point, $min_version_minor, |_f| {});
     };
-    ($name:ident, $modify_point:expr, $min_version_minor:expr, $modify_point_format:expr) => {
+    ($name:ident, $modify_point:expr_2021, $min_version_minor:expr_2021, $modify_point_format:expr_2021) => {
         #[test]
         fn $name() {
             use las::{point::Format, Builder, Point, Version};
@@ -49,10 +49,10 @@ macro_rules! roundtrip_point {
 }
 
 macro_rules! roundtrip_builder {
-    ($name:ident, $modify_builder:expr) => {
+    ($name:ident, $modify_builder:expr_2021) => {
         roundtrip_builder!($name, $modify_builder, 0);
     };
-    ($name:ident, $modify_builder:expr, $min_version_minor:expr) => {
+    ($name:ident, $modify_builder:expr_2021, $min_version_minor:expr_2021) => {
         #[test]
         fn $name() {
             use las::{Builder, Point, Version};
@@ -67,7 +67,7 @@ macro_rules! roundtrip_builder {
 }
 
 macro_rules! version {
-    ($name:ident, $major:expr, $minor:expr) => {
+    ($name:ident, $major:expr_2021, $minor:expr_2021) => {
         mod $name {
             use las::Version;
 
@@ -200,7 +200,7 @@ macro_rules! version {
                     evlrs,
                     |b: &mut Builder| {
                         let mut vlr = Vlr::default();
-                        vlr.data = vec![42; ::std::u16::MAX as usize + 1];
+                        vlr.data = vec![42; u16::MAX as usize + 1];
                         b.evlrs.push(vlr);
                     },
                     4

@@ -49,7 +49,7 @@ pub trait Feature {
 macro_rules! features {
     (   $(
             $(#[$meta:meta])*
-            $name:ident ($($versions:expr),+);
+            $name:ident ($($versions:expr_2021),+);
         )+
     ) => {
         $(

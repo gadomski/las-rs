@@ -158,7 +158,7 @@ mod tests {
     use super::*;
 
     macro_rules! version {
-        ($name:ident, $major:expr, $minor:expr, $supports:expr, $max_point_format:expr) => {
+        ($name:ident, $major:expr_2021, $minor:expr_2021, $supports:expr_2021, $max_point_format:expr_2021) => {
             mod $name {
                 use super::*;
                 use crate::feature::*;

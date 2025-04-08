@@ -548,7 +548,7 @@ mod tests {
     }
 
     macro_rules! roundtrip {
-        ($name:ident, $minor:expr) => {
+        ($name:ident, $minor:expr_2021) => {
             mod $name {
                 #[test]
                 fn roundtrip() {

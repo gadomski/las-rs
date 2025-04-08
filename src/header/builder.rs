@@ -355,7 +355,7 @@ mod tests {
     fn evlr_upgrade() {
         let mut builder = Builder::from((1, 4));
         let vlr = Vlr {
-            data: vec![0; ::std::u16::MAX as usize + 1],
+            data: vec![0; u16::MAX as usize + 1],
             ..Default::default()
         };
         builder.vlrs.push(vlr);

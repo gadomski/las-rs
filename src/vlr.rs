@@ -179,7 +179,6 @@ mod tests {
 
     #[test]
     fn too_long() {
-        use std::u16;
         let data = vec![0; u16::MAX as usize + 1];
         let vlr = Vlr {
             data,
