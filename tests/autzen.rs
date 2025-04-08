@@ -3,7 +3,7 @@
 extern crate las;
 
 macro_rules! autzen {
-    ($name:ident, $major:expr, $minor:expr) => {
+    ($name:ident, $major:expr_2021, $minor:expr_2021) => {
         mod $name {
             use las::{Builder, Reader, Version, Writer};
             use std::io::Cursor;

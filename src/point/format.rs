@@ -246,7 +246,7 @@ mod tests {
     use super::*;
 
     macro_rules! format {
-        ($name:ident, $n:expr, $expected:expr, $len:expr) => {
+        ($name:ident, $n:expr_2021, $expected:expr_2021, $len:expr_2021) => {
             mod $name {
                 use crate::point::Format;
 
