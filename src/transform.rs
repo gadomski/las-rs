@@ -88,7 +88,6 @@ pub(crate) enum RoundingMode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::i32;
 
     #[test]
     fn too_large() {

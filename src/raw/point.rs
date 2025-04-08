@@ -521,8 +521,8 @@ impl Flags {
     /// ```
     pub fn number_of_returns(&self) -> u8 {
         match *self {
-            Flags::TwoByte(a, _) => a >> 3 & 7,
-            Flags::ThreeByte(a, _, _) => a >> 4 & 15,
+            Flags::TwoByte(a, _) => (a >> 3) & 7,
+            Flags::ThreeByte(a, _, _) => (a >> 4) & 15,
         }
     }
 

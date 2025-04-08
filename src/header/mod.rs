@@ -779,7 +779,6 @@ mod tests {
 
     #[test]
     fn zero_legacy_fields_when_too_large() {
-        use std::u32;
         let mut header = Header::from((1, 4));
         header.number_of_points = u64::from(u32::MAX) + 1;
         let _ = header.number_of_points_by_return.insert(6, 42);
@@ -816,8 +815,6 @@ mod tests {
 
     #[test]
     fn number_of_points_large() {
-        use std::u32;
-
         let mut header = Header::from((1, 2));
         header.number_of_points = u32::MAX as u64 + 1;
         assert!(header.into_raw().is_err());
@@ -837,8 +834,6 @@ mod tests {
 
     #[test]
     fn number_of_points_by_return_large() {
-        use std::u32;
-
         let mut header = Header::from((1, 2));
         let _ = header
             .number_of_points_by_return
@@ -873,7 +868,6 @@ mod tests {
 
     #[test]
     fn header_too_large() {
-        use std::u16;
         let builder = Builder::new(raw::Header {
             padding: vec![0; u16::MAX as usize - 226],
             version: (1, 2).into(),
@@ -885,7 +879,6 @@ mod tests {
 
     #[test]
     fn offset_to_point_data_too_large() {
-        use std::u32;
         let mut builder = Builder::from((1, 2));
         builder.vlr_padding = vec![0; u32::MAX as usize - 226];
         assert!(builder.into_header().unwrap().into_raw().is_err());
