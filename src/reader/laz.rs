@@ -1,6 +1,6 @@
 use super::ReadPoints;
-use crate::{raw, Error, Header, Point, Result, Vlr};
-use laz::{LazDecompressor, LazVlr};
+use crate::{raw, Header, Point, Result};
+use laz::LazDecompressor;
 use std::io::{Cursor, Read, Seek};
 
 pub(crate) struct PointReader<D: LazDecompressor> {
@@ -16,8 +16,8 @@ impl<R: Read + Seek> PointReader<laz::ParLasZipDecompressor<R>> {
         read: R,
         header: Header,
     ) -> Result<PointReader<laz::ParLasZipDecompressor<R>>> {
-        let (vlr, buffer) = vlr_and_buffer(&header)?;
-        let decompressor = laz::ParLasZipDecompressor::new(read, vlr)?;
+        let decompressor = laz::ParLasZipDecompressor::new(read, header.laz_vlr()?)?;
+        let buffer = Cursor::new(vec![0u8; header.point_format().len().into()]);
         Ok(PointReader {
             decompressor,
             header,
@@ -33,8 +33,8 @@ impl<R: Read + Seek + Send> PointReader<laz::LasZipDecompressor<'_, R>> {
         read: R,
         header: Header,
     ) -> Result<PointReader<laz::LasZipDecompressor<'static, R>>> {
-        let (vlr, buffer) = vlr_and_buffer(&header)?;
-        let decompressor = laz::LasZipDecompressor::new(read, vlr)?;
+        let decompressor = laz::LasZipDecompressor::new(read, header.laz_vlr()?)?;
+        let buffer = Cursor::new(vec![0u8; header.point_format().len().into()]);
         Ok(PointReader {
             decompressor,
             header,
@@ -91,17 +91,4 @@ where
     fn header(&self) -> &Header {
         &self.header
     }
-}
-
-fn is_laszip_vlr(vlr: &Vlr) -> bool {
-    vlr.user_id == LazVlr::USER_ID && vlr.record_id == LazVlr::RECORD_ID
-}
-
-fn vlr_and_buffer(header: &Header) -> Result<(LazVlr, Cursor<Vec<u8>>)> {
-    let vlr = match header.vlrs().iter().find(|vlr| is_laszip_vlr(vlr)) {
-        None => return Err(Error::LasZipVlrNotFound),
-        Some(vlr) => LazVlr::from_buffer(&vlr.data)?,
-    };
-    let buffer = Cursor::new(vec![0u8; header.point_format().len().into()]);
-    Ok((vlr, buffer))
 }

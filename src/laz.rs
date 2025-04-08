@@ -83,7 +83,7 @@ impl Header {
         Ok(())
     }
 
-    /// Returns header's [LazVlr], or `None` if none is found.
+    /// Returns header's [LazVlr], or `Error::LasZipVlrNotFound` if none is found.
     ///
     /// # Examples
     ///
@@ -94,16 +94,16 @@ impl Header {
     ///
     /// #[cfg(feature = "laz")]
     /// {
-    /// assert!(header.laz_vlr().is_none());
+    /// assert!(header.laz_vlr().is_err());
     /// header.add_laz_vlr();
-    /// assert!(header.laz_vlr().is_some());
+    /// assert!(header.laz_vlr().is_ok());
     /// }
     /// ```
-    pub fn laz_vlr(&self) -> Option<LazVlr> {
+    pub fn laz_vlr(&self) -> Result<LazVlr> {
         self.vlrs
             .iter()
             .find(|vlr| is_laszip_vlr(vlr))
-            .and_then(|vlr| vlr.try_into().ok())
+            .map_or(Err(Error::LasZipVlrNotFound), |vlr| vlr.try_into())
     }
 }
 

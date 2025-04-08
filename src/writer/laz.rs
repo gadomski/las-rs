@@ -12,7 +12,7 @@ pub(crate) struct PointWriter<'a, W: Write + Seek + Send> {
 impl<'a, W: Write + Seek + Send> PointWriter<'a, W> {
     pub(crate) fn new(write: W, header: Header) -> Result<PointWriter<'a, W>> {
         let buffer = Cursor::new(vec![0u8; header.point_format().len() as usize]);
-        let vlr = header.laz_vlr().ok_or(Error::LasZipVlrNotFound)?;
+        let vlr = header.laz_vlr()?;
         let compressor = LasZipCompressor::new(write, vlr)?;
 
         Ok(Self {
@@ -66,11 +66,12 @@ mod tests {
 
     #[test]
     fn evlr() {
-        let mut vlr = Vlr::default();
-        vlr.user_id = "@gadomski".to_string();
-        vlr.record_id = 42;
-        vlr.description = "A great vlr".to_string();
-        vlr.data = b"some data".to_vec();
+        let vlr = Vlr {
+            user_id: "@gadomski".to_string(),
+            record_id: 42,
+            description: "A great vlr".to_string(),
+            data: b"some data".to_vec(),
+        };
         let mut builder = Builder::default();
         builder.version.minor = 4;
         builder.point_format.is_compressed = true;
@@ -79,8 +80,10 @@ mod tests {
         let cursor = Cursor::new(Vec::new());
         let mut writer = Writer::new(cursor, header).unwrap();
         for i in 0..5 {
-            let mut point = Point::default();
-            point.return_number = i;
+            let point = Point {
+                return_number: i,
+                ..Default::default()
+            };
             writer.write_point(point).unwrap();
         }
         let cursor = writer.into_inner().unwrap();
