@@ -200,7 +200,7 @@ macro_rules! version {
                     evlrs,
                     |b: &mut Builder| {
                         let mut vlr = Vlr::default();
-                        vlr.data = vec![42; ::std::u16::MAX as usize + 1];
+                        vlr.data = vec![42; u16::MAX as usize + 1];
                         b.evlrs.push(vlr);
                     },
                     4
