@@ -9,6 +9,15 @@ pub enum Error {
     #[error("the writer is closed")]
     ClosedWriter,
 
+    /// The laszip vlr was not found, the points cannot be decompressed.
+    #[cfg(feature = "copc")]
+    #[error("copcinfo vlr not found")]
+    CopcInfoVlrNotFound,
+    /// The laszip vlr was not found, the points cannot be decompressed.
+    #[cfg(feature = "copc")]
+    #[error("copchierarchy vlr not found")]
+    CopcHierarchyVlrNotFound,
+
     /// The header size, as computed, is too large.
     #[error("the header is too large ({0} bytes) to convert to a raw header")]
     HeaderTooLarge(usize),

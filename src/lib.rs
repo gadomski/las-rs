@@ -175,6 +175,9 @@
 #[cfg(feature = "laz")]
 pub mod laz;
 
+#[cfg(feature = "copc")]
+pub mod copc;
+
 pub mod feature;
 pub mod header;
 pub mod point;
