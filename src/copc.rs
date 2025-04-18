@@ -1,5 +1,4 @@
-//! copc header data
-//!
+//! [COPC](https://copc.io/) header data
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use core::panic;
@@ -118,7 +117,7 @@ impl VoxelKey {
     /// Computes the Childs of a VoxelKey
     /// There are max 8 Childs to a VoxelKey
     /// **dir**ection needs to be 0..8
-    pub fn child(&self, dir: i32) -> Self {
+    pub fn child(&self, direction: i32) -> Self {
         // TODO: Maybe dir %= 8; would be better
         if dir > 7 {
             panic!("direction needs to be in range 0..8! Was {dir}")
@@ -313,13 +312,15 @@ impl CopcHierarchyVlr {
 /// assert!(copc::is_copcinfo_vlr(&vlr));
 /// }
 /// ```
-pub fn is_copcinfo_vlr(vlr: &Vlr) -> bool {
-    vlr.user_id == CopcInfoVlr::USER_ID && vlr.record_id == CopcInfoVlr::RECORD_ID
+impl Vlr {
+pub fn is_copc_info(&self) -> bool {
+    self.user_id == CopcInfoVlr::USER_ID && self.record_id == CopcInfoVlr::RECORD_ID
+   }
 }
 
 impl Header {
     /// doc
-    pub fn copcinfo_vlr(&self) -> Result<CopcInfoVlr> {
+    pub fn copc_info_vlr(&self) -> Result<CopcInfoVlr> {
         self.vlrs
             .iter()
             .find(|vlr| is_copcinfo_vlr(vlr))
@@ -327,7 +328,7 @@ impl Header {
     }
 }
 
-/// Returns true if this [Vlr] is the Copc Page Vlr.
+/// Returns true if this [Vlr] is the Copc Heirarchy Vlr.
 ///
 /// # Examples
 ///
@@ -349,7 +350,7 @@ pub fn is_copchierarchy_evlr(vlr: &Vlr) -> bool {
 
 impl Header {
     /// doc
-    pub fn copchierarchy_evlr(&self) -> Result<CopcHierarchyVlr> {
+    pub fn copc_hierarchy_evlr(&self) -> Result<CopcHierarchyVlr> {
         let copc_info = self.copcinfo_vlr()?;
         self.evlrs()
             .iter()
@@ -371,7 +372,6 @@ mod tests {
             .iter()
             .map(|v| v.parent())
             .all(|v| v.eq(&VoxelKey::ROOT)));
-        println!("{childs:?}");
         assert!(childs
             .iter()
             .map(|c| (c, (0..8).map(|dir| c.child(dir)).collect::<Vec<_>>()))
@@ -385,8 +385,6 @@ mod tests {
         assert!(copcinfo.root_hier_offset == 4336);
         assert!(copcinfo.root_hier_size == 32);
         assert!(copchier.root.entries[0].key == VoxelKey::ROOT);
-        println!("{copcinfo:?}");
-        println!("{copchier:?}");
     }
     #[test]
     fn test_copc_autzen() {

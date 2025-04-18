@@ -27,7 +27,6 @@ criterion = "0.5"
 [features]
 laz = ["dep:laz"]
 laz-parallel = ["dep:laz", "laz/parallel"]
-copc = ["laz"]
 
 [lib]
 bench = false
