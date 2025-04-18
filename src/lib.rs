@@ -173,10 +173,9 @@
 )]
 
 #[cfg(feature = "laz")]
-pub mod laz;
-
-#[cfg(feature = "copc")]
 pub mod copc;
+#[cfg(feature = "laz")]
+pub mod laz;
 
 pub mod feature;
 pub mod header;

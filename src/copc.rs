@@ -1,11 +1,14 @@
 //! [COPC](https://copc.io/) header data
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use core::panic;
 use std::{
     collections::HashMap,
     io::{Read, Write},
 };
+/// The user id of the LasZip VLR header.
+pub const USER_ID: &str = "copc";
+/// The description of the LasZip VLR header.
+pub const DESCRIPTION: &str = "https://copc.io";
 
 use crate::{Error, Header, Result, Vlr};
 /// The COPC Info Vlr
@@ -40,12 +43,8 @@ pub struct CopcInfoVlr {
     reserved: [u64; 11],
 }
 impl CopcInfoVlr {
-    /// The user id of the LasZip VLR header.
-    pub const USER_ID: &'static str = "copc";
     /// The record id of the LasZip VLR header.
     pub const RECORD_ID: u16 = 1;
-    /// The description of the LasZip VLR header.
-    pub const DESCRIPTION: &'static str = "https://copc.io";
 
     /// Reads the Vlr data from the source.
     ///
@@ -117,10 +116,12 @@ impl VoxelKey {
     /// Computes the Childs of a VoxelKey
     /// There are max 8 Childs to a VoxelKey
     /// **dir**ection needs to be 0..8
-    pub fn child(&self, direction: i32) -> Self {
-        // TODO: Maybe dir %= 8; would be better
-        if dir > 7 {
-            panic!("direction needs to be in range 0..8! Was {dir}")
+    pub fn child(&self, direction: i32) -> Result<Self> {
+        // TODO: Maybe direction %= 8; would be better
+        if !(0..8).contains(&direction) {
+            return Err(Error::FunctionArgumentRequirementsNotMet {
+                argument: format!("direction needs to be (0..8). Was {direction}"),
+            });
         }
         // bit permutations:
         // 0 -> l+1,2x  ,2y  ,2z
@@ -130,12 +131,12 @@ impl VoxelKey {
         // ...
         // 7 -> +1,2x+1,2y+1,2z+1
         // TODO: << can overflow to negative
-        Self {
+        Ok(Self {
             l: self.l + 1,
-            x: (self.x << 1) | (dir & 0x1),
-            y: (self.y << 1) | ((dir >> 1) & 0x1),
-            z: (self.z << 1) | ((dir >> 2) & 0x1),
-        }
+            x: (self.x << 1) | (direction & 0x1),
+            y: (self.y << 1) | ((direction >> 1) & 0x1),
+            z: (self.z << 1) | ((direction >> 2) & 0x1),
+        })
     }
     /// Computes the parent VoxelKey
     pub fn parent(&self) -> Self {
@@ -173,9 +174,9 @@ impl VoxelKey {
     }
 }
 
-/// An entry corresponds to a single key/value pair in an EPT hierarchy, but con-
-/// tains additional information to allow direct access and decoding of the corre-
-/// sponding point data.
+/// An entry corresponds to a single key/value pair in an EPT hierarchy, but
+/// contains additional information to allow direct access and decoding of the
+/// corresponding point data.
 /// One Entry has 32 bytes
 #[derive(Debug)]
 struct Entry {
@@ -262,12 +263,8 @@ pub struct CopcHierarchyVlr {
     sub_pages: HashMap<VoxelKey, Page>,
 }
 impl CopcHierarchyVlr {
-    /// The user id of the LasZip VLR header.
-    pub const USER_ID: &'static str = "copc";
     /// The record id of the LasZip VLR header.
     pub const RECORD_ID: u16 = 1000;
-    /// The description of the LasZip VLR header.
-    pub const DESCRIPTION: &'static str = "https://copc.io";
 
     /// Writes the Vlr data to the source.
     ///
@@ -296,26 +293,26 @@ impl CopcHierarchyVlr {
     }
 }
 
-/// Returns true if this [Vlr] is the Copc info Vlr.
-///
-/// # Examples
-///
-/// ```
-/// #[cfg(feature = "copc")]
-/// {
-/// use las::{copc, Vlr};
-///
-/// let mut vlr = Vlr::default();
-/// assert!(!copc::is_copcinfo_vlr(&vlr));
-/// vlr.user_id = "copc".to_string();
-/// vlr.record_id = 1;
-/// assert!(copc::is_copcinfo_vlr(&vlr));
-/// }
-/// ```
 impl Vlr {
-pub fn is_copc_info(&self) -> bool {
-    self.user_id == CopcInfoVlr::USER_ID && self.record_id == CopcInfoVlr::RECORD_ID
-   }
+    /// Returns true if this [Vlr] is the Copc info Vlr.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[cfg(feature = "copc")]
+    /// {
+    /// use las::{copc, Vlr};
+    ///
+    /// let mut vlr = Vlr::default();
+    /// assert!(!copc::is_copcinfo_vlr(&vlr));
+    /// vlr.user_id = "copc".to_string();
+    /// vlr.record_id = 1;
+    /// assert!(copc::is_copcinfo_vlr(&vlr));
+    /// }
+    /// ```
+    pub fn is_copc_info(&self) -> bool {
+        self.user_id == USER_ID && self.record_id == CopcInfoVlr::RECORD_ID
+    }
 }
 
 impl Header {
@@ -323,38 +320,38 @@ impl Header {
     pub fn copc_info_vlr(&self) -> Result<CopcInfoVlr> {
         self.vlrs
             .iter()
-            .find(|vlr| is_copcinfo_vlr(vlr))
+            .find(|vlr| vlr.is_copc_info())
             .map_or(Err(Error::CopcInfoVlrNotFound), |vlr| vlr.try_into())
     }
 }
-
-/// Returns true if this [Vlr] is the Copc Heirarchy Vlr.
-///
-/// # Examples
-///
-/// ```
-/// #[cfg(feature = "copc")]
-/// {
-/// use las::{copc, Vlr};
-///
-/// let mut vlr = Vlr::default();
-/// assert!(!copc::is_copchierarchy_evlr(&vlr));
-/// vlr.user_id = "copc".to_string();
-/// vlr.record_id = 1000;
-/// assert!(copc::is_copchierarchy_evlr(&vlr));
-/// }
-/// ```
-pub fn is_copchierarchy_evlr(vlr: &Vlr) -> bool {
-    vlr.user_id == CopcHierarchyVlr::USER_ID && vlr.record_id == CopcHierarchyVlr::RECORD_ID
+impl Vlr {
+    /// Returns true if this [Vlr] is the Copc Heirarchy Vlr.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[cfg(feature = "copc")]
+    /// {
+    /// use las::{copc, Vlr};
+    ///
+    /// let mut vlr = Vlr::default();
+    /// assert!(!copc::is_copchierarchy_evlr(&vlr));
+    /// vlr.user_id = "copc".to_string();
+    /// vlr.record_id = 1000;
+    /// assert!(copc::is_copchierarchy_evlr(&vlr));
+    /// }
+    /// ```
+    pub fn is_copchierarchy_evlr(&self) -> bool {
+        self.user_id == USER_ID && self.record_id == CopcHierarchyVlr::RECORD_ID
+    }
 }
-
 impl Header {
     /// doc
     pub fn copc_hierarchy_evlr(&self) -> Result<CopcHierarchyVlr> {
-        let copc_info = self.copcinfo_vlr()?;
+        let copc_info = self.copc_info_vlr()?;
         self.evlrs()
             .iter()
-            .find(|vlr| is_copchierarchy_evlr(vlr))
+            .find(|vlr| vlr.is_copchierarchy_evlr())
             .map_or(Err(Error::CopcHierarchyVlrNotFound), |vlr| {
                 CopcHierarchyVlr::read_from_with(vlr, &copc_info)
             })
@@ -362,32 +359,35 @@ impl Header {
 }
 #[cfg(test)]
 mod tests {
-    use super::VoxelKey;
-
+    use super::{Result, VoxelKey};
     #[test]
     fn test_voxelkey() {
         let vk = VoxelKey::ROOT;
-        let childs = (0..8).map(|dir| vk.child(dir)).collect::<Vec<_>>();
+        let childs = (0..8)
+            .map(|dir| vk.child(dir))
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
         assert!(childs
             .iter()
             .map(|v| v.parent())
             .all(|v| v.eq(&VoxelKey::ROOT)));
         assert!(childs
             .iter()
-            .map(|c| (c, (0..8).map(|dir| c.child(dir)).collect::<Vec<_>>()))
+            .map(|c| (
+                c,
+                (0..8).map(|dir| c.child(dir).unwrap()).collect::<Vec<_>>()
+            ))
             .all(|(p, childs)| childs.iter().all(|c| c.parent().eq(p))));
     }
 
-    fn test_copc(path: &str) {
-        let reader = crate::Reader::from_path(path).expect("Cannot open reader");
-        let copcinfo = reader.header().copcinfo_vlr().unwrap();
-        let copchier = reader.header().copchierarchy_evlr().unwrap();
+    #[test]
+    fn test_copc_autzen() {
+        let reader =
+            crate::Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
+        let copcinfo = reader.header().copc_info_vlr().unwrap();
+        let copchier = reader.header().copc_hierarchy_evlr().unwrap();
         assert!(copcinfo.root_hier_offset == 4336);
         assert!(copcinfo.root_hier_size == 32);
         assert!(copchier.root.entries[0].key == VoxelKey::ROOT);
-    }
-    #[test]
-    fn test_copc_autzen() {
-        test_copc("tests/data/autzen.copc.laz");
     }
 }

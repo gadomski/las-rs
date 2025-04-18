@@ -10,11 +10,11 @@ pub enum Error {
     ClosedWriter,
 
     /// The laszip vlr was not found, the points cannot be decompressed.
-    #[cfg(feature = "copc")]
+    #[cfg(feature = "laz")]
     #[error("copcinfo vlr not found")]
     CopcInfoVlrNotFound,
     /// The laszip vlr was not found, the points cannot be decompressed.
-    #[cfg(feature = "copc")]
+    #[cfg(feature = "laz")]
     #[error("copchierarchy vlr not found")]
     CopcHierarchyVlrNotFound,
 
@@ -174,6 +174,13 @@ pub enum Error {
 
         /// The unsupported point format.
         format: Format,
+    },
+
+    /// Returned when a Function needs the arguments to be in a specific range
+    #[error("Function Argument was not in intended range: {argument}")]
+    FunctionArgumentRequirementsNotMet {
+        ///The Argument that does not meet the requrement
+        argument: String,
     },
 
     /// [std::str::Utf8Error]
