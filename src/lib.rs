@@ -210,7 +210,7 @@ pub use crate::{
     writer::Writer,
 };
 #[cfg(feature = "laz")]
-pub use reader::copc::CopcEntryReader;
+pub use copc::CopcEntryReader;
 #[allow(deprecated)]
 pub use {reader::Read, writer::Write};
 

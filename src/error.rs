@@ -181,11 +181,11 @@ pub enum Error {
     },
 
     /// Returned when a Function needs the arguments to be in a specific range
-    #[error("Function Argument was not in intended range: {argument}")]
-    FunctionArgumentRequirementsNotMet {
+    #[error("Direction not in intended range (0<=direction<=7). Was {0}")]
+    InvalidDirection(
         ///The Argument that does not meet the requrement
-        argument: String,
-    },
+        i32,
+    ),
 
     /// [std::str::Utf8Error]
     #[error(transparent)]

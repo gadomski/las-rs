@@ -49,8 +49,6 @@
 //! ```
 //!
 
-#[cfg(feature = "laz")]
-pub mod copc;
 mod las;
 #[cfg(feature = "laz")]
 mod laz;
@@ -174,7 +172,7 @@ impl Reader {
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
     pub fn new<R: std::io::Read + Seek + Send + 'static>(mut read: R) -> Result<Reader> {
-        let header = Header::read_and_build_from(&mut read)?;
+        let header = Header::new(&mut read)?;
         if header.point_format().is_compressed {
             #[cfg(feature = "laz")]
             {
