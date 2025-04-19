@@ -209,6 +209,8 @@ pub use crate::{
     vlr::Vlr,
     writer::Writer,
 };
+#[cfg(feature = "laz")]
+pub use reader::copc::CopcEntryReader;
 #[allow(deprecated)]
 pub use {reader::Read, writer::Write};
 

@@ -178,22 +178,22 @@ impl VoxelKey {
 /// contains additional information to allow direct access and decoding of the
 /// corresponding point data.
 /// One Entry has 32 bytes
-#[derive(Debug)]
-struct Entry {
-    // EPT key of the data to which this entry corresponds
-    key: VoxelKey,
-    // Absolute offset to the data chunk if the pointCount > 0.
-    // Absolute offset to a child hierarchy page if the pointCount is -1.
-    // 0 if the pointCount is 0.
-    offset: u64,
-    // Size of the data chunk in bytes (compressed size) if the pointCount > 0.
-    // Size of the hierarchy page if the pointCount is -1.
-    // 0 if the pointCount is 0.
-    byte_size: i32,
-    // If > 0, represents the number of points in the data chunk.
-    // If -1, indicates the information for this octree node is found in another hierarchy pag
-    // If 0, no point data exists for this key, though may exist for child entries.
-    point_count: i32,
+#[derive(Debug, Clone, Copy)]
+pub struct Entry {
+    /// EPT key of the data to which this entry corresponds
+    pub key: VoxelKey,
+    /// Absolute offset to the data chunk if the pointCount > 0.
+    /// Absolute offset to a child hierarchy page if the pointCount is -1.
+    /// 0 if the pointCount is 0.
+    pub offset: u64,
+    /// Size of the data chunk in bytes (compressed size) if the pointCount > 0.
+    /// Size of the hierarchy page if the pointCount is -1.
+    /// 0 if the pointCount is 0.
+    pub byte_size: i32,
+    /// If > 0, represents the number of points in the data chunk.
+    /// If -1, indicates the information for this octree node is found in another hierarchy pag
+    /// If 0, no point data exists for this key, though may exist for child entries.
+    pub point_count: i32,
 }
 impl Entry {
     /// Reads hierarchy entry from a `Read`.
@@ -291,8 +291,27 @@ impl CopcHierarchyVlr {
             .collect::<Result<HashMap<VoxelKey, Page>>>()?;
         Ok(CopcHierarchyVlr { root, sub_pages })
     }
+    /// iterates over all entries merging all referenced pages into root
+    pub fn iter_entrys(&self) -> impl Iterator<Item = Entry> {
+        self.root.entries.iter().flat_map(|entry| {
+            if entry.is_referencing_page() {
+                if let Some(page) = self.sub_pages.get(&entry.key) {
+                    page.entries.clone()
+                } else {
+                    // this entry is corrupt or the page is missing
+                    vec![Entry {
+                        key: entry.key,
+                        offset: entry.offset,
+                        byte_size: 0,
+                        point_count: 0,
+                    }]
+                }
+            } else {
+                vec![*entry]
+            }
+        })
+    }
 }
-
 impl Vlr {
     /// Returns true if this [Vlr] is the Copc info Vlr.
     ///
@@ -381,7 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn test_copc_autzen() {
+    fn test_vlr_copc_autzen() {
         let reader =
             crate::Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
         let copcinfo = reader.header().copc_info_vlr().unwrap();
@@ -389,5 +408,21 @@ mod tests {
         assert!(copcinfo.root_hier_offset == 4336);
         assert!(copcinfo.root_hier_size == 32);
         assert!(copchier.root.entries[0].key == VoxelKey::ROOT);
+    }
+
+    #[test]
+    fn test_copc_entry_key_autzen() {
+        let reader =
+            crate::Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
+        let root_entry = reader
+            .header()
+            .copc_hierarchy_evlr()
+            .unwrap()
+            .iter_entrys()
+            .next()
+            .unwrap();
+        assert_eq!(root_entry.key, VoxelKey::ROOT);
+        assert_eq!(root_entry.point_count, 107);
+        println!("{root_entry:?}");
     }
 }

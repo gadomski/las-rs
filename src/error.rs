@@ -22,6 +22,10 @@ pub enum Error {
     #[error("the header is too large ({0} bytes) to convert to a raw header")]
     HeaderTooLarge(usize),
 
+    /// The seek index used was too large
+    #[error("Seek Index reached the end: {0}")]
+    SeekIndexOutOfBounds(u64),
+
     /// An invalid classification number.
     #[error("invalid classification: {0}")]
     InvalidClassification(u8),

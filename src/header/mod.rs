@@ -65,7 +65,13 @@ use crate::{
     Vector, Version, Vlr,
 };
 use chrono::{Datelike, NaiveDate, Utc};
-use std::{collections::HashMap, io::Write, iter::Chain, slice::Iter};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    io::{Read, Seek, SeekFrom, Write},
+    iter::Chain,
+    slice::Iter,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -106,6 +112,86 @@ pub struct Header {
 pub struct Vlrs<'a>(Chain<Iter<'a, Vlr>, Iter<'a, Vlr>>);
 
 impl Header {
+    /// Reads all header, vlr and evlr data from file and returns the complete header
+    pub fn read_and_build_from<R: Read + Seek>(mut read: R) -> Result<Self> {
+        let raw_header = raw::Header::read_from(read.by_ref())?;
+        let mut position = u64::from(raw_header.header_size);
+        let number_of_variable_length_records = raw_header.number_of_variable_length_records;
+        let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
+        let offset_to_end_of_points = raw_header.offset_to_end_of_points();
+        let evlr = raw_header.evlr;
+
+        let mut builder = Builder::new(raw_header)?;
+
+        for _ in 0..number_of_variable_length_records {
+            let vlr = raw::Vlr::read_from(read.by_ref(), false).map(Vlr::new)?;
+            position += vlr.len(false) as u64;
+            builder.vlrs.push(vlr);
+        }
+        match position.cmp(&offset_to_point_data) {
+            Ordering::Less => {
+                let _ = read
+                    .by_ref()
+                    .take(offset_to_point_data - position)
+                    .read_to_end(&mut builder.vlr_padding)?;
+            }
+            Ordering::Equal => {} // pass
+            Ordering::Greater => {
+                return Err(Error::OffsetToPointDataTooSmall(
+                    offset_to_point_data as u32,
+                ))
+            }
+        }
+
+        let _ = read.seek(SeekFrom::Start(offset_to_end_of_points))?;
+        if let Some(evlr) = evlr {
+            // Account for any padding between the end of the point data and the start of the ELVRs
+            //
+            // Ignore this case if the point format is compressed.
+            // See https://github.com/gadomski/las-rs/issues/39
+            //
+            // When reading a compressed file, evlr.start_of_first_evlr
+            // is a compressed byte offset, while offset_to_end_of_points
+            // is an uncompressed byte offset, which results in
+            // evlr.start_of_first_evlr < offset_to_end_of_points,
+            //
+            // In this case, we assume that the ELVRs follow the point
+            // record data directly and there is no point_padding to account for.
+            if !builder.point_format.is_compressed {
+                match evlr.start_of_first_evlr.cmp(&offset_to_end_of_points) {
+                    Ordering::Less => {
+                        return Err(Error::OffsetToEvlrsTooSmall(evlr.start_of_first_evlr));
+                    }
+                    Ordering::Equal => {} // pass
+                    Ordering::Greater => {
+                        let n = evlr.start_of_first_evlr - offset_to_end_of_points;
+                        let _ = read
+                            .by_ref()
+                            .take(n)
+                            .read_to_end(&mut builder.point_padding)?;
+                    }
+                }
+            }
+            let _ = read.seek(SeekFrom::Start(evlr.start_of_first_evlr))?;
+            builder
+                .evlrs
+                .push(raw::Vlr::read_from(read.by_ref(), true).map(Vlr::new)?);
+        }
+
+        let _ = read.seek(SeekFrom::Start(offset_to_point_data))?;
+
+        if let Some(version) = builder.minimum_supported_version() {
+            if version > builder.version {
+                log::warn!(
+                    "upgrading las version to {} (from {})",
+                    version,
+                    builder.version
+                );
+                builder.version = version;
+            }
+        }
+        builder.into_header()
+    }
     /// Creates a new header from a raw header.
     ///
     /// # Examples
