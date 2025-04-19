@@ -55,7 +55,7 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     }
 }
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::{reader::copc::CopcEntryReader, Reader};
     use std::{fs::File, io::BufReader};
 

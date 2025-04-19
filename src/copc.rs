@@ -118,7 +118,7 @@ impl VoxelKey {
     /// **dir**ection needs to be 0..8
     pub fn child(&self, direction: i32) -> Result<Self> {
         // TODO: Maybe direction %= 8; would be better
-        if !(0..8).contains(&direction) {
+        if direction >= 0 && direction <= 8 {
             return Err(Error::FunctionArgumentRequirementsNotMet {
                 argument: format!("direction needs to be (0..8). Was {direction}"),
             });
