@@ -423,6 +423,5 @@ mod tests {
             .unwrap();
         assert_eq!(root_entry.key, VoxelKey::ROOT);
         assert_eq!(root_entry.point_count, 107);
-        println!("{root_entry:?}");
     }
 }
