@@ -9,9 +9,22 @@ pub enum Error {
     #[error("the writer is closed")]
     ClosedWriter,
 
+    /// The laszip vlr was not found, the points cannot be decompressed.
+    #[cfg(feature = "laz")]
+    #[error("copcinfo vlr not found")]
+    CopcInfoVlrNotFound,
+    /// The laszip vlr was not found, the points cannot be decompressed.
+    #[cfg(feature = "laz")]
+    #[error("copchierarchy vlr not found")]
+    CopcHierarchyVlrNotFound,
+
     /// The header size, as computed, is too large.
     #[error("the header is too large ({0} bytes) to convert to a raw header")]
     HeaderTooLarge(usize),
+
+    /// The seek index used was too large
+    #[error("Seek Index reached the end: {0}")]
+    SeekIndexOutOfBounds(u64),
 
     /// An invalid classification number.
     #[error("invalid classification: {0}")]
@@ -166,6 +179,13 @@ pub enum Error {
         /// The unsupported point format.
         format: Format,
     },
+
+    /// Returned when a Function needs the arguments to be in a specific range
+    #[error("Direction not in intended range (0<=direction<=7). Was {0}")]
+    InvalidDirection(
+        ///The Argument that does not meet the requrement
+        i32,
+    ),
 
     /// [std::str::Utf8Error]
     #[error(transparent)]

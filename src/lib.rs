@@ -173,6 +173,8 @@
 )]
 
 #[cfg(feature = "laz")]
+pub mod copc;
+#[cfg(feature = "laz")]
 pub mod laz;
 
 pub mod feature;
@@ -207,6 +209,8 @@ pub use crate::{
     vlr::Vlr,
     writer::Writer,
 };
+#[cfg(feature = "laz")]
+pub use copc::CopcEntryReader;
 #[allow(deprecated)]
 pub use {reader::Read, writer::Write};
 
