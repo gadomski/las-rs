@@ -9,15 +9,6 @@ pub enum Error {
     #[error("the writer is closed")]
     ClosedWriter,
 
-    /// The laszip vlr was not found, the points cannot be decompressed.
-    #[cfg(feature = "laz")]
-    #[error("copcinfo vlr not found")]
-    CopcInfoVlrNotFound,
-    /// The laszip vlr was not found, the points cannot be decompressed.
-    #[cfg(feature = "laz")]
-    #[error("copchierarchy vlr not found")]
-    CopcHierarchyVlrNotFound,
-
     /// The header size, as computed, is too large.
     #[error("the header is too large ({0} bytes) to convert to a raw header")]
     HeaderTooLarge(usize),
@@ -30,6 +21,10 @@ pub enum Error {
     #[error("invalid classification: {0}")]
     InvalidClassification(u8),
 
+    /// If a Entry is referencing a Page in the Copc Hierarchy but the page is not present
+    #[cfg(feature = "laz")]
+    #[error("Entry referenced a page that is not present")]
+    ReferencedPageMissingFromEvlr(crate::copc::Entry),
     /// The file signature is not LASF.
     #[error("the file signature is not 'LASF': {0:?}")]
     InvalidFileSignature([u8; 4]),

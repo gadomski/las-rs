@@ -194,6 +194,8 @@ mod utils;
 mod vector;
 mod version;
 
+#[cfg(feature = "laz")]
+pub use crate::copc::CopcEntryReader;
 pub use crate::{
     bounds::Bounds,
     color::Color,
@@ -209,8 +211,6 @@ pub use crate::{
     vlr::Vlr,
     writer::Writer,
 };
-#[cfg(feature = "laz")]
-pub use copc::CopcEntryReader;
 #[allow(deprecated)]
 pub use {reader::Read, writer::Write};
 
