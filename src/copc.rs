@@ -403,16 +403,13 @@ impl Vlr {
     /// # Examples
     ///
     /// ```
-    /// #[cfg(feature = "copc")]
-    /// {
-    /// use las::{copc, Vlr};
+    /// use las::Vlr;
     ///
     /// let mut vlr = Vlr::default();
-    /// assert!(!copc::is_copcinfo_vlr(&vlr));
+    /// assert!(!vlr.is_copc_info());
     /// vlr.user_id = "copc".to_string();
     /// vlr.record_id = 1;
-    /// assert!(copc::is_copcinfo_vlr(&vlr));
-    /// }
+    /// assert!(&vlr.is_copc_info());
     /// ```
     pub fn is_copc_info(&self) -> bool {
         self.user_id == USER_ID && self.record_id == CopcInfoVlr::RECORD_ID
@@ -441,18 +438,15 @@ impl Vlr {
     /// # Examples
     ///
     /// ```
-    /// #[cfg(feature = "copc")]
-    /// {
-    /// use las::{copc, Vlr};
+    /// use las::Vlr;
     ///
     /// let mut vlr = Vlr::default();
-    /// assert!(!copc::is_copchierarchy_evlr(&vlr));
+    /// assert!(!vlr.is_copc_hierarchy());
     /// vlr.user_id = "copc".to_string();
     /// vlr.record_id = 1000;
-    /// assert!(copc::is_copchierarchy_evlr(&vlr));
-    /// }
+    /// assert!(vlr.is_copc_hierarchy());
     /// ```
-    pub fn is_copchierarchy_evlr(&self) -> bool {
+    pub fn is_copc_hierarchy(&self) -> bool {
         self.user_id == USER_ID && self.record_id == CopcHierarchyVlr::RECORD_ID
     }
 }
@@ -471,7 +465,7 @@ impl Header {
         let copc_info = self.copc_info_vlr()?;
         self.evlrs()
             .iter()
-            .find(|vlr| vlr.is_copchierarchy_evlr())
+            .find(|vlr| vlr.is_copc_hierarchy())
             .and_then(|vlr| CopcHierarchyVlr::read_from_with(vlr, &copc_info).ok())
     }
 }
@@ -533,7 +527,25 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
             header,
         })
     }
-
+    /// Retrieves all entries from the COPC hierarchy.
+    ///
+    /// This method extracts all COPC hierarchy entries from the Extended Variable Length Record (EVLR)
+    /// in the file header, providing access to the octree structure of the point cloud.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<Vec<Entry>>` - A vector containing all valid entries in the COPC hierarchy if the
+    ///   COPC hierarchy EVLR exists, or `None` if the EVLR is not present
+    ///
+    /// # Notes
+    ///
+    /// The method filters out any entries that could not be parsed correctly, returning only
+    /// successfully parsed entries.
+    pub fn hierarchy_entries(&self) -> Option<Vec<Entry>> {
+        self.header()
+            .copc_hierarchy_evlr()
+            .map(|vlr| vlr.iter_entries().filter_map(|e| e.ok().copied()).collect())
+    }
     /// Reads all points specified by a COPC entry.
     ///
     /// Seeks to the specified offset in the file, decompresses the point data,
@@ -564,11 +576,10 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     /// let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
     /// let mut entry_reader = CopcEntryReader::new(file).unwrap();
     /// // Get entry from hierarchy
-    /// let copc_hierarchy_vlr = entry_reader.header().copc_hierarchy_evlr().unwrap();
-    /// let root_entry = copc_hierarchy_vlr.iter_entries().next().unwrap().unwrap();
+    /// let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
     /// // Read all points
     /// let mut points = Vec::new();
-    /// let point_count = entry_reader.read_entry_points(root_entry, &mut points).unwrap();
+    /// let point_count = entry_reader.read_entry_points(&root_entry, &mut points).unwrap();
     /// println!("Read {} points", point_count);
     /// ```
     pub fn read_entry_points(&mut self, entry: &Entry, points: &mut Vec<Point>) -> Result<u64> {
@@ -654,9 +665,10 @@ mod tests {
 
     #[test]
     fn test_copc_entry_key_autzen() {
-        let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
-        let copc_hierarchy_vlr = reader.header().copc_hierarchy_evlr().unwrap();
-        let root_entry = copc_hierarchy_vlr.iter_entries().next().unwrap().unwrap();
+        let file =
+            BufReader::new(File::open("tests/data/autzen.copc.laz").expect("Cannot open reader"));
+        let entry_reader = CopcEntryReader::new(file).unwrap();
+        let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
         assert_eq!(root_entry.key, VoxelKey::ROOT);
         assert_eq!(root_entry.point_count, 107);
     }
@@ -666,11 +678,10 @@ mod tests {
         let copc_points = {
             let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
             let mut entry_reader = CopcEntryReader::new(file).unwrap();
-            let copc_hierarchy_vlr = entry_reader.header().copc_hierarchy_evlr().unwrap();
-            let root_entry = copc_hierarchy_vlr.iter_entries().next().unwrap().unwrap();
+            let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
             let mut points = Vec::new();
             let _p_num = entry_reader
-                .read_entry_points(root_entry, &mut points)
+                .read_entry_points(&root_entry, &mut points)
                 .unwrap();
             points
         };
