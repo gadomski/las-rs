@@ -173,6 +173,8 @@
 )]
 
 #[cfg(feature = "laz")]
+pub mod copc;
+#[cfg(feature = "laz")]
 pub mod laz;
 
 pub mod feature;
@@ -192,6 +194,8 @@ mod utils;
 mod vector;
 mod version;
 
+#[cfg(feature = "laz")]
+pub use crate::copc::CopcEntryReader;
 pub use crate::{
     bounds::Bounds,
     color::Color,

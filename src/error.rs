@@ -13,9 +13,18 @@ pub enum Error {
     #[error("the header is too large ({0} bytes) to convert to a raw header")]
     HeaderTooLarge(usize),
 
+    /// The seek index used was too large
+    #[error("Seek Index reached the end: {0}")]
+    SeekIndexOutOfBounds(u64),
+
     /// An invalid classification number.
     #[error("invalid classification: {0}")]
     InvalidClassification(u8),
+
+    /// If a Entry is referencing a Page in the Copc Hierarchy but the page is not present
+    #[cfg(feature = "laz")]
+    #[error("Entry referenced a page that is not present")]
+    ReferencedPageMissingFromEvlr(crate::copc::Entry),
 
     /// The file signature is not LASF.
     #[error("the file signature is not 'LASF': {0:?}")]
@@ -166,6 +175,13 @@ pub enum Error {
         /// The unsupported point format.
         format: Format,
     },
+
+    /// Returned when a Function needs the arguments to be in a specific range
+    #[error("Direction not in intended range (0<=direction<=7). Was {0}")]
+    InvalidDirection(
+        ///The Argument that does not meet the requrement
+        i32,
+    ),
 
     /// [std::str::Utf8Error]
     #[error(transparent)]

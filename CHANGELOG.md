@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- COPC support ([#104](https://github.com/gadomski/las-rs/pull/104))
+
 ## [0.9.4]
 
 ### Changed
