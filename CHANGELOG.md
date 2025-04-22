@@ -7,24 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2025-04-21
+
 ### Added
 
 - COPC support ([#104](https://github.com/gadomski/las-rs/pull/104))
 
-## [0.9.4]
+## [0.9.4] - 2025-04-08
 
 ### Changed
 
 - Refactor to remove some duplicate code ([#101](https://github.com/gadomski/las-rs/pull/101))
 - Edition 2024 ([#102](https://github.com/gadomski/las-rs/pull/102))
 
-## [0.9.3]
+## [0.9.3] - 2024-12-17
 
 ### Fixed
 
 - Ignore everything after first null character ([#100](https://github.com/gadomski/las-rs/pull/100))
 
-## [0.9.2]
+## [0.9.2] - 2024-11-06
 
 ### Fixed
 
@@ -132,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Benchmarks now use [criterion](https://github.com/bheisler/criterion.rs) ([#52](https://github.com/gadomski/las-rs/pull/52))
 - Edition is now 2021 ([#52](https://github.com/gadomski/las-rs/pull/52))
 
-[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/gadomski/las-rs/compare/v0.9.6...HEAD
+[0.9.5]: https://github.com/gadomski/las-rs/releases/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/gadomski/las-rs/releases/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/gadomski/las-rs/releases/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/gadomski/las-rs/releases/compare/v0.9.1...v0.9.2
