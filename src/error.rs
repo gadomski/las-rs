@@ -25,6 +25,7 @@ pub enum Error {
     #[cfg(feature = "laz")]
     #[error("Entry referenced a page that is not present")]
     ReferencedPageMissingFromEvlr(crate::copc::Entry),
+
     /// The file signature is not LASF.
     #[error("the file signature is not 'LASF': {0:?}")]
     InvalidFileSignature([u8; 4]),

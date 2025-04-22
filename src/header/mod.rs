@@ -112,7 +112,7 @@ pub struct Header {
 pub struct Vlrs<'a>(Chain<Iter<'a, Vlr>, Iter<'a, Vlr>>);
 
 impl Header {
-    /// Reads all header, vlr and evlr data from file and returns the complete header
+    /// Reads all header, vlr and evlr data from file and returns the complete header.
     pub fn new<R: Read + Seek>(mut read: R) -> Result<Self> {
         let raw_header = raw::Header::read_from(read.by_ref())?;
         let mut position = u64::from(raw_header.header_size);

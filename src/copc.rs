@@ -7,19 +7,24 @@ use std::{
     collections::HashMap,
     io::{Cursor, Read, Seek, SeekFrom, Write},
 };
+
 /// The user id of the LasZip VLR header.
 pub const USER_ID: &str = "copc";
+
 /// The description of the LasZip VLR header.
 pub const DESCRIPTION: &str = "https://copc.io";
 
 use crate::{Error, Header, Result, Vlr};
-/// The COPC Info Vlr
+
+/// The COPC Info Vlr.
 ///
-/// The info VLR MUST exist.
-/// The info VLR MUST be the first VLR in the file (must begin at offset 375
-/// from the beginning of the file).
-/// The info VLR is 160 bytes described by the following structure. reserved
-/// elements MUST be set to 0.
+/// Requirements:
+///
+/// - The info VLR MUST exist.
+/// - The info VLR MUST be the first VLR in the file (must begin at offset 375
+///   from the beginning of the file).
+/// - The info VLR is 160 bytes described by the following structure. reserved
+///   elements MUST be set to 0.
 #[derive(Debug)]
 pub struct CopcInfoVlr {
     /// Actual (unscaled) X coordinate of center of octree
@@ -44,14 +49,14 @@ pub struct CopcInfoVlr {
     // Must be 0
     reserved: [u64; 11],
 }
+
 impl CopcInfoVlr {
     /// The record id of the LasZip VLR header.
     pub const RECORD_ID: u16 = 1;
 
     /// Reads the Vlr data from the source.
     ///
-    /// This **only** reads the *payload data* the
-    /// vlr header should already be read.
+    /// This only reads the payload data, the vlr header should already be read.
     fn read_from<R: Read>(mut src: R) -> Result<Self> {
         Ok(Self {
             center_x: src.read_f64::<LittleEndian>()?,
@@ -75,8 +80,8 @@ impl CopcInfoVlr {
 
     /// Writes the Vlr data to the source.
     ///
-    /// This **only** writes the *payload data* the
-    /// vlr header should be written before-hand.
+    /// This only writes the payload data the vlr header should be written
+    /// before-hand.
     pub fn write_to<W: Write>(&self, dst: &mut W) -> Result<()> {
         dst.write_f64::<LittleEndian>(self.center_x)?;
         dst.write_f64::<LittleEndian>(self.center_y)?;
@@ -103,7 +108,8 @@ impl TryFrom<&Vlr> for CopcInfoVlr {
 }
 
 /// VoxelKey corresponds to the naming of EPT data files.
-/// <https://entwine.io/en/latest/entwine-point-tile.html#ept-data>
+///
+/// See <https://entwine.io/en/latest/entwine-point-tile.html#ept-data> for more.
 /// The point cloud data itself is arranged in a 3D analogous manner to slippy map tiling schemes.
 /// The scheme is Level-X-Y-Z.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -114,10 +120,11 @@ pub struct VoxelKey {
     y: i32,
     z: i32,
 }
+
 impl VoxelKey {
-    /// Computes the Childs of a VoxelKey
-    /// There are max 8 Childs to a VoxelKey
-    /// **dir**ection needs to be 0..8
+    /// Computes a child of a VoxelKey
+    ///
+    /// There are max 8 Childs to a VoxelKey, direction must be in 0..8.
     pub fn child(&self, direction: i32) -> Result<Self> {
         // TODO: Maybe direction %= 8; would be better
         if !(0..8).contains(&direction) {
@@ -138,9 +145,9 @@ impl VoxelKey {
             z: (self.z << 1) | ((direction >> 2) & 0x1),
         })
     }
-    /// Computes the parent VoxelKey
+
+    /// Computes the parent VoxelKey.
     pub fn parent(&self) -> Self {
-        //bitshift back to the upper left parent index
         Self {
             l: 0.max(self.l - 1),
             x: self.x >> 1,
@@ -148,14 +155,16 @@ impl VoxelKey {
             z: self.z >> 1,
         }
     }
-    /// Creates the Root node of a Page
+
+    /// The root voxel key.
     pub const ROOT: Self = Self {
         l: 0,
         x: 0,
         y: 0,
         z: 0,
     };
-    /// Read a VoxelKey from Vlr Payload data
+
+    /// Read a VoxelKey from Vlr Payload data.
     pub fn read_from<R: Read>(read: &mut R) -> Result<Self> {
         Ok(Self {
             l: read.read_i32::<LittleEndian>()?,
@@ -177,26 +186,33 @@ impl VoxelKey {
 /// An entry corresponds to a single key/value pair in an EPT hierarchy, but
 /// contains additional information to allow direct access and decoding of the
 /// corresponding point data.
+///
 /// One Entry has 32 bytes
 #[derive(Debug, Clone, Copy)]
 pub struct Entry {
     /// EPT key of the data to which this entry corresponds
     pub key: VoxelKey,
+
     /// Absolute offset to the data chunk if the pointCount > 0.
+    ///
     /// Absolute offset to a child hierarchy page if the pointCount is -1.
     /// 0 if the pointCount is 0.
     pub offset: u64,
+
     /// Size of the data chunk in bytes (compressed size) if the pointCount > 0.
+    ///
     /// Size of the hierarchy page if the pointCount is -1.
     /// 0 if the pointCount is 0.
     pub byte_size: i32,
+
     /// If > 0, represents the number of points in the data chunk.
+    ///
     /// If -1, indicates the information for this octree node is found in another hierarchy pag
     /// If 0, no point data exists for this key, though may exist for child entries.
     pub point_count: i32,
 }
+
 impl Entry {
-    /// Reads hierarchy entry from a `Read`.
     fn read_from<R: Read>(read: &mut R) -> Result<Self> {
         Ok(Self {
             key: VoxelKey::read_from(read)?,
@@ -205,6 +221,7 @@ impl Entry {
             point_count: read.read_i32::<LittleEndian>()?,
         })
     }
+
     fn write_to<W: Write>(&self, dst: &mut W) -> Result<()> {
         self.key.write_to(dst)?;
         dst.write_u64::<LittleEndian>(self.offset)?;
@@ -217,16 +234,18 @@ impl Entry {
     }
 }
 
-/// The entries of a hierarchy page are consecutive. The number of entries in a page
-/// can be determined by taking the size of the page (contained in the parent page as
-/// Entry::byteSize or in the COPC info VLR as CopcData::root_hier_size)
-/// and dividing by the size of an Entry (32 bytes).
+/// The entries of a hierarchy page are consecutive.
+///
+/// The number of entries in a page can be determined by taking the size of the
+/// page (contained in the parent page as [Entry::byte_size] or in the COPC info
+/// VLR as [CopcData::root_hier_size]) and dividing by the size of an Entry (32
+/// bytes).
 #[derive(Debug)]
 struct Page {
-    entries: Vec<Entry>, //[page_size / 32];
+    entries: Vec<Entry>,
 }
+
 impl Page {
-    /// Reads hierarchy page from a `Read`.
     fn read_from(mut data: &[u8]) -> Result<Self> {
         Ok(Self {
             entries: (0..data.len() / 32)
@@ -234,6 +253,7 @@ impl Page {
                 .collect::<Result<Vec<Entry>>>()?,
         })
     }
+
     fn write_to<W: Write>(&self, dst: &mut W) -> Result<()> {
         self.entries
             .iter()
@@ -241,26 +261,28 @@ impl Page {
         Ok(())
     }
 }
-/// the hierarchy VLR MUST exist.
-/// Like EPT, COPC stores hierarchy information to allow a reader to locate points
-/// that are in a particular octree node. Also like EPT, the hierarchy MAY be
-/// arranged in a tree of pages, but SHALL always consist of at least ONE hierarchy
-/// page.
-/// The VLR data consists of one or more hierarchy pages. Each hierarchy data
-/// page is written as follows:
-/// The VoxelKey corresponds to the naming of EPT data files.
+
+/// The hierarchy VLR MUST exist.
 ///
-/// The octree hierarchy is arranged in pages. The COPC VLR provides information
-/// describing the location and size of root hierarchy page. The root hierarchy page
-/// can be used to traverse to child pages. Each entry in a hierarchy page either
-/// refers to a child hierarchy page, octree node data chunk, or an empty octree
-/// node. The size and file offset of each data chunk is provided in the hierarchy
+/// Like EPT, COPC stores hierarchy information to allow a reader to locate
+/// points that are in a particular octree node. Also like EPT, the hierarchy
+/// MAY be arranged in a tree of pages, but SHALL always consist of at least ONE
+/// hierarchy page.  The VLR data consists of one or more hierarchy pages. Each
+/// hierarchy data page is written as follows:
+///
+/// VoxelKey corresponds to the naming of EPT data files.  octree hierarchy is
+/// arranged in pages. The COPC VLR provides information describing the location
+/// and size of root hierarchy page. The root hierarchy page can be used to
+/// traverse to child pages. Each entry in a hierarchy page either refers to a
+/// child hierarchy page, octree node data chunk, or an empty octree node. The
+/// size and file offset of each data chunk is provided in the hierarchy
 /// entries, allowing the chunks to be directly read for decoding.
 #[derive(Debug)]
 pub struct CopcHierarchyVlr {
     root: Page,
     sub_pages: HashMap<VoxelKey, Page>,
 }
+
 impl CopcHierarchyVlr {
     /// The record id of the LasZip VLR header.
     pub const RECORD_ID: u16 = 1000;
@@ -275,7 +297,8 @@ impl CopcHierarchyVlr {
             .iter()
             .try_for_each(|(_, page)| page.write_to(dst))
     }
-    /// Reads the CopcHierarchyVlr from the Vlr payload with specifications from copc_info
+
+    /// Reads the CopcHierarchyVlr from the Vlr payload with specifications from copc_info.
     pub fn read_from_with(vlr: &Vlr, copc_info: &CopcInfoVlr) -> Result<CopcHierarchyVlr> {
         let root = Page::read_from(vlr.data[0..copc_info.root_hier_size as usize].as_ref())?;
         let sub_pages = root
@@ -290,11 +313,13 @@ impl CopcHierarchyVlr {
             .collect::<Result<HashMap<VoxelKey, Page>>>()?;
         Ok(CopcHierarchyVlr { root, sub_pages })
     }
+
     /// iterates over all entries merging all referenced pages into root
     pub fn iter_entries(&self) -> EntryIterator<'_> {
         EntryIterator::new(self.root.entries.iter().peekable(), &self.sub_pages)
     }
 }
+
 /// An iterator over COPC entries that handles references to sub-pages.
 ///
 /// This iterator provides a flattened view of all entries in a COPC hierarchy,
@@ -303,38 +328,26 @@ impl CopcHierarchyVlr {
 /// large hierarchies.
 ///
 /// When encountering an entry that references a sub-page, the iterator will:
+///
 /// 1. Look up the referenced page in the provided sub-pages HashMap
 /// 2. Iterate through all entries in that page
 /// 3. Continue with the next root entry
 ///
 /// If a referenced page is missing, the iterator will return an error containing
 /// the problematic entry.
-///
-/// # Type Parameters
-///
-/// * `'a` - The lifetime of the borrowed entries and sub-pages
 #[derive(Debug)]
 pub struct EntryIterator<'a> {
     /// Peekable iterator over root entries, allows looking ahead without consuming
     root_iter: std::iter::Peekable<std::slice::Iter<'a, Entry>>,
+
     /// Optional iterator over entries in the currently referenced page
     ref_iter: Option<std::slice::Iter<'a, Entry>>,
+
     /// Reference to the mapping of VoxelKeys to Pages containing sub-entries
     sub_pages: &'a HashMap<VoxelKey, Page>,
 }
 
 impl<'a> EntryIterator<'a> {
-    /// Creates a new EntryIterator.
-    ///
-    /// # Arguments
-    ///
-    /// * `root_iter` - A peekable iterator over the root entries
-    /// * `sub_pages` - A reference to the HashMap containing sub-pages indexed by VoxelKey
-    ///
-    /// # Returns
-    ///
-    /// A new EntryIterator instance
-    ///
     fn new(
         root_iter: std::iter::Peekable<std::slice::Iter<'a, Entry>>,
         sub_pages: &'a HashMap<VoxelKey, Page>,
@@ -347,19 +360,8 @@ impl<'a> EntryIterator<'a> {
     }
 }
 impl<'a> Iterator for EntryIterator<'a> {
-    /// The type yielded by this iterator - a Result containing either a reference
-    /// to an Entry or an Error if a referenced page is missing.
     type Item = Result<&'a Entry>;
-    /// Advances the iterator and returns the next value.
-    ///
-    /// This method handles the complexity of navigating between root entries
-    /// and referenced page entries, ensuring all entries are visited exactly once.
-    ///
-    /// # Returns
-    ///
-    /// * `Some(Ok(&Entry))` - The next entry if available
-    /// * `Some(Err(Error))` - If a referenced page is missing
-    /// * `None` - If iteration is complete
+
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match (
@@ -433,7 +435,7 @@ impl Header {
     }
 }
 impl Vlr {
-    /// Returns true if this [Vlr] is the Copc Heirarchy Vlr.
+    /// Returns true if this [Vlr] is the Copc Hierarchy Vlr.
     ///
     /// # Examples
     ///
@@ -450,6 +452,7 @@ impl Vlr {
         self.user_id == USER_ID && self.record_id == CopcHierarchyVlr::RECORD_ID
     }
 }
+
 impl Header {
     /// Retrieves the COPC hierarchy EVLR (Extended Variable Length Record) if available.
     ///
@@ -470,45 +473,25 @@ impl Header {
     }
 }
 
-#[allow(missing_debug_implementations)]
 /// Entry Reader can read whole entries of copc laz files
 /// A reader for COPC (Cloud Optimized Point Cloud) entries that handles decompression and point reading.
 ///
 /// This struct provides functionality to read points from COPC entries in LAZ files,
 /// handling the necessary decompression and format transformations.
-///
-/// # Fields
-///
-/// * `decompressor` - Point record decompressor for handling compressed point data
-/// * `buffer` - Temporary buffer used and reused during the decompression process
-/// * `header` - LAS file header containing metadata about the point cloud
+#[allow(missing_debug_implementations)]
 pub struct CopcEntryReader<'a, R: Read + Seek> {
     decompressor: LayeredPointRecordDecompressor<'a, R>,
     buffer: Cursor<Vec<u8>>,
     header: Header,
 }
+
 impl<R: Read + Seek> CopcEntryReader<'_, R> {
     /// Creates a new COPC Entry reader.
     ///
     /// Initializes a new reader by parsing the LAS header and setting up the decompressor
     /// with the appropriate field configurations from the LAZ VLR.
     ///
-    /// # Arguments
-    ///
-    /// * `read` - A readable and seekable source containing the COPC data
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Self>` - A new CopcEntryReader instance or an error if initialization fails
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// * The header cannot be read from the source
-    /// * The LAZ VLR is missing or invalid
-    /// * The decompressor cannot be configured with the field definitions
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use las::CopcEntryReader;
@@ -527,15 +510,11 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
             header,
         })
     }
+
     /// Retrieves all entries from the COPC hierarchy.
     ///
     /// This method extracts all COPC hierarchy entries from the Extended Variable Length Record (EVLR)
     /// in the file header, providing access to the octree structure of the point cloud.
-    ///
-    /// # Returns
-    ///
-    /// * `Option<Vec<Entry>>` - A vector containing all valid entries in the COPC hierarchy if the
-    ///   COPC hierarchy EVLR exists, or `None` if the EVLR is not present
     ///
     /// # Notes
     ///
@@ -546,29 +525,13 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
             .copc_hierarchy_evlr()
             .map(|vlr| vlr.iter_entries().filter_map(|e| e.ok().copied()).collect())
     }
+
     /// Reads all points specified by a COPC entry.
     ///
     /// Seeks to the specified offset in the file, decompresses the point data,
     /// and converts the raw points to the point format defined by the header.
     ///
-    /// # Arguments
-    ///
-    /// * `entry` - The COPC entry containing offset and point count information
-    /// * `points` - A mutable vector to store the read points
-    ///
-    /// # Returns
-    ///
-    /// * `Result<u64>` - The number of points read or an error
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// * Seeking to the entry offset fails
-    /// * Point decompression fails
-    /// * Converting between raw and processed point formats fails
-    /// * Integer conversion fails
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use las::CopcEntryReader;
@@ -604,16 +567,13 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
         }
         Ok(entry.point_count as u64)
     }
+
     /// Returns a reference to the LAS header.
     ///
     /// Provides access to the header information of the LAS/LAZ file,
     /// which contains metadata about the point cloud.
     ///
-    /// # Returns
-    ///
-    /// * `&Header` - A reference to the LAS header
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use las::CopcEntryReader;
@@ -628,6 +588,7 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
         &self.header
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::{Result, VoxelKey};
