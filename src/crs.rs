@@ -77,7 +77,7 @@ impl Header {
                     _ => unreachable!(),
                 };
 
-                crs_vlrs[pos] = Some(&vlr.data);
+                crs_vlrs[pos] = Some(vlr.data.as_slice());
             }
         }
         let [wkt, geotiff_main, double, string] = crs_vlrs;
@@ -205,9 +205,7 @@ fn get_wkt_epsg(bytes: &[u8]) -> CrsResult<Crs> {
     let wkt: String = bytes.iter().map(|b| *b as char).collect();
 
     // VERT_CS for WKT v1 and VERTCRS for v2
-    let pieces = wkt.split_once("VERT");
-
-    let pieces = if let Some((horizontal, vertical)) = pieces {
+    let pieces = if let Some((horizontal, vertical)) = wkt.split_once("VERT") {
         // both horizontal and vertical codes exist
         vec![horizontal.as_bytes(), vertical.as_bytes()]
     } else {
@@ -248,12 +246,11 @@ fn get_wkt_epsg(bytes: &[u8]) -> CrsResult<Crs> {
     })
 }
 
-/// Gets the EPSG code in the geotiff crs vlrs
-/// returns a tuple containing the horizontal code and the optional vertical code
+/// Gets the EPSG codes from the geotiff crs vlrs
 fn get_geotiff_epsg(
     main_vlr: &[u8],
-    double_vlr: Option<&Vec<u8>>,
-    ascii_vlr: Option<&Vec<u8>>,
+    double_vlr: Option<&[u8]>,
+    ascii_vlr: Option<&[u8]>,
 ) -> CrsResult<Crs> {
     let mut main_vlr = Cursor::new(main_vlr);
 
@@ -314,8 +311,8 @@ struct GeoTiffCRS {
 impl GeoTiffCRS {
     fn read_from(
         mut main_vlr: Cursor<&[u8]>,
-        double_vlr: Option<&Vec<u8>>,
-        ascii_vlr: Option<&Vec<u8>>,
+        double_vlr: Option<&[u8]>,
+        ascii_vlr: Option<&[u8]>,
         count: u16,
     ) -> CrsResult<Self> {
         let mut entries = Vec::with_capacity(count as usize);
@@ -346,8 +343,8 @@ struct GeoTiffKeyEntry {
 impl GeoTiffKeyEntry {
     fn read_from(
         main_vlr: &mut Cursor<&[u8]>,
-        double_vlr: &Option<&Vec<u8>>,
-        ascii_vlr: &Option<&Vec<u8>>,
+        double_vlr: &Option<&[u8]>,
+        ascii_vlr: &Option<&[u8]>,
     ) -> CrsResult<Self> {
         let id = main_vlr.read_u16::<LittleEndian>()?;
         let location = main_vlr.read_u16::<LittleEndian>()?;
