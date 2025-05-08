@@ -25,6 +25,10 @@ pub enum CrsError {
     UnimplementedForGeoTiffStringAndDoubleData(GeoTiffData),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("Invalid Epsg code")]
+    InvalidEpsgCode,
+    #[error("Cannot write CRS VLR as Header already contains CRS VLR")]
+    HeaderContainsCrsVlr,
 }
 
 /// horizontal and optional vertical crs given by EPSG code
@@ -59,7 +63,7 @@ impl Header {
     /// let reader = Reader::from_path("lidar.las").expect("Cannot open reader");
     /// let crs = reader.header().parse_crs().expect("Cannot parse CRS-VLR");
     /// ```
-    pub fn parse_crs(&self) -> CrsResult<Crs> {
+    pub fn parse_crs(&self) -> crate::Result<Crs> {
         let mut crs_vlrs = [None, None, None, None];
         for vlr in self.all_vlrs() {
             if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
@@ -99,13 +103,97 @@ impl Header {
             );
         }
 
-        if let Some(wkt) = wkt {
-            get_wkt_epsg(wkt)
+        let crs = if let Some(wkt) = wkt {
+            get_wkt_epsg(wkt)?
         } else if let Some(main) = geotiff_main {
-            get_geotiff_epsg(main, double, string)
+            get_geotiff_epsg(main, double, string)?
         } else {
-            Err(CrsError::NoCrs)
+            Err(CrsError::NoCrs)?
+        };
+        Ok(crs)
+    }
+
+    /// remove all CRS (E)VLRs from the header
+    pub fn remove_crs_vlrs(&mut self) {
+        // check vlrs
+        let mut crs_vlr_indecies = vec![];
+        for (i, vlr) in self.vlrs.iter().enumerate() {
+            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
+                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
+            {
+                crs_vlr_indecies.push(i);
+            }
         }
+        crs_vlr_indecies.sort_by(|a, b| b.cmp(a));
+
+        // preserves the order of the rest of the vlrs
+        for index in crs_vlr_indecies {
+            let _ = self.vlrs.remove(index);
+        }
+
+        // check evlrs
+        let mut crs_evlr_indecies = vec![];
+        for (i, vlr) in self.evlrs.iter().enumerate() {
+            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
+                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
+            {
+                crs_evlr_indecies.push(i);
+            }
+        }
+        crs_evlr_indecies.sort_by(|a, b| b.cmp(a));
+
+        // preserves the order of the rest of the evlrs
+        for index in crs_evlr_indecies {
+            let _ = self.evlrs.remove(index);
+        }
+
+        self.has_wkt_crs = false;
+    }
+
+    /// Add a WKT CRS VLR to the header given by the epsg code
+    ///
+    /// returns Err if the given code is not in the EPSG registry (given by the crs-definitions crate)
+    /// or the header already contains CSR VLRs
+    /// or the las version is below 1.4
+    pub fn add_wkt_crs_vlr(&mut self, epsg_code: u16) -> crate::Result<()> {
+        if self.version().minor < 4 {
+            return Err(crate::Error::UnsupportedFeature {
+                version: self.version(),
+                feature: "WKT CRS VLR",
+            });
+        }
+
+        for vlr in self.all_vlrs() {
+            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
+                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
+            {
+                return Err(CrsError::HeaderContainsCrsVlr)?;
+            }
+        }
+
+        let wkt_bytes = crs_definitions::from_code(epsg_code)
+            .ok_or(CrsError::InvalidEpsgCode)?
+            .wkt
+            .as_bytes()
+            .to_owned();
+
+        let mut user_id = [0; 16];
+        for (i, c) in "LASF_Projection".as_bytes().iter().enumerate() {
+            user_id[i] = *c;
+        }
+
+        let crs_vlr = crate::raw::Vlr {
+            reserved: 0,
+            user_id,
+            record_id: 2112,
+            record_length_after_header: crate::raw::vlr::RecordLength::Vlr(wkt_bytes.len() as u16),
+            description: [0; 32],
+            data: wkt_bytes,
+        };
+        self.vlrs.push(crate::Vlr::new(crs_vlr));
+
+        self.has_wkt_crs = true;
+        Ok(())
     }
 }
 
@@ -310,5 +398,39 @@ mod tests {
         let crs = reader.header().parse_crs().unwrap();
         assert!(crs.horizontal == 25832);
         assert!(crs.vertical == Some(5941));
+    }
+
+    #[test]
+    fn test_remove_crs_vlrs() {
+        let reader =
+            Reader::from_path("tests/data/32-1-472-150-76.laz").expect("Cannot open reader");
+        let mut header = reader.header().to_owned();
+        header.remove_crs_vlrs();
+
+        for vlr in header.all_vlrs() {
+            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
+                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
+            {
+                panic!("CRS VLRs are still in the header")
+            }
+        }
+    }
+
+    #[test]
+    fn test_write_crs_vlr() {
+        let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
+        let mut header = reader.header().to_owned();
+        // remove the current crs vlr(s)
+        header.remove_crs_vlrs();
+
+        // add a new crs vlr (not the correct one, but does not matter)
+        header
+            .add_wkt_crs_vlr(3006)
+            .expect("Could not add wkt crs vlr");
+
+        let crs = header.parse_crs().expect("Could not parse crs");
+
+        assert!(crs.horizontal == 3006);
+        assert!(crs.vertical.is_none());
     }
 }
