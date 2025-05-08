@@ -263,3 +263,25 @@ impl GeoTiffKeyEntry {
         Ok(GeoTiffKeyEntry { id, data })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::Reader;
+
+    #[test]
+    fn test_parse_crs_wkt_vlr_autzen() {
+        let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
+        let crs = reader.header().parse_crs().unwrap();
+        assert!(crs.horizontal == 6360);
+        assert!(crs.vertical.is_none())
+    }
+
+    #[test]
+    fn test_parse_crs_geotiff_vlr_norway() {
+        let reader =
+            Reader::from_path("tests/data/32-1-472-150-76.laz").expect("Cannot open reader");
+        let crs = reader.header().parse_crs().unwrap();
+        assert!(crs.horizontal == 25832);
+        assert!(crs.vertical == Some(5941));
+    }
+}
