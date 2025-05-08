@@ -194,4 +194,8 @@ pub enum Error {
     /// The vlr data is too long.
     #[error("the vlr is too long: {0}")]
     VlrTooLong(usize),
+
+    /// [crate::crs::CrsError]
+    #[error(transparent)]
+    CrsError(#[from] crate::crs::CrsError),
 }
