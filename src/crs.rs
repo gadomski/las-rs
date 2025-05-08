@@ -1,19 +1,3 @@
-/// For parsing CRS's stored in WKT-CRS v1 and v2 and GeoTiff U16 (E)VLR(s) in the Header
-///
-/// The CRS is returend in a Result<Crs, CrsError>
-/// CRS has the fields horizontal, which is a u16 EPSG code, and vertical, which is an optional u16 EPSG code.
-/// Only horizontal CRS's are detected for WKT-CRS (E)VLRs
-/// Geotiff-CRS (E)VLRs might have both
-///
-/// The validity of the extracted code is not checked.
-/// Use the crs-definitions crate for checking validity of EPSG codes.
-///
-/// Be aware that certain software adds invalid CRS VLRs when writing CRS-less lidar files (f.ex when QGIS convert .la[s,z] files without a CRS-VLR to .copc.laz files).
-/// This is because the las 1.4 spec (which .copc.laz demands), requires a WKT-CRS (E)VLR to be present.
-/// These VLRs often contain the invalid EPSG code 0.
-///
-/// Userdefined CRS's and CRS's stored in GeoTiff string or Doubles data is not yet supported.
-/// The different Error's are described in the CrsError enum
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{log, Level};
 use thiserror::Error;
@@ -24,14 +8,6 @@ use super::Header;
 
 /// crs result
 type CrsResult<T> = Result<T, CrsError>;
-
-/// horizontal and optional vertical crs given by EPSG code
-#[derive(Debug, Clone, Copy)]
-pub struct Crs {
-    pub horizontal: u16,
-    pub vertical: Option<u16>,
-}
-
 /// Crs-specific error enum
 #[derive(Error, Debug)]
 pub enum CrsError {
@@ -51,11 +27,38 @@ pub enum CrsError {
     Io(#[from] std::io::Error),
 }
 
+/// horizontal and optional vertical crs given by EPSG code
+#[derive(Debug, Clone, Copy)]
+pub struct Crs {
+    pub horizontal: u16,
+    pub vertical: Option<u16>,
+}
+
 impl Header {
-    /// Extracts the CRS by EPSG code stored in the CRS (E)VLR(s), if they exist
-    /// Supports both WKT definitions (by finding the EPSG code on the end of the WKT-string) and
-    /// legacy GeoTiff (but not GeoTiff string and double defined CRSs, only u16 EPSG code)
-    /// but most CRSs should be detected
+    /// For parsing CRS's from a header
+    /// Las stores CRS-info in (E)VLRs
+    /// parsing from (E)VLR(s) with WKT-CRS v1 or v2 or GeoTiff U16-data is supported
+    ///
+    /// The CRS is returend in a Result<Crs, CrsError>
+    /// CRS has the fields horizontal, which is a u16 EPSG code, and vertical, which is an optional u16 EPSG code.
+    ///
+    /// The validity of the extracted code is not checked.
+    /// Use the crs-definitions crate for checking validity of EPSG codes.
+    ///
+    /// Be aware that certain software adds invalid CRS VLRs when writing CRS-less lidar files (f.ex when QGIS convert .la[s,z] files without a CRS-VLR to .copc.laz files).
+    /// This is because the las 1.4 spec (which .copc.laz demands), requires a WKT-CRS (E)VLR to be present.
+    /// These VLRs often contain the invalid EPSG code 0.
+    ///
+    /// Userdefined CRS's and CRS's stored in GeoTiff string or Doubles data is not yet supported.
+    /// The different Error's are described in the CrsError enum
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use las::Reader;
+    /// let reader = Reader::from_path("lidar.las").expect("Cannot open reader");
+    /// let crs = reader.header().parse_crs().expect("Cannot parse CRS-VLR");
+    /// ```
     pub fn parse_crs(&self) -> CrsResult<Crs> {
         let mut crs_vlrs = [None, None, None, None];
         for vlr in self.all_vlrs() {
@@ -106,30 +109,54 @@ impl Header {
     }
 }
 
-/// find the epsg code located at the end of the WKT string
+/// find the EPSG codes for the WKT string
+///
+/// split the wkt string in two at VERTCRS
+/// and find the horizontal and vertical codes at the end of each substring
 fn get_wkt_epsg(bytes: &[u8]) -> CrsResult<Crs> {
-    let mut epsg_code = 0;
-    let mut has_code_started = false;
-    let mut power = 0;
-    for (i, byte) in bytes.iter().rev().enumerate() {
-        if (48..=57).contains(byte) {
-            // the byte is an ASCII encoded number
-            has_code_started = true;
+    let wkt: String = bytes.iter().map(|b| *b as char).collect();
 
-            epsg_code += 10_u16.pow(power) * (byte - 48) as u16;
-            power += 1;
-        } else if has_code_started {
-            break;
+    // VERT_CS for WKT v1 and VERTCRS for v2
+    let pieces = wkt.split_once("VERT");
+
+    let pieces = if let Some((horizontal, vertical)) = pieces {
+        // both horizontal and vertical codes exist
+        vec![horizontal.as_bytes(), vertical.as_bytes()]
+    } else {
+        // only horizontal code
+        vec![wkt.as_bytes()]
+    };
+
+    let mut epsg = [None, None];
+    for (pi, piece) in pieces.into_iter().enumerate() {
+        let mut epsg_code = 0;
+        let mut has_code_started = false;
+        let mut power = 0;
+        for (i, byte) in piece.iter().rev().enumerate() {
+            if (48..=57).contains(byte) {
+                // the byte is an ASCII encoded number
+                has_code_started = true;
+
+                epsg_code += 10_u16.pow(power) * (byte - 48) as u16;
+                power += 1;
+            } else if has_code_started {
+                break;
+            }
+            if i > 7 {
+                break;
+            }
         }
-        if i > 7 {
-            // the code should be a 4 or 5 digit number starting at index 2 or 3 from behind
-            // meaning that if i has reached 8 something is wrong
-            return Err(CrsError::UnreadableWktCrs);
+        if epsg_code != 0 {
+            epsg[pi] = Some(epsg_code);
         }
     }
+    if epsg[0].is_none() {
+        return Err(CrsError::UnreadableWktCrs);
+    }
+
     Ok(Crs {
-        horizontal: epsg_code,
-        vertical: None,
+        horizontal: epsg[0].unwrap(),
+        vertical: epsg[1],
     })
 }
 
@@ -272,8 +299,8 @@ mod tests {
     fn test_parse_crs_wkt_vlr_autzen() {
         let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
         let crs = reader.header().parse_crs().unwrap();
-        assert!(crs.horizontal == 6360);
-        assert!(crs.vertical.is_none())
+        assert!(crs.horizontal == 2992);
+        assert!(crs.vertical == Some(6360))
     }
 
     #[test]
