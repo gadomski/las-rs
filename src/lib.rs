@@ -187,6 +187,7 @@ pub mod writer;
 
 mod bounds;
 mod color;
+mod crs;
 mod error;
 mod gps_time_type;
 mod transform;
