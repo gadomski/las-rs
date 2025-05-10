@@ -23,6 +23,7 @@ uuid = "1"
 
 [dev-dependencies]
 criterion = "0.5"
+crs-definitions = { version = "0.0.3", features = ["wkt"] }
 
 [features]
 laz = ["dep:laz"]

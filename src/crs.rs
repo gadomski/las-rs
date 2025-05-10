@@ -125,12 +125,12 @@ impl Header {
         self.has_wkt_crs = false;
     }
 
-    /// Add a WKT CRS VLR to the header given by the epsg code
+    /// Add a WKT CRS VLR to the header
     ///
-    /// returns Err if the given code is not in the EPSG registry (given by the crs-definitions crate)
-    /// or the header already contains CSR VLRs
-    /// or the las version is below 1.4
-    pub fn add_wkt_crs_vlr(&mut self, epsg_code: u16) -> Result<()> {
+    /// returns Err if the header already contains CRS VLRs or the las version is below 1.4
+    ///
+    /// The WKT bytes can be obtained from a horizontal EPSG code by using the crs_definitions crate
+    pub fn set_wkt_crs(&mut self, wkt_bytes: &[u8]) -> Result<()> {
         if self.version().minor < 4 {
             return Err(Error::UnsupportedFeature {
                 version: self.version(),
@@ -146,12 +146,6 @@ impl Header {
             }
         }
 
-        let wkt_bytes = crs_definitions::from_code(epsg_code)
-            .ok_or(Error::InvalidEpsgCode)?
-            .wkt
-            .as_bytes()
-            .to_owned();
-
         let mut user_id = [0; 16];
         for (i, c) in "LASF_Projection".as_bytes().iter().enumerate() {
             user_id[i] = *c;
@@ -163,7 +157,7 @@ impl Header {
             record_id: 2112,
             record_length_after_header: crate::raw::vlr::RecordLength::Vlr(wkt_bytes.len() as u16),
             description: [0; 32],
-            data: wkt_bytes,
+            data: wkt_bytes.to_vec(),
         };
         self.vlrs.push(crate::Vlr::new(crs_vlr));
 
@@ -397,7 +391,7 @@ mod tests {
 
         // add a new crs vlr (not the correct one, but does not matter)
         header
-            .add_wkt_crs_vlr(3006)
+            .set_wkt_crs(crs_definitions::from_code(3006).unwrap().wkt().as_bytes())
             .expect("Could not add wkt crs vlr");
 
         let crs = header.parse_crs().expect("Could not parse crs").unwrap();
