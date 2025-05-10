@@ -195,7 +195,27 @@ pub enum Error {
     #[error("the vlr is too long: {0}")]
     VlrTooLong(usize),
 
-    /// [crate::crs::CrsError]
-    #[error(transparent)]
-    CrsError(#[from] crate::crs::CrsError),
+    /// Cannot get EPSG code(s) from user defined CRSes
+    #[error("Parsing of User Defined CRS not implemented")]
+    UserDefinedCrs,
+
+    /// Failed to parse EPSG code(s) from the WKT-CRS (E)VLR
+    #[error("Unable to parse the found WKT-CRS (E)VLR")]
+    UnreadableWktCrs,
+
+    /// Failed to parse EPSG code(s) from the GeoTiff-CRS (E)VLR
+    #[error("Unable to parse the found GeoTiff (E)VLR(s)")]
+    UnreadableGeoTiffCrs,
+
+    /// ??
+    #[error("Invalid key for Geotiff data")]
+    UndefinedDataForGeoTiffKey(u16),
+
+    /// Cannot get EPSG code(s) from GeoTiff String or Double data
+    #[error("The CRS parser does not handle CRS's defined by Geotiff String and Double data")]
+    UnimplementedForGeoTiffStringAndDoubleData(crate::crs::GeoTiffData),
+
+    /// Cannot write CRS VLR to the header as it already contains a CRS VLR
+    #[error("Cannot write CRS VLR as Header already contains CRS VLR")]
+    HeaderContainsCrsVlr,
 }

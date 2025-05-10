@@ -15,7 +15,6 @@ edition = "2024"
 [dependencies]
 byteorder = "1.4"
 chrono = "0.4"
-crs-definitions = { version = "0.3.0", default-features = false, features = ["wkt"] }
 laz = { version = "0.9.1", optional = true }
 log = "0.4"
 num-traits = "0.2"

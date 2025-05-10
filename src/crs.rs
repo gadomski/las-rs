@@ -4,36 +4,11 @@ use thiserror::Error;
 
 use std::io::{Cursor, Seek, SeekFrom};
 
-use super::Header;
+use crate::{Error, Header, Result};
 
-/// crs result
-type CrsResult<T> = Result<T, CrsError>;
-/// Crs-specific error enum
-#[derive(Error, Debug)]
-pub enum CrsError {
-    #[error("The header does not contain any CRS VLRs")]
-    NoCrs,
-    #[error("Parsing of User Defined CRS not implemented")]
-    UserDefinedCrs,
-    #[error("Unable to parse the found WKT-CRS (E)VLR")]
-    UnreadableWktCrs,
-    #[error("Unable to parse the found Geotiff (E)VLR(s)")]
-    UnreadableGeotiffCrs,
-    #[error("Invalid key for Geotiff data")]
-    UndefinedDataForGeoTiffKey(u16),
-    #[error("The CRS parser does not handle CRS's defined by Geotiff String and Double data")]
-    UnimplementedForGeoTiffStringAndDoubleData(GeoTiffData),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error("Invalid Epsg code")]
-    InvalidEpsgCode,
-    #[error("Cannot write CRS VLR as Header already contains CRS VLR")]
-    HeaderContainsCrsVlr,
-}
-
-/// horizontal and optional vertical crs given by EPSG code
+/// horizontal and optional vertical crs given by EPSG codes
 #[derive(Debug, Clone, Copy)]
-pub struct Crs {
+pub struct EpsgCrs {
     pub horizontal: u16,
     pub vertical: Option<u16>,
 }
@@ -63,7 +38,7 @@ impl Header {
     /// let reader = Reader::from_path("lidar.las").expect("Cannot open reader");
     /// let crs = reader.header().parse_crs().expect("Cannot parse CRS-VLR");
     /// ```
-    pub fn parse_crs(&self) -> crate::Result<Crs> {
+    pub fn parse_crs(&self) -> Result<Option<EpsgCrs>> {
         let mut crs_vlrs = [None, None, None, None];
         for vlr in self.all_vlrs() {
             if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
@@ -108,7 +83,7 @@ impl Header {
         } else if let Some(main) = geotiff_main {
             get_geotiff_epsg(main, double, string)?
         } else {
-            Err(CrsError::NoCrs)?
+            None
         };
         Ok(crs)
     }
@@ -155,9 +130,9 @@ impl Header {
     /// returns Err if the given code is not in the EPSG registry (given by the crs-definitions crate)
     /// or the header already contains CSR VLRs
     /// or the las version is below 1.4
-    pub fn add_wkt_crs_vlr(&mut self, epsg_code: u16) -> crate::Result<()> {
+    pub fn add_wkt_crs_vlr(&mut self, epsg_code: u16) -> Result<()> {
         if self.version().minor < 4 {
-            return Err(crate::Error::UnsupportedFeature {
+            return Err(Error::UnsupportedFeature {
                 version: self.version(),
                 feature: "WKT CRS VLR",
             });
@@ -167,12 +142,12 @@ impl Header {
             if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
                 (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
             {
-                return Err(CrsError::HeaderContainsCrsVlr)?;
+                return Err(Error::HeaderContainsCrsVlr)?;
             }
         }
 
         let wkt_bytes = crs_definitions::from_code(epsg_code)
-            .ok_or(CrsError::InvalidEpsgCode)?
+            .ok_or(Error::InvalidEpsgCode)?
             .wkt
             .as_bytes()
             .to_owned();
@@ -201,7 +176,7 @@ impl Header {
 ///
 /// split the wkt string in two at VERTCRS
 /// and find the horizontal and vertical codes at the end of each substring
-fn get_wkt_epsg(bytes: &[u8]) -> CrsResult<Crs> {
+fn get_wkt_epsg(bytes: &[u8]) -> Result<Option<EpsgCrs>> {
     let wkt: String = bytes.iter().map(|b| *b as char).collect();
 
     // VERT_CS for WKT v1 and VERTCRS for v2
@@ -237,13 +212,13 @@ fn get_wkt_epsg(bytes: &[u8]) -> CrsResult<Crs> {
         }
     }
     if epsg[0].is_none() {
-        return Err(CrsError::UnreadableWktCrs);
+        return Err(Error::UnreadableWktCrs);
     }
 
-    Ok(Crs {
+    Ok(Some(EpsgCrs {
         horizontal: epsg[0].unwrap(),
         vertical: epsg[1],
-    })
+    }))
 }
 
 /// Gets the EPSG codes from the geotiff crs vlrs
@@ -251,7 +226,7 @@ fn get_geotiff_epsg(
     main_vlr: &[u8],
     double_vlr: Option<&[u8]>,
     ascii_vlr: Option<&[u8]>,
-) -> CrsResult<Crs> {
+) -> Result<Option<EpsgCrs>> {
     let mut main_vlr = Cursor::new(main_vlr);
 
     let _ = main_vlr.read_u16::<LittleEndian>()?; // always 1
@@ -267,19 +242,19 @@ fn get_geotiff_epsg(
             // 3072 and 2048 should not co-exist, but might both be combined with 4096
             // 1024 should always exist
             1024 => match entry.data {
-                GeoTiffData::U16(0) => return Err(CrsError::UnreadableGeotiffCrs),
+                GeoTiffData::U16(0) => return Err(Error::UnreadableGeoTiffCrs),
                 GeoTiffData::U16(1) => (), // projected crs
                 GeoTiffData::U16(2) => (), // geographic coordinates
                 GeoTiffData::U16(3) => (), // geographic + a vertical crs
-                GeoTiffData::U16(32_767) => return Err(CrsError::UserDefinedCrs),
-                p => return Err(CrsError::UnimplementedForGeoTiffStringAndDoubleData(p)),
+                GeoTiffData::U16(32_767) => return Err(Error::UserDefinedCrs),
+                p => return Err(Error::UnimplementedForGeoTiffStringAndDoubleData(p)),
             },
             2048 | 3072 => {
                 if let GeoTiffData::U16(v) = entry.data {
                     out.0 = Some(v);
                 } else {
                     // should probably add support for this
-                    return Err(CrsError::UndefinedDataForGeoTiffKey(entry.id));
+                    return Err(Error::UndefinedDataForGeoTiffKey(entry.id));
                 }
             }
             4096 => {
@@ -288,19 +263,19 @@ fn get_geotiff_epsg(
                     out.1 = Some(v);
                 } else {
                     // should probably add support for this
-                    return Err(CrsError::UndefinedDataForGeoTiffKey(4096));
+                    return Err(Error::UndefinedDataForGeoTiffKey(4096));
                 }
             }
             _ => (), // the rest are descriptions and units.
         }
     }
     if out.0.is_none() {
-        return Err(CrsError::UnreadableGeotiffCrs);
+        return Err(Error::UnreadableGeoTiffCrs);
     }
-    Ok(Crs {
+    Ok(Some(EpsgCrs {
         horizontal: out.0.unwrap(),
         vertical: out.1,
-    })
+    }))
 }
 
 #[derive(Debug)]
@@ -314,7 +289,7 @@ impl GeoTiffCRS {
         double_vlr: Option<&[u8]>,
         ascii_vlr: Option<&[u8]>,
         count: u16,
-    ) -> CrsResult<Self> {
+    ) -> Result<Self> {
         let mut entries = Vec::with_capacity(count as usize);
         for _ in 0..count {
             entries.push(GeoTiffKeyEntry::read_from(
@@ -345,7 +320,7 @@ impl GeoTiffKeyEntry {
         main_vlr: &mut Cursor<&[u8]>,
         double_vlr: &Option<&[u8]>,
         ascii_vlr: &Option<&[u8]>,
-    ) -> CrsResult<Self> {
+    ) -> Result<Self> {
         let id = main_vlr.read_u16::<LittleEndian>()?;
         let location = main_vlr.read_u16::<LittleEndian>()?;
         let count = main_vlr.read_u16::<LittleEndian>()?;
@@ -353,7 +328,7 @@ impl GeoTiffKeyEntry {
         let data = match location {
             0 => GeoTiffData::U16(offset),
             34736 => {
-                let mut cursor = Cursor::new(double_vlr.ok_or(CrsError::UnreadableGeotiffCrs)?);
+                let mut cursor = Cursor::new(double_vlr.ok_or(Error::UnreadableGeoTiffCrs)?);
                 let _ = cursor.seek(SeekFrom::Start(offset as u64 * 8_u64))?; // 8 is the byte size of a f64 and offset is not a byte offset but an index
                 let mut doubles = Vec::with_capacity(count as usize);
                 for _ in 0..count {
@@ -362,7 +337,7 @@ impl GeoTiffKeyEntry {
                 GeoTiffData::Doubles(doubles)
             }
             34737 => {
-                let mut cursor = Cursor::new(ascii_vlr.ok_or(CrsError::UnreadableGeotiffCrs)?);
+                let mut cursor = Cursor::new(ascii_vlr.ok_or(Error::UnreadableGeoTiffCrs)?);
                 let _ = cursor.seek(SeekFrom::Start(offset as u64))?; // no need to multiply the index as the byte size of char is 1
                 let mut string = String::with_capacity(count as usize);
                 for _ in 0..count {
@@ -370,7 +345,7 @@ impl GeoTiffKeyEntry {
                 }
                 GeoTiffData::String(string)
             }
-            _ => return Err(CrsError::UndefinedDataForGeoTiffKey(id)),
+            _ => return Err(Error::UndefinedDataForGeoTiffKey(id)),
         };
         Ok(GeoTiffKeyEntry { id, data })
     }
@@ -383,7 +358,7 @@ mod tests {
     #[test]
     fn test_parse_crs_wkt_vlr_autzen() {
         let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
-        let crs = reader.header().parse_crs().unwrap();
+        let crs = reader.header().parse_crs().unwrap().unwrap();
         assert!(crs.horizontal == 2992);
         assert!(crs.vertical == Some(6360))
     }
@@ -392,7 +367,7 @@ mod tests {
     fn test_parse_crs_geotiff_vlr_norway() {
         let reader =
             Reader::from_path("tests/data/32-1-472-150-76.laz").expect("Cannot open reader");
-        let crs = reader.header().parse_crs().unwrap();
+        let crs = reader.header().parse_crs().unwrap().unwrap();
         assert!(crs.horizontal == 25832);
         assert!(crs.vertical == Some(5941));
     }
@@ -425,7 +400,7 @@ mod tests {
             .add_wkt_crs_vlr(3006)
             .expect("Could not add wkt crs vlr");
 
-        let crs = header.parse_crs().expect("Could not parse crs");
+        let crs = header.parse_crs().expect("Could not parse crs").unwrap();
 
         assert!(crs.horizontal == 3006);
         assert!(crs.vertical.is_none());
