@@ -41,9 +41,7 @@ impl Header {
     pub fn parse_crs(&self) -> Result<Option<EpsgCrs>> {
         let mut crs_vlrs = [None, None, None, None];
         for vlr in self.all_vlrs() {
-            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
-                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
-            {
+            if vlr.is_projection() {
                 let pos = match vlr.record_id {
                     2112 => 0,
                     34735 => 1,
@@ -93,9 +91,7 @@ impl Header {
         // check vlrs
         let mut crs_vlr_indecies = vec![];
         for (i, vlr) in self.vlrs.iter().enumerate() {
-            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
-                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
-            {
+            if vlr.is_projection() {
                 crs_vlr_indecies.push(i);
             }
         }
@@ -109,9 +105,7 @@ impl Header {
         // check evlrs
         let mut crs_evlr_indecies = vec![];
         for (i, vlr) in self.evlrs.iter().enumerate() {
-            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
-                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
-            {
+            if vlr.is_projection() {
                 crs_evlr_indecies.push(i);
             }
         }
@@ -139,9 +133,7 @@ impl Header {
         }
 
         for vlr in self.all_vlrs() {
-            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
-                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
-            {
+            if vlr.is_projection() {
                 return Err(Error::HeaderContainsCrsVlr)?;
             }
         }
@@ -374,9 +366,7 @@ mod tests {
         header.remove_crs_vlrs();
 
         for vlr in header.all_vlrs() {
-            if let ("lasf_projection", 2112 | 34735 | 34736 | 34737) =
-                (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
-            {
+            if vlr.is_projection() {
                 panic!("CRS VLRs are still in the header")
             }
         }
