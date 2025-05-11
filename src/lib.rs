@@ -177,6 +177,7 @@ pub mod copc;
 #[cfg(feature = "laz")]
 pub mod laz;
 
+pub mod crs;
 pub mod feature;
 pub mod header;
 pub mod point;
@@ -187,7 +188,6 @@ pub mod writer;
 
 mod bounds;
 mod color;
-mod crs;
 mod error;
 mod gps_time_type;
 mod transform;
