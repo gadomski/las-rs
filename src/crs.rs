@@ -94,34 +94,14 @@ impl Header {
 
     /// remove all CRS (E)VLRs from the header
     pub fn remove_crs_vlrs(&mut self) {
-        // check vlrs
-        let mut crs_vlr_indecies = vec![];
-        for (i, vlr) in self.vlrs.iter().enumerate() {
-            if vlr.is_projection() {
-                crs_vlr_indecies.push(i);
-            }
-        }
-        crs_vlr_indecies.sort_by(|a, b| b.cmp(a));
-
-        // preserves the order of the rest of the vlrs
-        for index in crs_vlr_indecies {
-            let _ = self.vlrs.remove(index);
-        }
-
-        // check evlrs
-        let mut crs_evlr_indecies = vec![];
-        for (i, vlr) in self.evlrs.iter().enumerate() {
-            if vlr.is_projection() {
-                crs_evlr_indecies.push(i);
-            }
-        }
-        crs_evlr_indecies.sort_by(|a, b| b.cmp(a));
-
-        // preserves the order of the rest of the evlrs
-        for index in crs_evlr_indecies {
-            let _ = self.evlrs.remove(index);
-        }
-
+        // remove projection vlrs
+        self.vlrs = self.vlrs.drain(..).filter(|v| !v.is_projection()).collect();
+        // remove projection evlrs
+        self.evlrs = self
+            .evlrs
+            .drain(..)
+            .filter(|v| !v.is_projection())
+            .collect();
         self.has_wkt_crs = false;
     }
 
