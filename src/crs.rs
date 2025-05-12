@@ -383,6 +383,7 @@ impl GeoTiffKeyEntry {
 mod tests {
     use crate::Reader;
 
+    #[cfg(feature = "laz")]
     #[test]
     fn test_get_epsg_crs_wkt_vlr_autzen() {
         let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
@@ -391,6 +392,7 @@ mod tests {
         assert!(crs.vertical == Some(6360))
     }
 
+    #[cfg(feature = "laz")]
     #[test]
     fn test_get_epsg_crs_geotiff_vlr_norway() {
         let reader =
@@ -400,6 +402,7 @@ mod tests {
         assert!(crs.vertical == Some(5941));
     }
 
+    #[cfg(feature = "laz")]
     #[test]
     fn test_remove_crs_vlrs() {
         let reader =
@@ -414,8 +417,9 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "laz")]
     #[test]
-    fn test_write_crs_vlr() {
+    fn test_write_crs_vlr_las_v1_4() {
         let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
         let mut header = reader.header().to_owned();
         // remove the current crs vlr(s)
@@ -430,5 +434,18 @@ mod tests {
 
         assert!(crs.horizontal == 3006);
         assert!(crs.vertical.is_none());
+    }
+
+    #[test]
+    fn test_write_crs_vlr_las_v1_2() {
+        let reader = Reader::from_path("tests/data/autzen.las").expect("Cannot open reader");
+        let mut header = reader.header().to_owned();
+        // remove the current crs vlr(s)
+        header.remove_crs_vlrs();
+
+        // try to add a new crs vlr (not supported for las 1.4)
+        let res = header.set_wkt_crs(crs_definitions::from_code(3006).unwrap().wkt.as_bytes());
+
+        assert!(res.is_err());
     }
 }
