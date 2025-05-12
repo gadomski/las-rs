@@ -33,7 +33,7 @@ impl Header {
     /// WKT takes precedence over GeoTiff in this function, but they should not co-exist
     ///
     /// Just because this function fails does not mean that no CRS-data is availible!
-    /// Use functions [get_wkt_crs] or [get_geotiff_crs] to get all data stored in the CRS-(E)VLRs
+    /// Use functions [Self::get_wkt_crs] or [Self::get_geotiff_crs] to get all data stored in the CRS-(E)VLRs
     ///
     /// Parsing code(s) from WKT-CRS v1 or v2 or GeoTiff U16-data is supported
     ///
@@ -50,9 +50,6 @@ impl Header {
     /// let reader = Reader::from_path("lidar.las").expect("Cannot open reader");
     /// let crs = reader.header().get_epsg_crs().expect("Cannot parse EPSG code(s) from the CRS-(E)VLRs");
     /// ```
-    ///
-    /// [get_wkt_crs]: Self::get_wkt_crs
-    /// [get_geotiff_crs]: Self::get_geotiff_crs
     pub fn get_epsg_crs(&self) -> Result<Option<EpsgCrs>> {
         let wkt = self.get_wkt_crs();
 
@@ -103,10 +100,10 @@ impl Header {
 
     /// Add a WKT CRS VLR to the header
     ///
-    /// returns Err if the header already contains CRS VLRs or the las version is below 1.4
+    /// returns Err if the header already contains CRS (E)VLRs or the Las version is below 1.4
     ///
     /// The WKT bytes can be obtained from a horizontal EPSG code by using the crs_definitions crate
-    pub fn set_wkt_crs(&mut self, wkt_bytes: &[u8]) -> Result<()> {
+    pub fn set_wkt_crs(&mut self, wkt_string: impl Into<String>) -> Result<()> {
         if self.version() < crate::Version::new(1, 4) {
             return Err(Error::UnsupportedFeature {
                 version: self.version(),
@@ -125,27 +122,29 @@ impl Header {
             user_id[i] = *c;
         }
 
+        let wkt_bytes = wkt_string.into().into_bytes();
         let num_bytes = wkt_bytes.len();
 
-        // must be added as an evlr, because of length
         if num_bytes > u16::MAX as usize {
+            // must be added as an evlr, because of length
             let crs_vlr = crate::raw::Vlr {
                 reserved: 0,
                 user_id,
                 record_id: 2112,
                 record_length_after_header: crate::raw::vlr::RecordLength::Evlr(num_bytes as u64),
                 description: [0; 32],
-                data: wkt_bytes.to_vec(),
+                data: wkt_bytes,
             };
             self.evlrs.push(crate::Vlr::new(crs_vlr));
         } else {
+            // just a normal vlr
             let crs_vlr = crate::raw::Vlr {
                 reserved: 0,
                 user_id,
                 record_id: 2112,
                 record_length_after_header: crate::raw::vlr::RecordLength::Vlr(num_bytes as u16),
                 description: [0; 32],
-                data: wkt_bytes.to_vec(),
+                data: wkt_bytes,
             };
             self.vlrs.push(crate::Vlr::new(crs_vlr));
         };
@@ -444,7 +443,7 @@ mod tests {
         header.remove_crs_vlrs();
 
         // try to add a new crs vlr (not supported for las 1.4)
-        let res = header.set_wkt_crs(crs_definitions::from_code(3006).unwrap().wkt.as_bytes());
+        let res = header.set_wkt_crs(crs_definitions::from_code(3006).unwrap().wkt);
 
         assert!(res.is_err());
     }
