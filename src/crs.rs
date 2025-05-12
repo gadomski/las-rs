@@ -41,11 +41,7 @@ impl Header {
     /// [EpsgCrs] has the fields horizontal, which is a u16 EPSG code, and vertical, which is an optional u16 EPSG code.
     ///
     /// The validity of the extracted code is not checked.
-    /// Use the crs-definitions crate for checking validity of horizontal EPSG codes.
-    ///
-    /// Be aware that certain software adds invalid CRS VLRs when writing CRS-less lidar files (f.ex when QGIS convert .la[s,z] files without a CRS-VLR to .copc.laz files).
-    /// This is because the Las v1.4 (which .copc.laz demands), requires a WKT-CRS (E)VLR to be present.
-    /// These (E)VLRs often contain the invalid EPSG code 0.
+    /// Use the crs-definitions crate for checking the validity of a horizontal EPSG code.
     ///
     /// # Example
     ///

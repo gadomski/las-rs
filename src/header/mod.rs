@@ -536,7 +536,7 @@ impl Header {
         Vlrs(self.vlrs.iter().chain(&self.evlrs))
     }
 
-    /// Returns wether or not this header has any CRS (E)VLRs
+    /// Returns whether or not this header has any CRS (E)VLRs
     ///
     /// # Examples
     ///
