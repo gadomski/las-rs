@@ -531,8 +531,27 @@ impl Header {
     /// builder.evlrs.push(Vlr::default());
     /// let header = builder.into_header().unwrap();
     /// assert_eq!(2, header.all_vlrs().count());
+    /// ```
     pub fn all_vlrs(&self) -> Vlrs<'_> {
         Vlrs(self.vlrs.iter().chain(&self.evlrs))
+    }
+
+    /// Returns wether or not this header has any CRS (E)VLRs
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    /// let header = Header::default();
+    /// assert!(!header.has_crs_vlrs());
+    /// ```
+    pub fn has_crs_vlrs(&self) -> bool {
+        for vlr in self.all_vlrs() {
+            if vlr.is_projection() {
+                return true;
+            }
+        }
+        false
     }
 
     /// Converts this header into a raw header.
