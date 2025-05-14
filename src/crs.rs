@@ -29,7 +29,7 @@ impl Header {
     /// WKT takes precedence over GeoTiff in this function, but they should not co-exist
     ///
     /// Just because this function fails does not mean that no CRS-data is availible!
-    /// Use functions [Self::get_wkt_crs] or [Self::get_geotiff_crs] to get all data stored in the CRS-(E)VLRs
+    /// Use functions [Self::get_wkt_crs_bytes] or [Self::get_geotiff_crs] to get all data stored in the CRS-(E)VLRs
     ///
     /// Parsing code(s) from WKT-CRS v1 or v2 or GeoTiff U16-data is supported
     ///
@@ -43,7 +43,7 @@ impl Header {
     ///
     /// ```
     /// use las::Reader;
-    /// let reader = Reader::from_path("lidar.las").expect("Cannot open reader");
+    /// let reader = Reader::from_path("tests/data/autzen.las").expect("Cannot open reader");
     /// let crs = reader.header().get_epsg_crs().expect("Cannot parse EPSG code(s) from the CRS-(E)VLRs");
     /// ```
     pub fn get_epsg_crs(&self) -> Result<Option<EpsgCrs>> {
