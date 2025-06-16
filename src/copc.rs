@@ -1,6 +1,6 @@
 //! [COPC](https://copc.io/) header data
 
-use crate::{raw, Point};
+use crate::{raw, Bounds, Point, Vector};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use laz::record::{LayeredPointRecordDecompressor, RecordDecompressor};
 use std::{
@@ -115,10 +115,14 @@ impl TryFrom<&Vlr> for CopcInfoVlr {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct VoxelKey {
     // A value < 0 indicates an invalid VoxelKey
-    l: i32,
-    x: i32,
-    y: i32,
-    z: i32,
+    /// The level of detail
+    pub l: i32,
+    #[allow(missing_docs)]
+    pub x: i32,
+    #[allow(missing_docs)]
+    pub y: i32,
+    #[allow(missing_docs)]
+    pub z: i32,
 }
 
 impl VoxelKey {
@@ -155,7 +159,41 @@ impl VoxelKey {
             z: self.z >> 1,
         }
     }
+    /// Calculates bounds of the VoxelKey.
+    /// Serves as a guidance implementation.
+    pub fn bounds(&self, copc_info: CopcInfoVlr) -> Bounds {
+        let root_min_x = copc_info.center_x - copc_info.halfsize;
+        let root_min_y = copc_info.center_y - copc_info.halfsize;
+        let root_min_z = copc_info.center_z - copc_info.halfsize;
 
+        let root_max_x = copc_info.center_x + copc_info.halfsize;
+        let root_max_y = copc_info.center_y + copc_info.halfsize;
+        let root_max_z = copc_info.center_z + copc_info.halfsize;
+
+        let root_size_x = root_max_x - root_min_x;
+        let root_size_y = root_max_y - root_min_y;
+        let root_size_z = root_max_z - root_min_z;
+
+        let voxel_size_x = root_size_x / (1 << self.l) as f64;
+        let voxel_size_y = root_size_y / (1 << self.l) as f64;
+        let voxel_size_z = root_size_z / (1 << self.l) as f64;
+
+        let voxel_min = Vector {
+            x: root_min_x + voxel_size_x * self.x as f64,
+            y: root_min_y + voxel_size_y * self.y as f64,
+            z: root_min_z + voxel_size_z * self.z as f64,
+        };
+
+        let voxel_max = Vector {
+            x: voxel_min.x + voxel_size_x,
+            y: voxel_min.y + voxel_size_y,
+            z: voxel_min.z + voxel_size_z,
+        };
+        Bounds {
+            min: voxel_min,
+            max: voxel_max,
+        }
+    }
     /// The root voxel key.
     pub const ROOT: Self = Self {
         l: 0,
@@ -591,8 +629,9 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Result, VoxelKey};
-    use crate::{copc::CopcEntryReader, Reader};
+
+    use super::{CopcInfoVlr, Result, VoxelKey};
+    use crate::{copc::CopcEntryReader, Bounds, Reader, Vector};
     use std::{fs::File, io::BufReader};
     #[test]
     fn test_voxelkey() {
@@ -655,5 +694,37 @@ mod tests {
             .iter()
             .zip(copc_points)
             .all(|(laz_point, copc_point)| laz_point.eq(&copc_point)));
+    }
+    #[test]
+    fn test_voxel_bounds() {
+        let copc_info = CopcInfoVlr {
+            center_x: 10.,
+            center_y: 10.,
+            center_z: 10.,
+            halfsize: 5.,
+            spacing: 1.,
+            root_hier_offset: 0,
+            root_hier_size: 0,
+            gpstime_minimum: 0.,
+            gpstime_maximum: 0.,
+            reserved: [0; 11],
+        };
+        let key = VoxelKey::ROOT.child(3).unwrap();
+        let bounds = key.bounds(copc_info);
+        assert_eq!(
+            bounds,
+            Bounds {
+                min: Vector {
+                    x: 10.0,
+                    y: 10.0,
+                    z: 5.0
+                },
+                max: Vector {
+                    x: 15.0,
+                    y: 15.0,
+                    z: 10.0
+                }
+            }
+        );
     }
 }
