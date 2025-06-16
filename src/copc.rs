@@ -115,10 +115,14 @@ impl TryFrom<&Vlr> for CopcInfoVlr {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct VoxelKey {
     // A value < 0 indicates an invalid VoxelKey
-    l: i32,
-    x: i32,
-    y: i32,
-    z: i32,
+    /// The level of detail
+    pub l: i32,
+    #[allow(missing_docs)]
+    pub x: i32,
+    #[allow(missing_docs)]
+    pub y: i32,
+    #[allow(missing_docs)]
+    pub z: i32,
 }
 
 impl VoxelKey {
