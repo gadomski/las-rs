@@ -629,8 +629,9 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Result, VoxelKey};
-    use crate::{copc::CopcEntryReader, Reader};
+
+    use super::{CopcInfoVlr, Result, VoxelKey};
+    use crate::{copc::CopcEntryReader, Bounds, Reader, Vector};
     use std::{fs::File, io::BufReader};
     #[test]
     fn test_voxelkey() {
@@ -693,5 +694,37 @@ mod tests {
             .iter()
             .zip(copc_points)
             .all(|(laz_point, copc_point)| laz_point.eq(&copc_point)));
+    }
+    #[test]
+    fn test_voxel_bounds() {
+        let copc_info = CopcInfoVlr {
+            center_x: 10.,
+            center_y: 10.,
+            center_z: 10.,
+            halfsize: 5.,
+            spacing: 1.,
+            root_hier_offset: 0,
+            root_hier_size: 0,
+            gpstime_minimum: 0.,
+            gpstime_maximum: 0.,
+            reserved: [0; 11],
+        };
+        let key = VoxelKey::ROOT.child(3).unwrap();
+        let bounds = key.bounds(copc_info);
+        assert_eq!(
+            bounds,
+            Bounds {
+                min: Vector {
+                    x: 10.0,
+                    y: 10.0,
+                    z: 5.0
+                },
+                max: Vector {
+                    x: 15.0,
+                    y: 15.0,
+                    z: 10.0
+                }
+            }
+        );
     }
 }
