@@ -1,8 +1,9 @@
 extern crate criterion;
 extern crate las;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use las::{Point, Reader, Writer};
+use std::hint::black_box;
 
 fn roundtrip(npoints: usize) {
     let mut writer = Writer::default();
@@ -17,7 +18,7 @@ fn roundtrip(npoints: usize) {
 
 fn bench(criterion: &mut Criterion) {
     for npoints in 0..4 {
-        criterion.bench_function(&format!("roundtrip {} points", npoints), |b| {
+        criterion.bench_function(&format!("roundtrip {npoints} points"), |b| {
             b.iter(|| roundtrip(black_box(npoints)))
         });
     }

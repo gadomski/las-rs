@@ -234,9 +234,9 @@ impl Format {
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Ok(n) = self.to_u8() {
-            write!(f, "point format {}", n)
+            write!(f, "point format {n}")
         } else {
-            write!(f, "point format that does not map onto a code: {:?}", self)
+            write!(f, "point format that does not map onto a code: {self:?}")
         }
     }
 }
