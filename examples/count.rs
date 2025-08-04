@@ -10,5 +10,5 @@ fn main() {
         .expect("Must provide a path to a las file");
     let mut reader = Reader::from_path(path).expect("Unable to open reader");
     let npoints = reader.points().collect::<Vec<Result<_, _>>>().len();
-    println!("Number of points: {}", npoints);
+    println!("Number of points: {npoints}");
 }
