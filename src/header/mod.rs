@@ -180,8 +180,8 @@ impl Header {
 
         let _ = read.seek(SeekFrom::Start(offset_to_point_data))?;
 
-        if let Some(version) = builder.minimum_supported_version() {
-            if version > builder.version {
+        if let Some(version) = builder.minimum_supported_version()
+            && version > builder.version {
                 log::warn!(
                     "upgrading las version to {} (from {})",
                     version,
@@ -189,7 +189,6 @@ impl Header {
                 );
                 builder.version = version;
             }
-        }
         builder.into_header()
     }
     /// Creates a new header from a raw header.
