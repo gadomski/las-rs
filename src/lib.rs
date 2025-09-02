@@ -204,13 +204,15 @@ pub use crate::{
     gps_time_type::GpsTimeType,
     header::{Builder, Header},
     point::Point,
-    reader::Reader,
+    reader::{Reader, ReaderOptions},
     transform::Transform,
     vector::Vector,
     version::Version,
     vlr::Vlr,
     writer::Writer,
 };
+#[cfg(feature = "laz")]
+pub use reader::LazParallelism;
 #[allow(deprecated)]
 pub use {reader::Read, writer::Write};
 
