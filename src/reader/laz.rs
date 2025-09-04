@@ -12,7 +12,7 @@ pub(crate) struct PointReader<D: LazDecompressor> {
 
 #[cfg(feature = "laz-parallel")]
 impl<R: Read + Seek> PointReader<laz::ParLasZipDecompressor<R>> {
-    pub(crate) fn new(
+    pub(crate) fn new_parallel(
         read: R,
         header: Header,
     ) -> Result<PointReader<laz::ParLasZipDecompressor<R>>> {
@@ -27,7 +27,6 @@ impl<R: Read + Seek> PointReader<laz::ParLasZipDecompressor<R>> {
     }
 }
 
-#[cfg(not(feature = "laz-parallel"))]
 impl<R: Read + Seek + Send> PointReader<laz::LasZipDecompressor<'_, R>> {
     pub(crate) fn new(
         read: R,
