@@ -149,6 +149,60 @@ pub trait Read {
     fn points(&mut self) -> PointIterator<'_>;
 }
 
+/// Choice of laz parallelism.
+#[cfg(feature = "laz")]
+#[derive(Debug, Clone, Copy)]
+pub enum LazParallelism {
+    #[cfg(feature = "laz-parallel")]
+    /// Use parallel laz decompression / compression
+    Yes,
+    /// Do not use parallel laz decompression / compression
+    No,
+}
+
+/// Options for Reader.
+///
+/// Currently, the only option is the selection of LAZ parallelism via [LazParallelism].
+/// This option requires the `laz` feature to be enabled (and to use parallelism, the `laz-parallel`
+/// feature must also be enabled)
+/// By default, if the `laz-parallel` feature is enabled, parallelism will be the default choice
+#[derive(Debug, Clone, Copy)]
+pub struct ReaderOptions {
+    #[cfg(feature = "laz")]
+    laz_parallelism: LazParallelism,
+}
+
+impl ReaderOptions {
+    /// Change the laz parallelism option
+    #[cfg(feature = "laz")]
+    pub fn with_laz_parallelism(mut self, laz_parallelism: LazParallelism) -> Self {
+        self.laz_parallelism = laz_parallelism;
+        self
+    }
+}
+
+impl Default for ReaderOptions {
+    fn default() -> Self {
+        #[cfg(feature = "laz-parallel")]
+        {
+            Self {
+                laz_parallelism: LazParallelism::Yes,
+            }
+        }
+        #[cfg(all(feature = "laz", not(feature = "laz-parallel")))]
+        {
+            Self {
+                laz_parallelism: LazParallelism::No,
+            }
+        }
+
+        #[cfg(not(feature = "laz"))]
+        {
+            Self {}
+        }
+    }
+}
+
 /// Reads LAS data.
 #[allow(missing_debug_implementations)]
 pub struct Reader {
@@ -156,7 +210,7 @@ pub struct Reader {
 }
 
 impl Reader {
-    /// Creates a new reader.
+    /// Creates a new reader with default options.
     ///
     /// This does *not* wrap the `Read` in a `BufRead`, so if you're concerned
     /// about performance you should do that wrapping yourself (or use
@@ -171,20 +225,50 @@ impl Reader {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new<R: std::io::Read + Seek + Send + 'static>(mut read: R) -> Result<Reader> {
+    pub fn new<R: std::io::Read + Seek + Send + 'static>(read: R) -> Result<Reader> {
+        Self::with_options(read, ReaderOptions::default())
+    }
+
+    /// Creates a new reader with custom options.
+    ///
+    /// This does *not* wrap the `Read` in a `BufRead`, so if you're concerned
+    /// about performance you should do that wrapping yourself (or use
+    /// `from_path`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::BufReader;
+    /// use std::fs::File;
+    /// # use las::{Reader, ReaderOptions};
+    /// let file = File::open("tests/data/autzen.las").unwrap();
+    /// let reader = Reader::with_options(BufReader::new(file), ReaderOptions::default()).unwrap();
+    /// ```
+    pub fn with_options<R: std::io::Read + Seek + Send + 'static>(
+        mut read: R,
+        options: ReaderOptions,
+    ) -> Result<Reader> {
         let header = Header::new(&mut read)?;
         if header.point_format().is_compressed {
             #[cfg(feature = "laz")]
             {
-                Ok(Reader {
-                    point_reader: Box::new(laz::PointReader::new(read, header)?),
-                })
+                let point_reader: Box<dyn ReadPoints> = match options.laz_parallelism {
+                    #[cfg(feature = "laz-parallel")]
+                    LazParallelism::Yes => {
+                        laz::PointReader::new_parallel(read, header).map(Box::new)?
+                    }
+                    LazParallelism::No => laz::PointReader::new(read, header).map(Box::new)?,
+                };
+
+                Ok(Reader { point_reader })
             }
             #[cfg(not(feature = "laz"))]
             {
                 Err(Error::LaszipNotEnabled)
             }
         } else {
+            // Silence unused variable warning as the only option is related to laz
+            let _ = options;
             Ok(Reader {
                 point_reader: Box::new(las::PointReader::new(read, header)?),
             })

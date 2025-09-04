@@ -13,7 +13,10 @@ fn detect_laszip() {
 
 #[cfg(feature = "laz")]
 mod laz_compression_test {
-    use std::io::Cursor;
+    use std::{
+        fs::File,
+        io::{BufReader, Cursor},
+    };
 
     /// Read file, write it compressed, read the compressed data written
     /// compare that points are the same
@@ -39,6 +42,73 @@ mod laz_compression_test {
         let points_2: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
 
         assert_eq!(points, points_2);
+    }
+
+    fn compare_autzen_points(laz_points: Vec<las::Point>, las_points: Vec<las::Point>) {
+        assert_eq!(laz_points.len(), las_points.len());
+        for (mut p_laz, p_las) in laz_points.into_iter().zip(las_points.into_iter()) {
+            p_laz.color = None; // The LAS file does not have colors
+            assert_eq!(p_laz, p_las);
+        }
+    }
+
+    #[test]
+    fn test_reader_with_options() {
+        let file = File::open("tests/data/autzen.laz")
+            .map(BufReader::new)
+            .unwrap();
+        let mut laz_reader =
+            las::Reader::with_options(file, las::ReaderOptions::default()).unwrap();
+
+        let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
+
+        let mut laz_vec = Vec::new();
+        laz_reader.read_all_points_into(&mut laz_vec).unwrap();
+
+        let mut las_vec = Vec::new();
+        las_reader.read_all_points_into(&mut las_vec).unwrap();
+
+        compare_autzen_points(laz_vec, las_vec);
+    }
+
+    #[cfg(feature = "laz-parallel")]
+    #[test]
+    fn test_reader_with_options_parallel() {
+        {
+            let file = File::open("tests/data/autzen.laz")
+                .map(BufReader::new)
+                .unwrap();
+            let opts = las::ReaderOptions::default().with_laz_parallelism(las::LazParallelism::No);
+            let mut laz_reader = las::Reader::with_options(file, opts).unwrap();
+
+            let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
+
+            let mut laz_vec = Vec::new();
+            laz_reader.read_all_points_into(&mut laz_vec).unwrap();
+
+            let mut las_vec = Vec::new();
+            las_reader.read_all_points_into(&mut las_vec).unwrap();
+
+            compare_autzen_points(laz_vec, las_vec);
+        }
+
+        {
+            let file = File::open("tests/data/autzen.laz")
+                .map(BufReader::new)
+                .unwrap();
+            let opts = las::ReaderOptions::default().with_laz_parallelism(las::LazParallelism::Yes);
+            let mut laz_reader = las::Reader::with_options(file, opts).unwrap();
+
+            let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
+
+            let mut laz_vec = Vec::new();
+            laz_reader.read_all_points_into(&mut laz_vec).unwrap();
+
+            let mut las_vec = Vec::new();
+            las_reader.read_all_points_into(&mut las_vec).unwrap();
+
+            compare_autzen_points(laz_vec, las_vec);
+        }
     }
 
     #[test]
