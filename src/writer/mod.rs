@@ -131,7 +131,7 @@ pub struct Writer<W: 'static + std::io::Write + Seek + Send> {
     point_writer: Box<dyn WritePoint<W> + Send>,
 }
 
-impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
     /// Creates a new writer.
     ///
     /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
@@ -297,7 +297,7 @@ impl<W: 'static + std::io::Write + Seek + Send> Writer<W> {
 }
 
 #[allow(deprecated)]
-impl<W: 'static + std::io::Write + Seek + Debug + Send> Write for Writer<W> {
+impl<W: 'static + std::io::Write + Seek + Debug + Send + Sync> Write for Writer<W> {
     fn header(&self) -> &Header {
         self.header()
     }
@@ -345,14 +345,6 @@ impl Writer<BufWriter<File>> {
 impl Default for Writer<Cursor<Vec<u8>>> {
     fn default() -> Writer<Cursor<Vec<u8>>> {
         Writer::new(Cursor::new(Vec::new()), Header::default()).unwrap()
-    }
-}
-
-impl<W: 'static + Seek + std::io::Write + Send> Drop for Writer<W> {
-    fn drop(&mut self) {
-        if !self.closed {
-            self.close().expect("Error when dropping the writer");
-        }
     }
 }
 

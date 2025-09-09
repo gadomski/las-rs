@@ -225,7 +225,7 @@ impl Reader {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::new(BufReader::new(file)).unwrap();
     /// ```
-    pub fn new<R: std::io::Read + Seek + Send + 'static>(read: R) -> Result<Reader> {
+    pub fn new<R: std::io::Read + Seek + Send + Sync + 'static>(read: R) -> Result<Reader> {
         Self::with_options(read, ReaderOptions::default())
     }
 
@@ -244,7 +244,7 @@ impl Reader {
     /// let file = File::open("tests/data/autzen.las").unwrap();
     /// let reader = Reader::with_options(BufReader::new(file), ReaderOptions::default()).unwrap();
     /// ```
-    pub fn with_options<R: std::io::Read + Seek + Send + 'static>(
+    pub fn with_options<R: std::io::Read + Seek + Send + Sync + 'static>(
         mut read: R,
         options: ReaderOptions,
     ) -> Result<Reader> {
