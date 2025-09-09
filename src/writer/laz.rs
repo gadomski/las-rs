@@ -9,7 +9,7 @@ pub(crate) struct PointWriter<'a, W: Write + Seek + Send> {
     header: Header,
 }
 
-impl<'a, W: Write + Seek + Send> PointWriter<'a, W> {
+impl<'a, W: Write + Seek + Send + Sync> PointWriter<'a, W> {
     pub(crate) fn new(write: W, header: Header) -> Result<PointWriter<'a, W>> {
         let buffer = Cursor::new(vec![0u8; header.point_format().len() as usize]);
         let vlr = header.laz_vlr()?;
@@ -23,7 +23,7 @@ impl<'a, W: Write + Seek + Send> PointWriter<'a, W> {
     }
 }
 
-impl<W: Write + Seek + Send> WritePoint<W> for PointWriter<'_, W> {
+impl<W: Write + Seek + Send + Sync> WritePoint<W> for PointWriter<'_, W> {
     fn write_point(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
         self.buffer.set_position(0);
