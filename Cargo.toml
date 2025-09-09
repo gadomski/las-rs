@@ -1,6 +1,6 @@
 [package]
 name = "las"
-version = "0.9.5"
+version = "0.9.6"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
 description = "Reads and writes point clouds stored in the ASPRS las file format."
 documentation = "https://docs.rs/las"
@@ -15,14 +15,14 @@ edition = "2024"
 [dependencies]
 byteorder = "1.4"
 chrono = "0.4"
-laz = { version = "0.9.1", optional = true }
+laz = { version = "0.11.0", optional = true }
 log = "0.4"
 num-traits = "0.2"
 thiserror = "2.0"
 uuid = "1"
 
 [dev-dependencies]
-criterion = "0.6"
+criterion = "0.7"
 crs-definitions = { version = "0.3", features = ["wkt"] }
 
 [features]
