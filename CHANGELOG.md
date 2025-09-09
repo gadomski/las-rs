@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Sync` restriction for reading and writing ([#119](https://github.com/gadomski/las-rs/pull/119))
+
+### Removed
+
+- `Drop` implementation for `Writer` ([#119](https://github.com/gadomski/las-rs/pull/119))
+
 ## [0.9.6] - 2025-09-04
 
 ### Added
