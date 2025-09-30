@@ -1,11 +1,11 @@
-//! Module for handeling Coordinate Reference System data in a headers variable length records
+//! Module for handling Coordinate Reference System (CRS) data in a headers variable length records
 //!
-//! CRSes are stored either as WKT or in GeoTiff
-//! [Header::get_epsg_crs] parses the CRS data to EPSG code(s)
+//! CRSes are stored either as [WKT](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry) or as [GeoTiff tags](https://docs.ogc.org/is/19-008r4/19-008r4.html).
+//! [Header::get_epsg_crs] parses the CRS data to [EPSG](https://en.wikipedia.org/wiki/EPSG_Geodetic_Parameter_Dataset) code(s).
 //!
-//! Only WKT is supported for writing CRS data to a header
+//! Only WKT is supported for writing CRS data to a header.
 
-use crate::{Error, Header, Result};
+use crate::{Error, Header, Result, Vlr};
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::{log, Level};
 use std::io::{Cursor, Seek, SeekFrom};
@@ -15,29 +15,27 @@ use std::io::{Cursor, Seek, SeekFrom};
 pub struct EpsgCrs {
     /// EPSG code for the horizontal CRS
     pub horizontal: u16,
+
     /// Optional EPSG code for the vertical CRS
     pub vertical: Option<u16>,
 }
 
 impl Header {
     /// Parse the EPSG coordinate reference system (CRSes) code(s) from the header.
-    /// Las stores CRS-info in (E)VLRs either as Well Known Text (WKT) or in GeoTIff-format
     ///
+    /// Las stores CRS-info in (E)VLRs either as Well Known Text (WKT) or in GeoTIff-format
     /// Most (not all!) CRSes used for Aerial Lidar has an associated EPSG code.
     /// Use this function to try and parse the EPSG code(s) from the VLR data.
     ///
-    /// WKT takes precedence over GeoTiff in this function, but they should not co-exist
+    /// WKT takes precedence over GeoTiff in this function, but they should not co-exist.
     ///
-    /// Just because this function fails does not mean that no CRS-data is availible!
-    /// Use functions [Self::get_wkt_crs_bytes] or [Self::get_geotiff_crs] to get all data stored in the CRS-(E)VLRs
+    /// Just because this function fails does not mean that no CRS-data is available.
+    /// Use functions [Self::get_wkt_crs_bytes] or [Self::get_geotiff_crs] to get all data stored in the CRS-(E)VLRs.
     ///
-    /// Parsing code(s) from WKT-CRS v1 or v2 or GeoTiff U16-data is supported
-    ///
-    /// The CRS is returend in a Result<Option<[EpsgCrs]>, Error>
-    /// [EpsgCrs] has the fields horizontal, which is a u16 EPSG code, and vertical, which is an optional u16 EPSG code.
+    /// Parsing code(s) from WKT-CRS v1 or v2 or GeoTiff U16-data is supported.
     ///
     /// The validity of the extracted code is not checked.
-    /// Use the crs-definitions crate for checking the validity of a horizontal EPSG code.
+    /// Use the [crs-definitions](https://docs.rs/crs-definitions/latest/crs_definitions/) crate for checking the validity of a horizontal EPSG code.
     ///
     /// # Example
     ///
@@ -47,45 +45,36 @@ impl Header {
     /// let crs = reader.header().get_epsg_crs().expect("Cannot parse EPSG code(s) from the CRS-(E)VLRs");
     /// ```
     pub fn get_epsg_crs(&self) -> Result<Option<EpsgCrs>> {
-        let wkt = self.get_wkt_crs_bytes();
-
-        // warn about header and VLR inconsistencies
-        if wkt.is_some() && !self.has_wkt_crs() {
-            log!(
-                Level::Warn,
-                "WKT CRS (E)VLR found, but header says it does not exist"
-            );
-        } else if wkt.is_none() && self.has_wkt_crs() {
-            log!(
-                Level::Warn,
-                "No WKT CRS (E)VLR found, but header says it exists"
-            );
+        if let Some(wkt) = self.get_wkt_crs_bytes() {
+            if !self.has_wkt_crs() {
+                log!(
+                    Level::Warn,
+                    "WKT CRS (E)VLR found, but header says it does not exist"
+                );
+            }
+            get_epsg_from_wkt_crs_bytes(wkt)
+        } else if let Some(geotiff) = self.get_geotiff_crs()? {
+            if self.has_wkt_crs() {
+                log!(
+                    Level::Warn,
+                    "Only Geotiff CRS (E)VLRs found, but header says WKT exists"
+                );
+            }
+            get_epsg_from_geotiff_crs(geotiff)
+        } else {
+            if self.has_wkt_crs() {
+                log!(
+                    Level::Warn,
+                    "No WKT CRS (E)VLR found, but header says it exists"
+                );
+            }
+            Ok(None)
         }
-
-        if let Some(wkt) = wkt {
-            return get_epsg_from_wkt_crs_bytes(wkt);
-        }
-
-        let geotiff = self.get_geotiff_crs()?;
-
-        if self.has_wkt_crs() && geotiff.is_some() {
-            log!(
-                Level::Warn,
-                "Only Geotiff CRS (E)VLRs found, but header says WKT exists"
-            );
-        }
-
-        if let Some(geotiff) = geotiff {
-            return get_epsg_from_geotiff_crs(geotiff);
-        }
-        Ok(None)
     }
 
-    /// remove all CRS (E)VLRs from the header
+    /// Removes all CRS (E)VLRs from the header
     pub fn remove_crs_vlrs(&mut self) {
-        // remove projection vlrs
         self.vlrs = self.vlrs.drain(..).filter(|v| !v.is_projection()).collect();
-        // remove projection evlrs
         self.evlrs = self
             .evlrs
             .drain(..)
@@ -94,9 +83,9 @@ impl Header {
         self.has_wkt_crs = false;
     }
 
-    /// Add a WKT CRS VLR to the header
+    /// Adds a WKT CRS VLR to the header
     ///
-    /// returns Err if the header already contains CRS (E)VLRs or the Las version is below 1.4
+    /// Returns an if the header already contains CRS (E)VLRs or the Las version is below 1.4.
     ///
     /// The WKT bytes can be obtained from a horizontal EPSG code by using the crs_definitions crate
     pub fn set_wkt_crs(&mut self, wkt_crs_bytes: Vec<u8>) -> Result<()> {
@@ -113,91 +102,74 @@ impl Header {
             }
         }
 
-        let mut user_id = [0; 16];
-        for (i, c) in "LASF_Projection".as_bytes().iter().enumerate() {
-            user_id[i] = *c;
-        }
-
         let num_bytes = wkt_crs_bytes.len();
-
-        if num_bytes > u16::MAX as usize {
-            // must be added as an evlr, because of length
-            let crs_vlr = crate::raw::Vlr {
-                reserved: 0,
-                user_id,
-                record_id: 2112,
-                record_length_after_header: crate::raw::vlr::RecordLength::Evlr(num_bytes as u64),
-                description: [0; 32],
-                data: wkt_crs_bytes,
-            };
-            self.evlrs.push(crate::Vlr::new(crs_vlr));
-        } else {
-            // just a normal vlr
-            let crs_vlr = crate::raw::Vlr {
-                reserved: 0,
-                user_id,
-                record_id: 2112,
-                record_length_after_header: crate::raw::vlr::RecordLength::Vlr(num_bytes as u16),
-                description: [0; 32],
-                data: wkt_crs_bytes,
-            };
-            self.vlrs.push(crate::Vlr::new(crs_vlr));
+        let vlr = Vlr {
+            user_id: "LASF_Projection".to_string(),
+            record_id: 2112,
+            description: String::new(),
+            data: wkt_crs_bytes,
         };
-
+        if num_bytes > u16::MAX as usize {
+            self.evlrs.push(vlr);
+        } else {
+            self.vlrs.push(vlr);
+        };
         self.has_wkt_crs = true;
+
         Ok(())
     }
 
-    /// Get the WKT-CRS-data if the WKT-CRS (E)VLR exists
+    /// Gets the WKT-CRS-data if the WKT-CRS (E)VLR exists
     pub fn get_wkt_crs_bytes(&self) -> Option<&[u8]> {
         for vlr in self.all_vlrs() {
-            if let ("lasf_projection", 2112) = (vlr.user_id.to_lowercase().as_str(), vlr.record_id)
-            {
+            if vlr.is_crs_wkt() {
                 return Some(vlr.data.as_slice());
             }
         }
         None
     }
 
-    /// Get all the GeoTiff CRS data if the GeoTiff-CRS (E)VLR(s) exist
+    /// Gets all the GeoTiff CRS data if the GeoTiff-CRS (E)VLR(s) exist
     pub fn get_geotiff_crs(&self) -> Result<Option<GeoTiffCrs>> {
-        let mut geotiff_vlrs = [None, None, None];
+        let mut main_vlr = None;
+        let mut double_vlr = None;
+        let mut ascii_vlr = None;
         for vlr in self.all_vlrs() {
             if vlr.is_projection() {
-                let pos = match vlr.record_id {
-                    34735 => 0,
-                    34736 => 1,
-                    34737 => 2,
+                match vlr.record_id {
+                    34735 => {
+                        main_vlr = Some(vlr.data.as_slice());
+                    }
+                    34736 => {
+                        double_vlr = Some(vlr.data.as_slice());
+                    }
+                    34737 => {
+                        ascii_vlr = Some(vlr.data.as_slice());
+                    }
                     _ => continue,
                 };
-
-                geotiff_vlrs[pos] = Some(vlr.data.as_slice());
             }
         }
-        let [geotiff_main, double, string] = geotiff_vlrs;
-
-        if let Some(main_vlr) = geotiff_main {
-            let crs_data = GeoTiffCrs::read_from(main_vlr, double, string)?;
-            Ok(Some(crs_data))
+        if let Some(main_vlr) = main_vlr {
+            Ok(Some(GeoTiffCrs::read_from(
+                main_vlr, double_vlr, ascii_vlr,
+            )?))
         } else {
             Ok(None)
         }
     }
 }
 
-/// Get the EPSG code(s) from WKT-CRS bytes
+/// Gets the EPSG code(s) from WKT-CRS bytes.
 ///
-/// Splits the wkt string in two at "VERT" and
-/// finds the horizontal and vertical codes at the end of each substring
+/// Splits the wkt string in two at "VERT" and finds the horizontal and vertical codes at the end of each substring.
 pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<Option<EpsgCrs>> {
     let wkt = String::from_utf8_lossy(bytes);
 
     // VERT_CS for WKT v1 and VERTCRS for v2
     let pieces = if let Some((horizontal, vertical)) = wkt.split_once("VERT") {
-        // both horizontal and vertical codes exist
         vec![horizontal.as_bytes(), vertical.as_bytes()]
     } else {
-        // only horizontal code
         vec![wkt.as_bytes()]
     };
 
