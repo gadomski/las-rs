@@ -10,6 +10,8 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use log::{log, Level};
 use std::io::{Cursor, Seek, SeekFrom};
 
+const EPSG_RANGE: std::ops::RangeInclusive<u16> = 1024..=(i16::MAX as u16);
+
 /// Horizontal and optional vertical CRS given by EPSG code(s)
 #[derive(Debug, Clone, Copy)]
 pub struct EpsgCrs {
@@ -52,7 +54,7 @@ impl Header {
                     "WKT CRS (E)VLR found, but header says it does not exist"
                 );
             }
-            get_epsg_from_wkt_crs_bytes(wkt)
+            Ok(Some(get_epsg_from_wkt_crs_bytes(wkt)?))
         } else if let Some(geotiff) = self.get_geotiff_crs()? {
             if self.has_wkt_crs() {
                 log!(
@@ -60,7 +62,7 @@ impl Header {
                     "Only Geotiff CRS (E)VLRs found, but header says WKT exists"
                 );
             }
-            get_epsg_from_geotiff_crs(geotiff)
+            Ok(Some(get_epsg_from_geotiff_crs(geotiff)?))
         } else {
             if self.has_wkt_crs() {
                 log!(
@@ -85,9 +87,9 @@ impl Header {
 
     /// Adds a WKT CRS VLR to the header
     ///
-    /// Returns an if the header already contains CRS (E)VLRs or the Las version is below 1.4.
+    /// Returns Err if the header already contains CRS (E)VLRs or the Las version is below 1.4.
     ///
-    /// The WKT bytes can be obtained from a horizontal EPSG code by using the crs_definitions crate
+    /// The WKT bytes can be obtained from a horizontal EPSG code by using the [crs-definitions](https://docs.rs/crs-definitions/latest/crs_definitions/) crate
     pub fn set_wkt_crs(&mut self, wkt_crs_bytes: Vec<u8>) -> Result<()> {
         if self.version() < crate::Version::new(1, 4) {
             return Err(Error::UnsupportedFeature {
@@ -160,14 +162,20 @@ impl Header {
     }
 }
 
-/// Gets the EPSG code(s) from WKT-CRS bytes.
+/// Tries to parse EPSG code(s) from WKT-CRS bytes.
 ///
-/// Splits the wkt string in two at "VERT" and finds the horizontal and vertical codes at the end of each substring.
-pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<Option<EpsgCrs>> {
+/// By parsing the EPSG codes at the end of the vertical and horizontal CRS sub-strings
+/// This is not true WKT parser and might provide a bad code if
+/// the WKT-CRS bytes does not look as expected
+pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<EpsgCrs> {
     let wkt = String::from_utf8_lossy(bytes);
 
-    // VERT_CS for WKT v1 and VERTCRS for v2
-    let pieces = if let Some((horizontal, vertical)) = wkt.split_once("VERT") {
+    // VERT_CS for WKT v1 and VERTCRS or VERTICALCRS for v2
+    let pieces = if let Some((horizontal, vertical)) = wkt.split_once("VERTCRS") {
+        vec![horizontal.as_bytes(), vertical.as_bytes()]
+    } else if let Some((horizontal, vertical)) = wkt.split_once("VERTICALCRS") {
+        vec![horizontal.as_bytes(), vertical.as_bytes()]
+    } else if let Some((horizontal, vertical)) = wkt.split_once("VERT_CS") {
         vec![horizontal.as_bytes(), vertical.as_bytes()]
     } else {
         vec![wkt.as_bytes()]
@@ -175,40 +183,51 @@ pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<Option<EpsgCrs>> {
 
     let mut epsg = [None, None];
     for (pi, piece) in pieces.into_iter().enumerate() {
+        // the EPSG code is located at the end of the substrings
+        // and so we iterate through the substrings backwards collecting
+        // digits and adding them to our EPSG code
         let mut epsg_code = 0;
-        let mut has_code_started = false;
-        let mut power = 0;
-        for (i, byte) in piece.iter().rev().enumerate() {
+        let mut code_has_started = false;
+        let mut power = 1;
+        // the 10 last bytes should be enough (with a small margin)
+        // as the code is 4 or 5 digits starting at the 2 or 3 byte from the back
+        for byte in piece.iter().rev().take(10) {
+            // if the byte is an ASCII encoded digit
             if (48..=57).contains(byte) {
-                // the byte is an ASCII encoded number
-                has_code_started = true;
+                // mark that the EPSG code has started
+                // so that we can break when we no
+                // longer find digits
+                code_has_started = true;
 
-                epsg_code += 10_u16.pow(power) * (byte - 48) as u16;
-                power += 1;
-            } else if has_code_started {
-                break;
-            }
-            if i > 7 {
+                // translate from ASCII to digits
+                // and multiply by powers of 10
+                // sum it to build the EPSG
+                // code digit by digit
+                epsg_code += power * (byte - 48) as u16;
+                power *= 10;
+            } else if code_has_started {
+                // we no longer see digits
+                // so the code must be over
                 break;
             }
         }
-        if epsg_code != 0 {
+        if EPSG_RANGE.contains(&epsg_code) {
             epsg[pi] = Some(epsg_code);
         }
     }
-    if epsg[0].is_none() {
-        return Err(Error::UnreadableWktCrs);
+    if let Some(horizontal) = epsg[0] {
+        Ok(EpsgCrs {
+            horizontal,
+            vertical: epsg[1],
+        })
+    } else {
+        Err(Error::UnreadableWktCrs)
     }
-
-    Ok(Some(EpsgCrs {
-        horizontal: epsg[0].unwrap(),
-        vertical: epsg[1],
-    }))
 }
 
 /// Get the EPSG code(s) from GeoTiff-CRS-data
-pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: GeoTiffCrs) -> Result<Option<EpsgCrs>> {
-    let mut out = (None, None);
+pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: GeoTiffCrs) -> Result<EpsgCrs> {
+    let mut out = (0, None);
     for entry in geotiff_crs_data.entries {
         match entry.id {
             // 2048 and 3072 should not co-exist, but might both be combined with 4096
@@ -223,35 +242,25 @@ pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: GeoTiffCrs) -> Result<Option<
             },
             2048 | 3072 => {
                 if let GeoTiffData::U16(v) = entry.data {
-                    out.0 = Some(v);
-                } else {
-                    // should probably add support for this
-                    return Err(Error::UnimplementedForGeoTiffStringAndDoubleData(
-                        entry.data,
-                    ));
+                    out.0 = v;
                 }
             }
             4096 => {
                 // vertical crs
                 if let GeoTiffData::U16(v) = entry.data {
                     out.1 = Some(v);
-                } else {
-                    log!(
-                        Level::Info,
-                        "Unable to parse EPSG code from found vertical CRS component in GeoTiff data"
-                    );
                 }
             }
             _ => (), // the rest are descriptions and units.
         }
     }
-    if out.0.is_none() {
+    if !EPSG_RANGE.contains(&out.0) {
         return Err(Error::UnreadableGeoTiffCrs);
     }
-    Ok(Some(EpsgCrs {
-        horizontal: out.0.unwrap(),
+    Ok(EpsgCrs {
+        horizontal: out.0,
         vertical: out.1,
-    }))
+    })
 }
 
 /// Struct for the GeoTiff CRS data
