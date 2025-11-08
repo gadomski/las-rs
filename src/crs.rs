@@ -13,7 +13,7 @@ use std::io::{Cursor, Seek, SeekFrom};
 const EPSG_RANGE: std::ops::RangeInclusive<u16> = 1024..=(i16::MAX as u16);
 
 /// Horizontal and optional vertical CRS given by EPSG code(s)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EpsgCrs {
     /// EPSG code for the horizontal CRS
     pub horizontal: u16,
@@ -62,7 +62,7 @@ impl Header {
                     "Only Geotiff CRS (E)VLRs found, but header says WKT exists"
                 );
             }
-            Ok(Some(get_epsg_from_geotiff_crs(geotiff)?))
+            Ok(Some(get_epsg_from_geotiff_crs(&geotiff)?))
         } else {
             if self.has_wkt_crs() {
                 log!(
@@ -98,10 +98,8 @@ impl Header {
             });
         }
 
-        for vlr in self.all_vlrs() {
-            if vlr.is_projection() {
-                return Err(Error::HeaderContainsCrsVlr)?;
-            }
+        if self.all_vlrs().any(|v| v.is_projection()) {
+            return Err(Error::HeaderContainsCrsVlr);
         }
 
         let num_bytes = wkt_crs_bytes.len();
@@ -123,12 +121,9 @@ impl Header {
 
     /// Gets the WKT-CRS-data if the WKT-CRS (E)VLR exists
     pub fn get_wkt_crs_bytes(&self) -> Option<&[u8]> {
-        for vlr in self.all_vlrs() {
-            if vlr.is_crs_wkt() {
-                return Some(vlr.data.as_slice());
-            }
-        }
-        None
+        self.all_vlrs()
+            .find(|&v| v.is_crs_wkt())
+            .map(|cv| cv.data.as_slice())
     }
 
     /// Gets all the GeoTiff CRS data if the GeoTiff-CRS (E)VLR(s) exist
@@ -136,21 +131,19 @@ impl Header {
         let mut main_vlr = None;
         let mut double_vlr = None;
         let mut ascii_vlr = None;
-        for vlr in self.all_vlrs() {
-            if vlr.is_projection() {
-                match vlr.record_id {
-                    34735 => {
-                        main_vlr = Some(vlr.data.as_slice());
-                    }
-                    34736 => {
-                        double_vlr = Some(vlr.data.as_slice());
-                    }
-                    34737 => {
-                        ascii_vlr = Some(vlr.data.as_slice());
-                    }
-                    _ => continue,
-                };
-            }
+        for vlr in self.all_vlrs().filter(|&v| v.is_projection()) {
+            match vlr.record_id {
+                34735 => {
+                    main_vlr = Some(vlr.data.as_slice());
+                }
+                34736 => {
+                    double_vlr = Some(vlr.data.as_slice());
+                }
+                34737 => {
+                    ascii_vlr = Some(vlr.data.as_slice());
+                }
+                _ => continue,
+            };
         }
         if let Some(main_vlr) = main_vlr {
             Ok(Some(GeoTiffCrs::read_from(
@@ -193,7 +186,7 @@ pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<EpsgCrs> {
         // as the code is 4 or 5 digits starting at the 2 or 3 byte from the back
         for byte in piece.iter().rev().take(10) {
             // if the byte is an ASCII encoded digit
-            if (48..=57).contains(byte) {
+            if byte.is_ascii_digit() {
                 // mark that the EPSG code has started
                 // so that we can break when we no
                 // longer find digits
@@ -226,19 +219,19 @@ pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<EpsgCrs> {
 }
 
 /// Get the EPSG code(s) from GeoTiff-CRS-data
-pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: GeoTiffCrs) -> Result<EpsgCrs> {
+pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: &GeoTiffCrs) -> Result<EpsgCrs> {
     let mut out = (0, None);
-    for entry in geotiff_crs_data.entries {
+    for entry in geotiff_crs_data.entries.iter() {
         match entry.id {
             // 2048 and 3072 should not co-exist, but might both be combined with 4096
             // 1024 should always exist
-            1024 => match entry.data {
+            1024 => match &entry.data {
                 GeoTiffData::U16(0) => return Err(Error::UnreadableGeoTiffCrs),
                 GeoTiffData::U16(1) => (), // projected crs
                 GeoTiffData::U16(2) => (), // geographic crs
                 GeoTiffData::U16(3) => (), // geographic + a vertical crs
                 GeoTiffData::U16(32_767) => return Err(Error::UserDefinedCrs),
-                p => return Err(Error::UnimplementedForGeoTiffStringAndDoubleData(p)),
+                _ => return Err(Error::UnimplementedForGeoTiffStringAndDoubleData),
             },
             2048 | 3072 => {
                 if let GeoTiffData::U16(v) = entry.data {
@@ -264,7 +257,7 @@ pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: GeoTiffCrs) -> Result<EpsgCrs
 }
 
 /// Struct for the GeoTiff CRS data
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GeoTiffCrs {
     /// The GeoTiff key entries
     pub entries: Vec<GeoTiffKeyEntry>,
@@ -297,7 +290,7 @@ impl GeoTiffCrs {
 
 /// GeoTiff data enum
 /// GeoTiff data can either be a u16, an ascii string or sequence of f64
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GeoTiffData {
     /// a single u16
     U16(u16),
@@ -308,7 +301,7 @@ pub enum GeoTiffData {
 }
 
 /// A single GeoTiff key entry
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GeoTiffKeyEntry {
     /// The Id of the entry
     pub id: u16,

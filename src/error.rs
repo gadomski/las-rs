@@ -207,13 +207,13 @@ pub enum Error {
     #[error("Unable to parse the found GeoTiff (E)VLR(s)")]
     UnreadableGeoTiffCrs,
 
-    /// ??
-    #[error("Invalid key for Geotiff data")]
+    /// The data type for the Geotiff key entry is undefined
+    #[error("Invalid location key encountered for GeotiffKeyEntry with id {0}")]
     UndefinedDataForGeoTiffKey(u16),
 
     /// Cannot get EPSG code(s) from GeoTiff String or Double data
     #[error("The CRS parser does not handle CRS's defined by Geotiff String and Double data")]
-    UnimplementedForGeoTiffStringAndDoubleData(crate::crs::GeoTiffData),
+    UnimplementedForGeoTiffStringAndDoubleData,
 
     /// Cannot write CRS VLR to the header as it already contains a CRS VLR
     #[error("Cannot write CRS VLR as Header already contains CRS VLR")]
