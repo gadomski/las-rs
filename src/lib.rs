@@ -177,6 +177,7 @@ pub mod copc;
 #[cfg(feature = "laz")]
 pub mod laz;
 
+pub mod crs;
 pub mod feature;
 pub mod header;
 pub mod point;

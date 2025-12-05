@@ -151,6 +151,22 @@ impl Vlr {
         self.data.len() > u16::MAX as usize
     }
 
+    /// Check if the vlr is a projection (coordinate reference system) VLR
+    pub fn is_projection(&self) -> bool {
+        matches!(
+            (self.user_id.to_lowercase().as_str(), self.record_id),
+            ("lasf_projection", 2112 | 34735 | 34736 | 34737)
+        )
+    }
+
+    /// Returns true if it's a well-known WKT coordinate reference system VLR.
+    pub fn is_crs_wkt(&self) -> bool {
+        matches!(
+            (self.user_id.to_lowercase().as_str(), self.record_id),
+            ("lasf_projection", 2112)
+        )
+    }
+
     fn record_length_after_header(&self, is_extended: bool) -> Result<raw::vlr::RecordLength> {
         if is_extended {
             Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))
