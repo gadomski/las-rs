@@ -1,87 +1,21 @@
 //! Module for handling Coordinate Reference System (CRS) data in a headers variable length records
 //!
 //! CRSes are stored either as [WKT](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry) or as [GeoTiff tags](https://docs.ogc.org/is/19-008r4/19-008r4.html).
-//! [Header::get_epsg_crs] parses the CRS data to [EPSG](https://en.wikipedia.org/wiki/EPSG_Geodetic_Parameter_Dataset) code(s).
+//! Use [Header::get_wkt_crs_bytes] or [Header::get_geotiff_crs] respectively to read the crs-data from the header's (E)VLRs.
+//! The returned objects are not CRS-aware, they have only parsed the data available in the CRS-(E)VLRs.
+//! Use the [las-crs](https://docs.rs/las-crs/latest/las_crs) crate to parse the data to EPSG codes.
 //!
-//! Only WKT is supported for writing CRS data to a header.
+//! Only WKT is supported for writing CRS data to a header and only for las version 1.4.
 
 use crate::{Error, Header, Result, Vlr};
 use byteorder::{LittleEndian, ReadBytesExt};
-use log::{log, Level};
 use std::io::{Cursor, Seek, SeekFrom};
 
-const EPSG_RANGE: std::ops::RangeInclusive<u16> = 1024..=(i16::MAX as u16);
-
-/// Horizontal and optional vertical CRS given by EPSG code(s)
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct EpsgCrs {
-    /// EPSG code for the horizontal CRS
-    pub horizontal: u16,
-
-    /// Optional EPSG code for the vertical CRS
-    pub vertical: Option<u16>,
-}
-
 impl Header {
-    /// Parse the EPSG coordinate reference system (CRSes) code(s) from the header.
-    ///
-    /// Las stores CRS-info in (E)VLRs either as Well Known Text (WKT) or in GeoTIff-format
-    /// Most (not all!) CRSes used for Aerial Lidar has an associated EPSG code.
-    /// Use this function to try and parse the EPSG code(s) from the VLR data.
-    ///
-    /// WKT takes precedence over GeoTiff in this function, but they should not co-exist.
-    ///
-    /// Just because this function fails does not mean that no CRS-data is available.
-    /// Use functions [Self::get_wkt_crs_bytes] or [Self::get_geotiff_crs] to get all data stored in the CRS-(E)VLRs.
-    ///
-    /// Parsing code(s) from WKT-CRS v1 or v2 or GeoTiff U16-data is supported.
-    ///
-    /// The validity of the extracted code is not checked.
-    /// Use the [crs-definitions](https://docs.rs/crs-definitions/latest/crs_definitions/) crate for checking the validity of a horizontal EPSG code.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use las::Reader;
-    /// let reader = Reader::from_path("tests/data/autzen.las").expect("Cannot open reader");
-    /// let crs = reader.header().get_epsg_crs().expect("Cannot parse EPSG code(s) from the CRS-(E)VLRs");
-    /// ```
-    pub fn get_epsg_crs(&self) -> Result<Option<EpsgCrs>> {
-        if let Some(wkt) = self.get_wkt_crs_bytes() {
-            if !self.has_wkt_crs() {
-                log!(
-                    Level::Warn,
-                    "WKT CRS (E)VLR found, but header says it does not exist"
-                );
-            }
-            Ok(Some(get_epsg_from_wkt_crs_bytes(wkt)?))
-        } else if let Some(geotiff) = self.get_geotiff_crs()? {
-            if self.has_wkt_crs() {
-                log!(
-                    Level::Warn,
-                    "Only Geotiff CRS (E)VLRs found, but header says WKT exists"
-                );
-            }
-            Ok(Some(get_epsg_from_geotiff_crs(&geotiff)?))
-        } else {
-            if self.has_wkt_crs() {
-                log!(
-                    Level::Warn,
-                    "No WKT CRS (E)VLR found, but header says it exists"
-                );
-            }
-            Ok(None)
-        }
-    }
-
     /// Removes all CRS (E)VLRs from the header
     pub fn remove_crs_vlrs(&mut self) {
-        self.vlrs = self.vlrs.drain(..).filter(|v| !v.is_projection()).collect();
-        self.evlrs = self
-            .evlrs
-            .drain(..)
-            .filter(|v| !v.is_projection())
-            .collect();
+        self.vlrs.retain(|v| !v.is_crs());
+        self.evlrs.retain(|v| !v.is_crs());
         self.has_wkt_crs = false;
     }
 
@@ -98,7 +32,7 @@ impl Header {
             });
         }
 
-        if self.all_vlrs().any(|v| v.is_projection()) {
+        if self.all_vlrs().any(|v| v.is_crs()) {
             return Err(Error::HeaderContainsCrsVlr);
         }
 
@@ -122,7 +56,7 @@ impl Header {
     /// Gets the WKT-CRS-data if the WKT-CRS (E)VLR exists
     pub fn get_wkt_crs_bytes(&self) -> Option<&[u8]> {
         self.all_vlrs()
-            .find(|&v| v.is_crs_wkt())
+            .find(|&v| v.is_wkt_crs())
             .map(|cv| cv.data.as_slice())
     }
 
@@ -131,7 +65,7 @@ impl Header {
         let mut main_vlr = None;
         let mut double_vlr = None;
         let mut ascii_vlr = None;
-        for vlr in self.all_vlrs().filter(|&v| v.is_projection()) {
+        for vlr in self.all_vlrs().filter(|&v| v.is_geotiff_crs()) {
             match vlr.record_id {
                 34735 => {
                     main_vlr = Some(vlr.data.as_slice());
@@ -153,107 +87,6 @@ impl Header {
             Ok(None)
         }
     }
-}
-
-/// Tries to parse EPSG code(s) from WKT-CRS bytes.
-///
-/// By parsing the EPSG codes at the end of the vertical and horizontal CRS sub-strings
-/// This is not true WKT parser and might provide a bad code if
-/// the WKT-CRS bytes does not look as expected
-pub fn get_epsg_from_wkt_crs_bytes(bytes: &[u8]) -> Result<EpsgCrs> {
-    let wkt = String::from_utf8_lossy(bytes);
-
-    // VERT_CS for WKT v1 and VERTCRS or VERTICALCRS for v2
-    let pieces = if let Some((horizontal, vertical)) = wkt.split_once("VERTCRS") {
-        vec![horizontal.as_bytes(), vertical.as_bytes()]
-    } else if let Some((horizontal, vertical)) = wkt.split_once("VERTICALCRS") {
-        vec![horizontal.as_bytes(), vertical.as_bytes()]
-    } else if let Some((horizontal, vertical)) = wkt.split_once("VERT_CS") {
-        vec![horizontal.as_bytes(), vertical.as_bytes()]
-    } else {
-        vec![wkt.as_bytes()]
-    };
-
-    let mut epsg = [None, None];
-    for (pi, piece) in pieces.into_iter().enumerate() {
-        // the EPSG code is located at the end of the substrings
-        // and so we iterate through the substrings backwards collecting
-        // digits and adding them to our EPSG code
-        let mut epsg_code = 0;
-        let mut code_has_started = false;
-        let mut power = 1;
-        // the 10 last bytes should be enough (with a small margin)
-        // as the code is 4 or 5 digits starting at the 2 or 3 byte from the back
-        for byte in piece.iter().rev().take(10) {
-            // if the byte is an ASCII encoded digit
-            if byte.is_ascii_digit() {
-                // mark that the EPSG code has started
-                // so that we can break when we no
-                // longer find digits
-                code_has_started = true;
-
-                // translate from ASCII to digits
-                // and multiply by powers of 10
-                // sum it to build the EPSG
-                // code digit by digit
-                epsg_code += power * (byte - 48) as u16;
-                power *= 10;
-            } else if code_has_started {
-                // we no longer see digits
-                // so the code must be over
-                break;
-            }
-        }
-        if EPSG_RANGE.contains(&epsg_code) {
-            epsg[pi] = Some(epsg_code);
-        }
-    }
-    if let Some(horizontal) = epsg[0] {
-        Ok(EpsgCrs {
-            horizontal,
-            vertical: epsg[1],
-        })
-    } else {
-        Err(Error::UnreadableWktCrs)
-    }
-}
-
-/// Get the EPSG code(s) from GeoTiff-CRS-data
-pub fn get_epsg_from_geotiff_crs(geotiff_crs_data: &GeoTiffCrs) -> Result<EpsgCrs> {
-    let mut out = (0, None);
-    for entry in geotiff_crs_data.entries.iter() {
-        match entry.id {
-            // 2048 and 3072 should not co-exist, but might both be combined with 4096
-            // 1024 should always exist
-            1024 => match &entry.data {
-                GeoTiffData::U16(0) => return Err(Error::UnreadableGeoTiffCrs),
-                GeoTiffData::U16(1) => (), // projected crs
-                GeoTiffData::U16(2) => (), // geographic crs
-                GeoTiffData::U16(3) => (), // geographic + a vertical crs
-                GeoTiffData::U16(32_767) => return Err(Error::UserDefinedCrs),
-                _ => return Err(Error::UnimplementedForGeoTiffStringAndDoubleData),
-            },
-            2048 | 3072 => {
-                if let GeoTiffData::U16(v) = entry.data {
-                    out.0 = v;
-                }
-            }
-            4096 => {
-                // vertical crs
-                if let GeoTiffData::U16(v) = entry.data {
-                    out.1 = Some(v);
-                }
-            }
-            _ => (), // the rest are descriptions and units.
-        }
-    }
-    if !EPSG_RANGE.contains(&out.0) {
-        return Err(Error::UnreadableGeoTiffCrs);
-    }
-    Ok(EpsgCrs {
-        horizontal: out.0,
-        vertical: out.1,
-    })
 }
 
 /// Struct for the GeoTiff CRS data
@@ -353,9 +186,21 @@ mod tests {
     #[test]
     fn test_get_epsg_crs_wkt_vlr_autzen() {
         let reader = Reader::from_path("tests/data/autzen.copc.laz").expect("Cannot open reader");
-        let crs = reader.header().get_epsg_crs().unwrap().unwrap();
-        assert!(crs.horizontal == 2992);
-        assert!(crs.vertical == Some(6360))
+        let crs = reader
+            .header()
+            .get_wkt_crs_bytes()
+            .expect("Could not get WKT bytes");
+
+        let crs_str = String::from_utf8_lossy(crs);
+        let (horizontal_component, vertical_component) = crs_str.split_once("VERT_CS").unwrap();
+
+        // NAD83 / Oregon GIC Lambert (ft)
+        let horizontal_crs = "AUTHORITY[\"EPSG\",\"2992\"]";
+        assert!(horizontal_component.contains(horizontal_crs));
+
+        // NAVD88 height (ftUS)
+        let vertical_crs = "AUTHORITY[\"EPSG\",\"6360\"]";
+        assert!(vertical_component.contains(vertical_crs));
     }
 
     #[cfg(feature = "laz")]
@@ -363,9 +208,33 @@ mod tests {
     fn test_get_epsg_crs_geotiff_vlr_norway() {
         let reader =
             Reader::from_path("tests/data/32-1-472-150-76.laz").expect("Cannot open reader");
-        let crs = reader.header().get_epsg_crs().unwrap().unwrap();
-        assert!(crs.horizontal == 25832);
-        assert!(crs.vertical == Some(5941));
+        let crs = reader.header().get_geotiff_crs().unwrap().unwrap();
+
+        let horizontal = crs
+            .entries
+            .iter()
+            .find(|key| key.id == 2048 || key.id == 3072)
+            .unwrap()
+            .data
+            .clone();
+        let vertical = crs
+            .entries
+            .iter()
+            .find(|key| key.id == 4096)
+            .unwrap()
+            .data
+            .clone();
+
+        if let crate::crs::GeoTiffData::U16(h_code) = horizontal {
+            assert!(h_code == 25832);
+        } else {
+            panic!("Expected GeoTiffData::U16")
+        }
+        if let crate::crs::GeoTiffData::U16(v_code) = vertical {
+            assert!(v_code == 5941);
+        } else {
+            panic!("Expected GeoTiffData::U16")
+        }
     }
 
     #[cfg(feature = "laz")]
@@ -377,7 +246,7 @@ mod tests {
         header.remove_crs_vlrs();
 
         for vlr in header.all_vlrs() {
-            if vlr.is_projection() {
+            if vlr.is_crs() {
                 panic!("CRS VLRs are still in the header")
             }
         }
@@ -391,21 +260,17 @@ mod tests {
         // remove the current crs vlr(s)
         header.remove_crs_vlrs();
 
+        let random_bytes =
+            "Test bytes. Just seeing if writing and reading is consitent:)".as_bytes();
+
         // add a new crs vlr (not the correct one, but does not matter)
         header
-            .set_wkt_crs(
-                crs_definitions::from_code(3006)
-                    .unwrap()
-                    .wkt
-                    .as_bytes()
-                    .to_vec(),
-            )
+            .set_wkt_crs(random_bytes.to_vec())
             .expect("Could not add wkt crs vlr");
 
-        let crs = header.get_epsg_crs().expect("Could not parse crs").unwrap();
+        let read_bytes = header.get_wkt_crs_bytes().unwrap();
 
-        assert!(crs.horizontal == 3006);
-        assert!(crs.vertical.is_none());
+        assert!(read_bytes == random_bytes);
     }
 
     #[test]
@@ -415,14 +280,8 @@ mod tests {
         // remove the current crs vlr(s)
         header.remove_crs_vlrs();
 
-        // try to add a new crs vlr (not supported for las 1.4)
-        let res = header.set_wkt_crs(
-            crs_definitions::from_code(3006)
-                .unwrap()
-                .wkt
-                .as_bytes()
-                .to_vec(),
-        );
+        // try to add a new crs vlr (not supported below las 1.4)
+        let res = header.set_wkt_crs("just some bytes".as_bytes().to_vec());
 
         assert!(res.is_err());
     }

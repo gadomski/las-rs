@@ -152,18 +152,26 @@ impl Vlr {
     }
 
     /// Check if the vlr is a projection (coordinate reference system) VLR
-    pub fn is_projection(&self) -> bool {
+    pub fn is_crs(&self) -> bool {
         matches!(
             (self.user_id.to_lowercase().as_str(), self.record_id),
-            ("lasf_projection", 2112 | 34735 | 34736 | 34737)
+            ("lasf_projection", 2112 | 34735..=34737)
         )
     }
 
     /// Returns true if it's a well-known WKT coordinate reference system VLR.
-    pub fn is_crs_wkt(&self) -> bool {
+    pub fn is_wkt_crs(&self) -> bool {
         matches!(
             (self.user_id.to_lowercase().as_str(), self.record_id),
             ("lasf_projection", 2112)
+        )
+    }
+
+    /// Returns true if it's a geotiff coordinate reference system VLR.
+    pub fn is_geotiff_crs(&self) -> bool {
+        matches!(
+            (self.user_id.to_lowercase().as_str(), self.record_id),
+            ("lasf_projection", 34735..=34737)
         )
     }
 

@@ -546,12 +546,7 @@ impl Header {
     /// assert!(!header.has_crs_vlrs());
     /// ```
     pub fn has_crs_vlrs(&self) -> bool {
-        for vlr in self.all_vlrs() {
-            if vlr.is_projection() {
-                return true;
-            }
-        }
-        false
+        self.all_vlrs().any(|v| v.is_crs())
     }
 
     /// Converts this header into a raw header.
