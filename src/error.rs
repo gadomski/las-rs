@@ -194,4 +194,29 @@ pub enum Error {
     /// The vlr data is too long.
     #[error("the vlr is too long: {0}")]
     VlrTooLong(usize),
+
+    /// The GeoTiff-CRS (E)VLR(s) could not be read. Either the ascii- or double-vlrs are missing
+    #[error("Unable to read the ascii or double GeoTiff (E)VLR(s)")]
+    UnreadableGeoTiffCrs,
+
+    /// The Geotiff key entry is undefined
+    #[error("Invalid location key encountered for GeotiffKeyEntry with id {0}")]
+    UndefinedDataForGeoTiffKey(u16),
+
+    /// Invalid GeoTIFF header values
+    #[error("Invalid GeoTIFF header: expected key_directory_version={expected_version}, key_revision={expected_revision}, minor_revision={expected_minor}, but got key_directory_version={actual_version}, key_revision={actual_revision}, minor_revision={actual_minor}")]
+    InvalidGeoTiffHeader {
+        /// Expected key directory version
+        expected_version: u16,
+        /// Actual key directory version
+        actual_version: u16,
+        /// Expected key revision
+        expected_revision: u16,
+        /// Actual key revision
+        actual_revision: u16,
+        /// Expected minor revision
+        expected_minor: u16,
+        /// Actual minor revision
+        actual_minor: u16,
+    },
 }
