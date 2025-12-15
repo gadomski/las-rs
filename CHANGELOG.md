@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7](https://github.com/gadomski/las-rs/compare/v0.9.6...v0.9.7) - 2025-12-15
+
+### Other
+
+- add crates.io environment
+- add release-plz ([#127](https://github.com/gadomski/las-rs/pull/127))
+- add reproducer for https://github.com/gadomski/las-rs/issues/15 ([#126](https://github.com/gadomski/las-rs/pull/126))
+- *(deps)* update criterion requirement from 0.7 to 0.8 ([#123](https://github.com/gadomski/las-rs/pull/123))
+- *(deps)* bump actions/checkout from 5 to 6 ([#122](https://github.com/gadomski/las-rs/pull/122))
+- *(deps)* update laz requirement from 0.10.0 to 0.11.0 ([#119](https://github.com/gadomski/las-rs/pull/119))
+
 ### Added
 
 - `Sync` restriction for reading and writing ([#119](https://github.com/gadomski/las-rs/pull/119))
