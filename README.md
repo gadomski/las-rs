@@ -1,5 +1,4 @@
-las-rs
-======
+# las-rs
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/gadomski/las-rs/continuous-integration.yml?branch=main&style=for-the-badge)](https://github.com/gadomski/las-rs/actions/workflows/continuous-integration.yml)
 [![Crates.io](https://img.shields.io/crates/v/las?style=for-the-badge)](https://crates.io/crates/las)
@@ -11,14 +10,14 @@ Read and write [ASPRS las files](http://www.asprs.org/Committee-General/LASer-LA
 
 ```toml
 [dependencies]
-las = "0.9"
+las = "*"
 ```
 
 To include [laz](https://laszip.org/) support:
 
 ```toml
 [dependencies]
-las = { version = "0.9", features = ["laz"] }
+las = { version = "*", features = ["laz"] }
 ```
 
 To include `laz` support with parallel compression/decompression
@@ -26,5 +25,5 @@ to enhance speed (`laz-parallel` implies `laz` so you don't need to specify both
 
 ```toml
 [dependencies]
-las = { version = "0.9", features = ["laz-parallel"] }
+las = { version = "*", features = ["laz-parallel"] }
 ```
