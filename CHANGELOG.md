@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.8](https://github.com/gadomski/las-rs/compare/v0.9.7...v0.9.8) - 2025-12-15
+
+### Added
+
+- crs ([#130](https://github.com/gadomski/las-rs/pull/130))
+
+### Other
+
+- remove doc_auto_cfg for docs.rs ([#132](https://github.com/gadomski/las-rs/pull/132))
+- environment for release-plz
+
 ## [0.9.7](https://github.com/gadomski/las-rs/compare/v0.9.6...v0.9.7) - 2025-12-15
 
 ### Other
