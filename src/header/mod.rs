@@ -85,13 +85,13 @@ mod builder;
 pub struct Header {
     bounds: Bounds,
     date: Option<NaiveDate>,
-    evlrs: Vec<Vlr>,
+    pub(crate) evlrs: Vec<Vlr>,
     file_source_id: u16,
     generating_software: String,
     gps_time_type: GpsTimeType,
     guid: Uuid,
     has_synthetic_return_numbers: bool,
-    has_wkt_crs: bool,
+    pub(crate) has_wkt_crs: bool,
     number_of_points: u64,
     number_of_points_by_return: HashMap<u8, u64>,
     padding: Vec<u8>,
@@ -531,8 +531,22 @@ impl Header {
     /// builder.evlrs.push(Vlr::default());
     /// let header = builder.into_header().unwrap();
     /// assert_eq!(2, header.all_vlrs().count());
+    /// ```
     pub fn all_vlrs(&self) -> Vlrs<'_> {
         Vlrs(self.vlrs.iter().chain(&self.evlrs))
+    }
+
+    /// Returns whether or not this header has any CRS (E)VLRs
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Header;
+    /// let header = Header::default();
+    /// assert!(!header.has_crs_vlrs());
+    /// ```
+    pub fn has_crs_vlrs(&self) -> bool {
+        self.all_vlrs().any(|v| v.is_crs())
     }
 
     /// Converts this header into a raw header.
