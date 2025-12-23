@@ -209,7 +209,7 @@ pub use crate::{
     vector::Vector,
     version::Version,
     vlr::Vlr,
-    writer::Writer,
+    writer::{Writer, WriterOptions},
 };
 #[cfg(feature = "laz")]
 pub use reader::LazParallelism;

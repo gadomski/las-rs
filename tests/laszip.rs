@@ -111,6 +111,39 @@ mod laz_compression_test {
         }
     }
 
+    #[cfg(feature = "laz-parallel")]
+    #[test]
+    fn test_writer_laz_parallel() {
+        use las::{LazParallelism, Writer, WriterOptions};
+
+        // Read some original data
+        let original_path = "./tests/data/autzen.las";
+        let mut original_points = vec![];
+        let mut reader = las::Reader::from_path(original_path).unwrap();
+        let _ = reader.read_all_points_into(&mut original_points).unwrap();
+
+        let header = reader.header().clone();
+        println!("original_points: {}", original_points.len());
+
+        // Write it compressed, with parallelism enabled
+        let output = Cursor::new(vec![]);
+        let options = WriterOptions::default().with_laz_parallelism(LazParallelism::Yes);
+        let mut writer = Writer::with_options(output, header, options).unwrap();
+        let mid = original_points.len() / 2;
+        let (first_half, second_half) = original_points.split_at(mid);
+        writer.write_points(first_half).unwrap();
+        writer.write_points(second_half).unwrap();
+        writer.close().unwrap();
+        let written_bytes = writer.into_inner().unwrap();
+
+        // Read what we wrote and compare to original points
+        let mut points = vec![];
+        let mut reader = las::Reader::new(written_bytes).unwrap();
+        let _ = reader.read_all_points_into(&mut points).unwrap();
+
+        assert_eq!(points, original_points);
+    }
+
     #[test]
     fn test_point_format_id_is_correct() {
         let las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
