@@ -151,6 +151,60 @@ impl Vlr {
         self.data.len() > u16::MAX as usize
     }
 
+    /// Check if the vlr is a projection (coordinate reference system) VLR
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// vlr.user_id = "LASF_Projection".to_string();
+    /// vlr.record_id = 2112;
+    /// assert!(vlr.is_crs());
+    /// ```
+    pub fn is_crs(&self) -> bool {
+        matches!(
+            (self.user_id.to_lowercase().as_str(), self.record_id),
+            ("lasf_projection", 2112 | 34735..=34737)
+        )
+    }
+
+    /// Returns true if it's a well-known WKT coordinate reference system VLR.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// vlr.user_id = "LASF_Projection".to_string();
+    /// vlr.record_id = 2112;
+    /// assert!(vlr.is_wkt_crs());
+    /// ```
+    pub fn is_wkt_crs(&self) -> bool {
+        matches!(
+            (self.user_id.to_lowercase().as_str(), self.record_id),
+            ("lasf_projection", 2112)
+        )
+    }
+
+    /// Returns true if it's a geotiff coordinate reference system VLR.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// vlr.user_id = "LASF_Projection".to_string();
+    /// vlr.record_id = 34735;
+    /// assert!(vlr.is_geotiff_crs());
+    /// ```
+    pub fn is_geotiff_crs(&self) -> bool {
+        matches!(
+            (self.user_id.to_lowercase().as_str(), self.record_id),
+            ("lasf_projection", 34735..=34737)
+        )
+    }
+
     fn record_length_after_header(&self, is_extended: bool) -> Result<raw::vlr::RecordLength> {
         if is_extended {
             Ok(raw::vlr::RecordLength::Evlr(self.data.len() as u64))

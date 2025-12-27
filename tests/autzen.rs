@@ -1,7 +1,5 @@
 //! Massage and work the auzten file to make sure we can deal with real data.
 
-extern crate las;
-
 macro_rules! autzen {
     ($name:ident, $major:expr_2021, $minor:expr_2021) => {
         mod $name {
@@ -223,4 +221,17 @@ fn test_laz_read_all_points() {
 #[test]
 fn test_copc_read_all_points() {
     test_read_all_points_into_on("tests/data/autzen.copc.laz");
+}
+
+#[cfg(feature = "laz-parallel")]
+#[test]
+fn test_seek_to_zero() {
+    use las::Reader;
+    use std::fs::File;
+
+    // https://github.com/gadomski/las-rs/issues/125
+    let file = File::open("tests/data/autzen.copc.laz").unwrap();
+    let mut reader = Reader::new(file).unwrap();
+    for _ in reader.read_points(1_000).unwrap() {}
+    reader.seek(0).unwrap();
 }
