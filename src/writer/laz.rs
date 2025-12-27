@@ -3,10 +3,7 @@ use crate::{Error, Header, Point, Result};
 use ::laz::{LasZipCompressor, LazCompressorOwned};
 #[cfg(feature = "laz-parallel")]
 use laz::ParLasZipCompressor;
-use std::{
-    io::{Cursor, Seek, Write},
-    usize,
-};
+use std::io::{Cursor, Seek, Write};
 
 pub(crate) struct PointWriter<C> {
     compressor: C,
