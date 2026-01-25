@@ -35,6 +35,8 @@ mod las;
 #[cfg(feature = "laz")]
 mod laz;
 
+#[cfg(feature = "laz")]
+use crate::LazParallelism;
 use crate::{Error, Header, Point, Result};
 use std::{
     fmt::Debug,
@@ -45,6 +47,12 @@ use std::{
 
 trait WritePoint<W: std::io::Write>: Send {
     fn write_point(&mut self, point: Point) -> Result<()>;
+    fn write_points(&mut self, points: &[Point]) -> Result<()> {
+        for point in points.iter().cloned() {
+            self.write_point(point)?;
+        }
+        Ok(())
+    }
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
     fn get_mut(&mut self) -> &mut W;
@@ -109,6 +117,52 @@ pub trait Write {
     fn write(&mut self, point: Point) -> Result<()>;
 }
 
+/// Options for Writer
+///
+/// Currently, the only option is the selection of LAZ parallelism via [LazParallelism].
+/// This option requires the `laz` feature to be enabled (and to use parallelism, the `laz-parallel`
+/// feature must also be enabled).
+/// Using parallel writing will speedup compression when writing points in batch, at the cost
+/// of slightly more memory consumption.
+///
+/// By default, if the `laz-parallel` feature is enabled, parallelism will be the default choice
+#[derive(Debug, Clone, Copy)]
+pub struct WriterOptions {
+    #[cfg(feature = "laz")]
+    laz_parallelism: LazParallelism,
+}
+
+impl WriterOptions {
+    /// Change the laz parallelism option
+    #[cfg(feature = "laz")]
+    pub fn with_laz_parallelism(mut self, laz_parallelism: LazParallelism) -> Self {
+        self.laz_parallelism = laz_parallelism;
+        self
+    }
+}
+
+impl Default for WriterOptions {
+    fn default() -> Self {
+        #[cfg(feature = "laz-parallel")]
+        {
+            Self {
+                laz_parallelism: LazParallelism::Yes,
+            }
+        }
+        #[cfg(all(feature = "laz", not(feature = "laz-parallel")))]
+        {
+            Self {
+                laz_parallelism: LazParallelism::No,
+            }
+        }
+
+        #[cfg(not(feature = "laz"))]
+        {
+            Self {}
+        }
+    }
+}
+
 /// Writes LAS data.
 ///
 /// The LAS header needs to be re-written when the writer closes. For convenience, this is done via
@@ -144,7 +198,30 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
     /// use las::Writer;
     /// let writer = Writer::new(Cursor::new(Vec::new()), Default::default());
     /// ```
-    pub fn new(mut write: W, mut header: Header) -> Result<Writer<W>> {
+    pub fn new(write: W, header: Header) -> Result<Writer<W>> {
+        Self::with_options(write, header, WriterOptions::default())
+    }
+
+    /// Creates a new writer with custom options
+    ///
+    /// The header that is passed in will have various fields zero'd, e.g. bounds, number of
+    /// points, etc.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(feature = "laz-parallel")]
+    /// # fn main() {
+    /// use std::io::Cursor;
+    /// use las::{Writer, WriterOptions, LazParallelism};
+    /// let options = WriterOptions::default()
+    ///     .with_laz_parallelism(LazParallelism::Yes);
+    /// let writer = Writer::with_options(Cursor::new(Vec::new()), Default::default(), options);
+    /// # }
+    /// # #[cfg(not(feature = "laz-parallel"))]
+    /// # fn main() {}
+    /// ```
+    pub fn with_options(mut write: W, mut header: Header, options: WriterOptions) -> Result<Self> {
         let start = write.stream_position()?;
         header.clear();
         if header.point_format().is_compressed {
@@ -152,10 +229,19 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
             {
                 header.add_laz_vlr()?;
                 header.write_to(&mut write)?;
+
+                let point_writer: Box<dyn WritePoint<W>> = match options.laz_parallelism {
+                    #[cfg(feature = "laz-parallel")]
+                    LazParallelism::Yes => {
+                        laz::PointWriter::new_parallel(write, header).map(Box::new)?
+                    }
+                    LazParallelism::No => laz::PointWriter::new(write, header).map(Box::new)?,
+                };
+
                 Ok(Writer {
                     closed: false,
                     start,
-                    point_writer: Box::new(laz::PointWriter::new(write, header)?),
+                    point_writer,
                 })
             }
             #[cfg(not(feature = "laz"))]
@@ -163,6 +249,8 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
                 Err(Error::LaszipNotEnabled)
             }
         } else {
+            // Silence unused variable warning as the only option is related to laz
+            let _ = options;
             header.write_to(&mut write)?;
             Ok(Writer {
                 closed: false,
@@ -260,6 +348,24 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
             ));
         }
         self.point_writer.write_point(point)
+    }
+
+    /// Writes all the points
+    pub fn write_points(&mut self, points: &[Point]) -> Result<()> {
+        if self.closed {
+            return Err(Error::ClosedWriter);
+        }
+
+        if points
+            .iter()
+            .any(|point| !point.matches(self.header().point_format()))
+        {
+            return Err(Error::PointAttributesDoNotMatch(
+                *self.header().point_format(),
+            ));
+        }
+
+        self.point_writer.write_points(points)
     }
 
     /// Writes a point.

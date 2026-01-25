@@ -1,16 +1,19 @@
 use super::WritePoint;
 use crate::{Error, Header, Point, Result};
-use ::laz::LasZipCompressor;
+use ::laz::{LasZipCompressor, LazCompressor, LazCompressorWithInner};
+#[cfg(feature = "laz-parallel")]
+use laz::ParLasZipCompressor;
 use std::io::{Cursor, Seek, Write};
 
-pub(crate) struct PointWriter<'a, W: Write + Seek + Send> {
-    compressor: LasZipCompressor<'a, W>,
+pub(crate) struct PointWriter<C> {
+    compressor: C,
+    // Buffer with raw bytes of the points to be compressed
     buffer: Cursor<Vec<u8>>,
     header: Header,
 }
 
-impl<'a, W: Write + Seek + Send + Sync> PointWriter<'a, W> {
-    pub(crate) fn new(write: W, header: Header) -> Result<PointWriter<'a, W>> {
+impl<'a, W: Write + Seek + Send + Sync> PointWriter<LasZipCompressor<'a, W>> {
+    pub(crate) fn new(write: W, header: Header) -> Result<PointWriter<LasZipCompressor<'a, W>>> {
         let buffer = Cursor::new(vec![0u8; header.point_format().len() as usize]);
         let vlr = header.laz_vlr()?;
         let compressor = LasZipCompressor::new(write, vlr)?;
@@ -23,7 +26,29 @@ impl<'a, W: Write + Seek + Send + Sync> PointWriter<'a, W> {
     }
 }
 
-impl<W: Write + Seek + Send + Sync> WritePoint<W> for PointWriter<'_, W> {
+#[cfg(feature = "laz-parallel")]
+impl<W: Write + Seek + Send + Sync> PointWriter<ParLasZipCompressor<W>> {
+    pub(crate) fn new_parallel(
+        write: W,
+        header: Header,
+    ) -> Result<PointWriter<ParLasZipCompressor<W>>> {
+        let buffer = Cursor::new(vec![0u8; header.point_format().len() as usize]);
+        let vlr = header.laz_vlr()?;
+        let compressor = ParLasZipCompressor::new(write, vlr)?;
+
+        Ok(Self {
+            header,
+            buffer,
+            compressor,
+        })
+    }
+}
+
+impl<W, C> WritePoint<W> for PointWriter<C>
+where
+    C: LazCompressor + LazCompressorWithInner<W> + Send + Sync,
+    W: Write + Seek + Send + Sync,
+{
     fn write_point(&mut self, point: Point) -> Result<()> {
         self.header.add_point(&point);
         self.buffer.set_position(0);
@@ -37,12 +62,36 @@ impl<W: Write + Seek + Send + Sync> WritePoint<W> for PointWriter<'_, W> {
             .map_err(Error::from)
     }
 
+    fn write_points(&mut self, points: &[Point]) -> Result<()> {
+        if points.is_empty() {
+            return Ok(());
+        }
+
+        let current_cap = self.buffer.get_ref().capacity();
+        let necessary_cap = self.header.point_format().len() as usize * points.len();
+        if necessary_cap > current_cap {
+            self.buffer.get_mut().reserve(necessary_cap - current_cap);
+        }
+        self.buffer.set_position(0);
+
+        for point in points.iter().cloned() {
+            self.header.add_point(&point);
+            let raw_point = point.into_raw(self.header.transforms())?;
+            raw_point.write_to(&mut self.buffer, self.header.point_format())?;
+        }
+
+        let len = self.buffer.position() as usize;
+        let buffer = &self.buffer.get_ref()[..len];
+        self.compressor.compress_many(buffer)?;
+        Ok(())
+    }
+
     fn into_inner(self: Box<Self>) -> W {
         self.compressor.into_inner()
     }
 
     fn get_mut(&mut self) -> &mut W {
-        self.compressor.get_mut()
+        self.compressor.inner_mut()
     }
 
     fn header(&self) -> &Header {
