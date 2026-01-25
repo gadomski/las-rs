@@ -52,6 +52,10 @@ impl Header {
                 let _ = laz_items.add_item(LazItemType::RGB12);
             }
 
+            if point_format.has_waveform {
+                let _ = laz_items.add_item(LazItemType::WavePacket13);
+            }
+
             if point_format.extra_bytes > 0 {
                 let _ = laz_items.add_item(LazItemType::Byte(point_format.extra_bytes));
             }
@@ -66,6 +70,11 @@ impl Header {
                     let _ = laz_items.add_item(LazItemType::RGB14);
                 }
             }
+
+            if point_format.has_waveform {
+                let _ = laz_items.add_item(LazItemType::WavePacket14);
+            }
+
             if point_format.extra_bytes > 0 {
                 let _ = laz_items.add_item(LazItemType::Byte14(point_format.extra_bytes));
             }
