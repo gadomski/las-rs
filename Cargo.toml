@@ -1,6 +1,6 @@
 [package]
 name = "las"
-version = "0.9.8"
+version = "0.9.9"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
 description = "Reads and writes point clouds stored in the ASPRS las file format."
 documentation = "https://docs.rs/las"
