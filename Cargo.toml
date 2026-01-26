@@ -15,7 +15,7 @@ edition = "2024"
 [dependencies]
 byteorder = "1.4"
 chrono = "0.4"
-laz = { version = "0.11.0", optional = true }
+laz = { version = "0.12.0", optional = true }
 log = "0.4"
 num-traits = "0.2"
 thiserror = "2.0"
