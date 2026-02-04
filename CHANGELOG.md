@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.10](https://github.com/gadomski/las-rs/compare/v0.9.9...v0.9.10) - 2026-02-04
+
+### Fixed
+
+- re-add writer drop implementation ([#137](https://github.com/gadomski/las-rs/pull/137))
+
 ## [0.9.9](https://github.com/gadomski/las-rs/compare/v0.9.8...v0.9.9) - 2026-01-26
 
 ### Added
