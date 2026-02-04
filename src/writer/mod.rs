@@ -179,7 +179,7 @@ impl Default for WriterOptions {
 /// } // <- `close` is not called
 /// ```
 #[allow(missing_debug_implementations)]
-pub struct Writer<W: 'static + std::io::Write + Seek + Send> {
+pub struct Writer<W: 'static + std::io::Write + Seek + Send + Sync> {
     closed: bool,
     start: u64,
     point_writer: Box<dyn WritePoint<W> + Send>,
@@ -451,6 +451,14 @@ impl Writer<BufWriter<File>> {
 impl Default for Writer<Cursor<Vec<u8>>> {
     fn default() -> Writer<Cursor<Vec<u8>>> {
         Writer::new(Cursor::new(Vec::new()), Header::default()).unwrap()
+    }
+}
+
+impl<W: 'static + Seek + std::io::Write + Send + Sync> Drop for Writer<W> {
+    fn drop(&mut self) {
+        if !self.closed {
+            self.close().expect("Error when dropping the writer");
+        }
     }
 }
 

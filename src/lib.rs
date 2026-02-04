@@ -220,4 +220,4 @@ pub use {reader::Read, writer::Write};
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
-use criterion as _;
+use {criterion as _, tempfile as _};

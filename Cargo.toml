@@ -23,6 +23,7 @@ uuid = "1"
 
 [dev-dependencies]
 criterion = "0.8"
+tempfile = "3.24.0"
 
 [features]
 laz = ["dep:laz"]
