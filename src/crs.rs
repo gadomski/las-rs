@@ -149,6 +149,104 @@ pub struct GeoTiffCrs {
 }
 
 impl GeoTiffCrs {
+    /// Get the projected CRS geo key value if it exists.
+    ///
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
+    ///
+    /// > The ProjectedCRSGeoKey SHALL have type u16. \
+    /// > ProjectedCRSGeoKey values in the range `1024..=32766` SHALL be EPSG projected CRS codes.
+    /// >
+    /// > A value of `0` SHALL indicate intentionally omitted parameters. \
+    /// > Values `1..=1023` are reserved. \
+    /// > A value of `32767` indicates a user-defined projected crs component
+    /// > (please read chapters 7.4.2 and 7.5 of the GeoTiff spec for more info). \
+    /// > Values `32768..` SHALL be considered private.
+    pub fn get_projected_crs_geo_key_value(&self) -> Option<u16> {
+        self.entries
+            .iter()
+            .find(|gk| gk.is_projected_crs_geo_key())
+            .and_then(|gk| {
+                if let GeoTiffData::U16(k) = gk.data {
+                    Some(k)
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Get the geodetic (or geocentric) CRS geo key value if it exists.
+    ///
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
+    ///
+    /// > The GeodeticCRSGeoKey SHALL have type u16. \
+    /// > GeodeticCRSGeoKey values in the range `1024..=32766` SHALL be EPSG geographic 2D or geocentric CRS codes.
+    /// >
+    /// > A value of `0` SHALL indicate intentionally omitted parameters. \
+    /// > Values `1..=1023` are reserved. \
+    /// > A value of `32767` indicates a user-defined geographic crs component
+    /// > (please read chapters 7.4.3 and 7.5 of the GeoTiff spec for more info). \
+    /// > Values `32768..` SHALL be considered private.
+    pub fn get_geodetic_crs_geo_key_value(&self) -> Option<u16> {
+        self.entries
+            .iter()
+            .find(|gk| gk.is_geodetic_crs_geo_key())
+            .and_then(|gk| {
+                if let GeoTiffData::U16(k) = gk.data {
+                    Some(k)
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Get the vertical CRS geo key value if it exists.
+    ///
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
+    ///
+    /// > The VerticalCRSGeoKey SHALL have type u16. \
+    /// > VerticalCRSGeoKey values in the range `1024..=32766` SHALL be EPSG Vertical CRS Codes or EPSG geographic 3D CRS codes.
+    /// >
+    /// > A value of `0` SHALL indicate intentionally omitted parameters. \
+    /// > Values `1..=1023` are reserved. \
+    /// > A value of `32767` indicates a user-defined vertical crs component
+    /// > (please read chapters 7.4.4 and 7.5 of the GeoTiff spec for more info). \
+    /// > Values `32768..` SHALL be considered private.
+    pub fn get_vertical_crs_geo_key_value(&self) -> Option<u16> {
+        self.entries
+            .iter()
+            .find(|gk| gk.is_vertical_crs_geo_key())
+            .and_then(|gk| {
+                if let GeoTiffData::U16(k) = gk.data {
+                    Some(k)
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Get the GTModelTypeGeoKey value if it exists.
+    ///
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
+    ///
+    /// > The GTModelTypeGeoKey value SHALL be:
+    /// > * `0` to indicate that the Model CRS in undefined or unknown
+    /// > * `1` to indicate that the Model CRS is a 2D projected coordinate reference system, indicated by the value of the ProjectedCRSGeoKey
+    /// > * `2` to indicate that the Model CRS is a geographic 2D coordinate reference system, indicated by the value of the GeodeticCRSGeoKey
+    /// > * `3` to indicate that the Model CRS is a geocentric Cartesian 3D coordinate reference system, indicated by the value of the GeodeticCRSGeoKey
+    /// > * `32767` to indicate that the Model CRS type is user-defined.
+    pub fn get_gt_model_type_geo_key_value(&self) -> Option<u16> {
+        self.entries
+            .iter()
+            .find(|gk| gk.is_gt_model_type_geo_key())
+            .and_then(|gk| {
+                if let GeoTiffData::U16(k) = gk.data {
+                    Some(k)
+                } else {
+                    None
+                }
+            })
+    }
+
     fn read_from(
         main_vlr: &[u8],
         double_vlr: Option<&[u8]>,
@@ -161,13 +259,13 @@ impl GeoTiffCrs {
         let minor_revision = main_vlr.read_u16::<LittleEndian>()?;
 
         // Validate GeoTIFF header values according to spec
-        if key_directory_version != 1 || key_revision != 1 || minor_revision != 0 {
+        if key_directory_version != 1 || key_revision != 1 || minor_revision > 1 {
             return Err(Error::InvalidGeoTiffHeader {
                 expected_version: 1,
                 actual_version: key_directory_version,
                 expected_revision: 1,
                 actual_revision: key_revision,
-                expected_minor: 0,
+                expected_minor: 1,
                 actual_minor: minor_revision,
             });
         }
@@ -208,6 +306,26 @@ pub struct GeoTiffKeyEntry {
 }
 
 impl GeoTiffKeyEntry {
+    /// Is this key the geotiff model type geo key?
+    pub fn is_gt_model_type_geo_key(&self) -> bool {
+        self.id == 1024
+    }
+
+    /// Is this key entry a geodetic crs geo key?
+    pub fn is_geodetic_crs_geo_key(&self) -> bool {
+        self.id == 2048
+    }
+
+    /// Is this key entry a projected crs geo key?
+    pub fn is_projected_crs_geo_key(&self) -> bool {
+        self.id == 3072
+    }
+
+    /// Is this key entry a vertical crs geo key?
+    pub fn is_vertical_crs_geo_key(&self) -> bool {
+        self.id == 4096
+    }
+
     fn read_from(
         main_vlr: &mut Cursor<&[u8]>,
         double_vlr: &Option<&[u8]>,
@@ -219,7 +337,7 @@ impl GeoTiffKeyEntry {
         let offset = main_vlr.read_u16::<LittleEndian>()?;
         let data = match location {
             0 => GeoTiffData::U16(offset),
-            34736 => {
+            DOUBLE_VLR_ID => {
                 let mut cursor = Cursor::new(double_vlr.ok_or(Error::UnreadableGeoTiffCrs)?);
                 let _ = cursor.seek(SeekFrom::Start(offset as u64 * 8_u64))?; // 8 is the byte size of a f64 and offset is not a byte offset but an index
                 let mut doubles = Vec::with_capacity(count as usize);
@@ -228,7 +346,7 @@ impl GeoTiffKeyEntry {
                 }
                 GeoTiffData::Doubles(doubles)
             }
-            34737 => {
+            ASCII_VLR_ID => {
                 let mut cursor = Cursor::new(ascii_vlr.ok_or(Error::UnreadableGeoTiffCrs)?);
                 let _ = cursor.seek(SeekFrom::Start(offset as u64))?; // no need to multiply the index as the byte size of char is 1
                 let mut string = String::with_capacity(count as usize);
@@ -276,30 +394,14 @@ mod tests {
         let crs = reader.header().get_geotiff_crs().unwrap().unwrap();
 
         let horizontal = crs
-            .entries
-            .iter()
-            .find(|key| key.id == 2048 || key.id == 3072)
-            .unwrap()
-            .data
-            .clone();
+            .get_projected_crs_geo_key_value()
+            .expect("No projected crs geo key found");
         let vertical = crs
-            .entries
-            .iter()
-            .find(|key| key.id == 4096)
-            .unwrap()
-            .data
-            .clone();
+            .get_vertical_crs_geo_key_value()
+            .expect("No vertical crs geo key found");
 
-        if let crate::crs::GeoTiffData::U16(h_code) = horizontal {
-            assert!(h_code == 25832);
-        } else {
-            panic!("Expected GeoTiffData::U16")
-        }
-        if let crate::crs::GeoTiffData::U16(v_code) = vertical {
-            assert!(v_code == 5941);
-        } else {
-            panic!("Expected GeoTiffData::U16")
-        }
+        assert!(horizontal == 25832);
+        assert!(vertical == 5941);
     }
 
     #[cfg(feature = "laz")]
@@ -310,10 +412,8 @@ mod tests {
         let mut header = reader.header().to_owned();
         header.remove_crs_vlrs();
 
-        for vlr in header.all_vlrs() {
-            if vlr.is_crs() {
-                panic!("CRS VLRs are still in the header")
-            }
+        if header.all_vlrs().any(|vlr| vlr.is_crs()) {
+            panic!("CRS VLRs are still in the header")
         }
     }
 
@@ -326,7 +426,7 @@ mod tests {
         header.remove_crs_vlrs();
 
         let random_bytes =
-            "Test bytes. Just seeing if writing and reading is consitent:)".as_bytes();
+            "Test bytes. Just seeing if writing and reading is consistent:)".as_bytes();
 
         // add a new crs vlr (not the correct one, but does not matter)
         header
