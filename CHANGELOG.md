@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.11](https://github.com/gadomski/las-rs/compare/v0.9.10...v0.9.11) - 2026-04-07
+
+### Fixed
+
+- bump fmt required version ([#140](https://github.com/gadomski/las-rs/pull/140))
+
+### Other
+
+- Added functions for easier access to crs in GeoTiffCrs ([#142](https://github.com/gadomski/las-rs/pull/142))
+- *(deps)* bump actions/create-github-app-token from 2.2.1 to 3.0.0 ([#139](https://github.com/gadomski/las-rs/pull/139))
+
 ## [0.9.10](https://github.com/gadomski/las-rs/compare/v0.9.9...v0.9.10) - 2026-02-04
 
 ### Fixed
