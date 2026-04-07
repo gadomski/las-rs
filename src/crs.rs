@@ -151,14 +151,16 @@ pub struct GeoTiffCrs {
 impl GeoTiffCrs {
     /// Get the projected CRS geo key value if it exists.
     ///
-    /// From the GeoTiff spec: \
-    /// The ProjectedCRSGeoKey SHALL have type SHORT. \
-    /// ProjectedCRSGeoKey values in the range 1024-32766 SHALL be EPSG Projected CRS Codes.
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
     ///
-    /// Values 1..=1023 are reserved. \
-    /// A value of 32767 indicates a user-defined projected crs component. \
-    /// Please read chapters 7.4.2 and 7.5 of the GeoTiff spec for more info. \
-    /// Values > 32767 SHALL be considered private.
+    /// > The ProjectedCRSGeoKey SHALL have type u16. \
+    /// > ProjectedCRSGeoKey values in the range `1024..=32766` SHALL be EPSG projected CRS codes.
+    /// >
+    /// > A value of `0` SHALL indicate intentionally omitted parameters. \
+    /// > Values `1..=1023` are reserved. \
+    /// > A value of `32767` indicates a user-defined projected crs component
+    /// > (please read chapters 7.4.2 and 7.5 of the GeoTiff spec for more info). \
+    /// > Values `32768..` SHALL be considered private.
     pub fn get_projected_crs_geo_key_value(&self) -> Option<u16> {
         self.entries
             .iter()
@@ -174,14 +176,16 @@ impl GeoTiffCrs {
 
     /// Get the geodetic (or geocentric) CRS geo key value if it exists.
     ///
-    /// From the GeoTiff spec: \
-    /// The GeodeticCRSGeoKey SHALL have type SHORT. \
-    /// GeodeticCRSGeoKey values in the range 1024-32766 SHALL be EPSG geographic 2D or geocentric CRS codes.
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
     ///
-    /// Values 1..=1023 are reserved. \
-    /// A value of 32767 indicates a user-defined geographic crs component. \
-    /// Please read chapters 7.4.3 and 7.5 of the GeoTiff spec for more info. \
-    /// Values > 32767 SHALL be considered private.
+    /// > The GeodeticCRSGeoKey SHALL have type u16. \
+    /// > GeodeticCRSGeoKey values in the range `1024..=32766` SHALL be EPSG geographic 2D or geocentric CRS codes.
+    /// >
+    /// > A value of `0` SHALL indicate intentionally omitted parameters. \
+    /// > Values `1..=1023` are reserved. \
+    /// > A value of `32767` indicates a user-defined geographic crs component
+    /// > (please read chapters 7.4.3 and 7.5 of the GeoTiff spec for more info). \
+    /// > Values `32768..` SHALL be considered private.
     pub fn get_geodetic_crs_geo_key_value(&self) -> Option<u16> {
         self.entries
             .iter()
@@ -197,14 +201,16 @@ impl GeoTiffCrs {
 
     /// Get the vertical CRS geo key value if it exists.
     ///
-    /// From the spec:\
-    /// The VerticalCRSGeoKey SHALL have type SHORT. \
-    /// VerticalGeoKey values in the range 1024-32766 SHALL be either EPSG Vertical CRS Codes or EPSG geographic 3D CRS codes.
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
     ///
-    /// Values 1..=1023 are reserved. \
-    /// A value of 32767 indicates a user-defined vertical crs component. \
-    /// Please read chapters 7.4.4 and 7.5 of the GeoTiff spec for more info. \
-    /// Values > 32767 SHALL be considered private.
+    /// > The VerticalCRSGeoKey SHALL have type u16. \
+    /// > VerticalCRSGeoKey values in the range `1024..=32766` SHALL be EPSG Vertical CRS Codes or EPSG geographic 3D CRS codes.
+    /// >
+    /// > A value of `0` SHALL indicate intentionally omitted parameters. \
+    /// > Values `1..=1023` are reserved. \
+    /// > A value of `32767` indicates a user-defined vertical crs component
+    /// > (please read chapters 7.4.4 and 7.5 of the GeoTiff spec for more info). \
+    /// > Values `32768..` SHALL be considered private.
     pub fn get_vertical_crs_geo_key_value(&self) -> Option<u16> {
         self.entries
             .iter()
@@ -220,14 +226,14 @@ impl GeoTiffCrs {
 
     /// Get the GTModelTypeGeoKey value if it exists.
     ///
-    /// From the GeoTiff spec:
+    /// From the [GeoTiff spec](https://www.ogc.org/standards/geotiff/):
     ///
-    /// The GTModelTypeGeoKey value SHALL be:
-    /// * `0` to indicate that the Model CRS in undefined or unknown
-    /// * `1` to indicate that the Model CRS is a 2D projected coordinate reference system, indicated by the value of the ProjectedCRSGeoKey
-    /// * `2` to indicate that the Model CRS is a geographic 2D coordinate reference system, indicated by the value of the GeodeticCRSGeoKey
-    /// * `3` to indicate that the Model CRS is a geocentric Cartesian 3D coordinate reference system, indicated by the value of the GeodeticCRSGeoKey
-    /// * `32767` to indicate that the Model CRS type is user-defined.
+    /// > The GTModelTypeGeoKey value SHALL be:
+    /// > * `0` to indicate that the Model CRS in undefined or unknown
+    /// > * `1` to indicate that the Model CRS is a 2D projected coordinate reference system, indicated by the value of the ProjectedCRSGeoKey
+    /// > * `2` to indicate that the Model CRS is a geographic 2D coordinate reference system, indicated by the value of the GeodeticCRSGeoKey
+    /// > * `3` to indicate that the Model CRS is a geocentric Cartesian 3D coordinate reference system, indicated by the value of the GeodeticCRSGeoKey
+    /// > * `32767` to indicate that the Model CRS type is user-defined.
     pub fn get_gt_model_type_geo_key_value(&self) -> Option<u16> {
         self.entries
             .iter()
