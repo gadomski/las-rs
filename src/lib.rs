@@ -189,6 +189,7 @@ mod bounds;
 mod color;
 mod error;
 mod gps_time_type;
+mod point_cloud;
 mod transform;
 mod utils;
 mod vector;
@@ -204,6 +205,7 @@ pub use crate::{
     gps_time_type::GpsTimeType,
     header::{Builder, Header},
     point::Point,
+    point_cloud::{PointCloud, PointRef, PointRefIter},
     reader::{Reader, ReaderOptions},
     transform::Transform,
     vector::Vector,

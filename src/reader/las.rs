@@ -1,5 +1,5 @@
 use super::ReadPoints;
-use crate::{raw, Header, Point, Result};
+use crate::{raw, Header, Point, PointCloud, Result};
 use std::io::{Read, Seek, SeekFrom};
 
 pub(crate) struct PointReader<R: Read + Seek> {
@@ -48,6 +48,16 @@ impl<R: Read + Seek> ReadPoints for PointReader<R> {
             }
         }
         Ok(count)
+    }
+
+    fn read_points_into_cloud(&mut self, n: u64, cloud: &mut PointCloud) -> Result<u64> {
+        let points_left = self.header.number_of_points() - self.index;
+        let n = points_left.min(n);
+        let n_usize = usize::try_from(n)?;
+        let slab = cloud.resize_for(n_usize);
+        self.read.read_exact(slab)?;
+        self.index += n;
+        Ok(n)
     }
 
     fn seek(&mut self, index: u64) -> Result<()> {

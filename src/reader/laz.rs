@@ -1,5 +1,5 @@
 use super::ReadPoints;
-use crate::{raw, Header, Point, Result};
+use crate::{raw, Header, Point, PointCloud, Result};
 use laz::LazDecompressor;
 use std::io::{Cursor, Read, Seek};
 
@@ -78,6 +78,16 @@ where
             self.index += 1;
             points.push(point);
         }
+        Ok(n)
+    }
+
+    fn read_points_into_cloud(&mut self, n: u64, cloud: &mut PointCloud) -> Result<u64> {
+        let points_left = self.header.number_of_points() - self.index;
+        let n = points_left.min(n);
+        let n_usize = usize::try_from(n)?;
+        let slab = cloud.resize_for(n_usize);
+        self.decompressor.decompress_many(slab)?;
+        self.index += n;
         Ok(n)
     }
 

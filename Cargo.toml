@@ -36,6 +36,11 @@ bench = false
 name = "roundtrip"
 harness = false
 
+[[bench]]
+name = "point_cloud"
+harness = false
+required-features = ["laz"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

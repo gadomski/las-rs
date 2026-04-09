@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `PointCloud` and `PointRef`: a byte-slab point cloud API for
+  high-throughput bulk reads, with row-oriented and column-oriented accessors
+  over a single contiguous `Vec<u8>`. `Reader::read_into_cloud` and
+  `Reader::read_all_into_cloud` fill a cloud directly from the LAZ
+  decompressor or the raw reader, skipping per-point `Point` materialization.
+  This addresses the LAZ decompression throughput gap reported in
+  [#121](https://github.com/gadomski/las-rs/issues/121) — on a 167M-point LAZ
+  file with `laz-parallel`, `read_into_cloud` runs ~1.77× faster than
+  `read_points_into` for a 10M-point batch (722 ms → 408 ms). The existing
+  `Point` / `read_points_into` API is unchanged.
+
 ## [0.9.11](https://github.com/gadomski/las-rs/compare/v0.9.10...v0.9.11) - 2026-04-07
 
 ### Fixed

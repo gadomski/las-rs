@@ -53,7 +53,7 @@ mod las;
 #[cfg(feature = "laz")]
 mod laz;
 
-use crate::{Error, Header, Point, Result};
+use crate::{Error, Header, Point, PointCloud, Result};
 use std::{
     fs::File,
     io::{BufReader, Seek},
@@ -63,6 +63,7 @@ use std::{
 trait ReadPoints {
     fn read_point(&mut self) -> Result<Option<Point>>;
     fn read_points(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64>;
+    fn read_points_into_cloud(&mut self, n: u64, cloud: &mut PointCloud) -> Result<u64>;
     fn seek(&mut self, index: u64) -> Result<()>;
     fn header(&self) -> &Header;
 }
@@ -345,6 +346,66 @@ impl Reader {
     /// ```
     pub fn read_points_into(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64> {
         self.point_reader.read_points(n, points)
+    }
+
+    /// Decompresses up to `n` points directly into `cloud`, replacing its
+    /// current contents.
+    ///
+    /// Returns the number of points decoded. The cloud's point format must
+    /// match this reader's header format; if it doesn't, the cloud is
+    /// reinitialized to the reader's format and its existing contents are
+    /// discarded.
+    ///
+    /// This is the high-throughput entry point: it skips the per-point
+    /// [Point] materialization and instead fills the cloud's
+    /// underlying byte slab directly from the LAZ decompressor (or from the
+    /// raw reader, for uncompressed files).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{Reader, PointCloud};
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let mut cloud = PointCloud::new(
+    ///     *reader.header().point_format(),
+    ///     *reader.header().transforms(),
+    /// );
+    /// let n = reader.read_into_cloud(&mut cloud, 10).unwrap();
+    /// assert_eq!(n, 10);
+    /// assert_eq!(cloud.len(), 10);
+    /// ```
+    pub fn read_into_cloud(&mut self, cloud: &mut PointCloud, n: u64) -> Result<u64> {
+        let header_format = *self.point_reader.header().point_format();
+        let header_transforms = *self.point_reader.header().transforms();
+        if cloud.format() != &header_format {
+            *cloud = PointCloud::new(header_format, header_transforms);
+        }
+        self.point_reader.read_points_into_cloud(n, cloud)
+    }
+
+    /// Convenience: allocates and fills a new [PointCloud] holding every
+    /// remaining point in the file.
+    ///
+    /// For very large files, prefer [Reader::read_into_cloud] with a reused
+    /// [PointCloud] and a batch size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Reader;
+    /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
+    /// let cloud = reader.read_all_into_cloud().unwrap();
+    /// assert_eq!(cloud.len(), reader.header().number_of_points() as usize);
+    /// ```
+    pub fn read_all_into_cloud(&mut self) -> Result<PointCloud> {
+        let header_format = *self.point_reader.header().point_format();
+        let header_transforms = *self.point_reader.header().transforms();
+        let mut cloud = PointCloud::new(header_format, header_transforms);
+        let remaining = self.point_reader.header().number_of_points();
+        let _ = self
+            .point_reader
+            .read_points_into_cloud(remaining, &mut cloud)?;
+        Ok(cloud)
     }
 
     /// Reads a point.
