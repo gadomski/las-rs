@@ -26,6 +26,15 @@ pub enum Error {
     #[error("Entry referenced a page that is not present")]
     ReferencedPageMissingFromEvlr(crate::copc::Entry),
 
+    /// The byte buffer length is not a multiple of the point record length.
+    #[error("byte buffer length {len} is not a multiple of point record length {record_len}")]
+    InvalidCloudByteLength {
+        /// The buffer length.
+        len: usize,
+        /// The expected record length.
+        record_len: usize,
+    },
+
     /// The file signature is not LASF.
     #[error("the file signature is not 'LASF': {0:?}")]
     InvalidFileSignature([u8; 4]),

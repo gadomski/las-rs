@@ -30,7 +30,7 @@
 //! assert!(min_x <= max_x);
 //! ```
 
-use crate::{point::Format, Transform, Vector};
+use crate::{Point, Transform, Vector, point::Format, raw};
 
 /// Per-format byte offsets for fields that live at a format-dependent position
 /// within a record.
@@ -196,6 +196,52 @@ impl PointCloud {
         }
     }
 
+    /// Creates a point cloud by wrapping an existing byte buffer.
+    ///
+    /// The byte buffer must be a sequence of tightly-packed point records for
+    /// the given format — i.e. its length must be a multiple of the format's
+    /// record length. This is useful for callers that already have a
+    /// decompressed `Vec<u8>` in hand (custom decompressor, memory-mapped
+    /// region, received over the wire) and want to hand it over without an
+    /// extra allocation or copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCloudByteLength`](crate::Error::InvalidCloudByteLength)
+    /// if `bytes.len()` is not a multiple of the format's record length.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use las::{PointCloud, point::Format, Transform, Vector};
+    ///
+    /// let format = Format::new(0).unwrap();
+    /// let transforms: Vector<Transform> = Default::default();
+    /// let record_len = format.len() as usize;
+    /// let bytes = vec![0u8; record_len * 5];
+    /// let cloud = PointCloud::from_raw_bytes(format, transforms, bytes).unwrap();
+    /// assert_eq!(cloud.len(), 5);
+    /// ```
+    pub fn from_raw_bytes(
+        format: Format,
+        transforms: Vector<Transform>,
+        bytes: Vec<u8>,
+    ) -> crate::Result<Self> {
+        let offsets = Offsets::for_format(&format);
+        if offsets.record_len == 0 || !bytes.len().is_multiple_of(offsets.record_len) {
+            return Err(crate::Error::InvalidCloudByteLength {
+                len: bytes.len(),
+                record_len: offsets.record_len,
+            });
+        }
+        Ok(PointCloud {
+            bytes,
+            format,
+            transforms,
+            offsets,
+        })
+    }
+
     /// Returns the number of points currently held.
     pub fn len(&self) -> usize {
         if self.offsets.record_len == 0 {
@@ -250,13 +296,37 @@ impl PointCloud {
         }
     }
 
-    /// Iterates points row-by-row.
+    /// Iterates points row-by-row as zero-copy [PointRef] views.
     pub fn iter(&self) -> PointRefIter<'_> {
         PointRefIter {
             cloud: self,
             index: 0,
             len: self.len(),
         }
+    }
+
+    /// Iterates points as owned [Point] values, using the existing
+    /// `raw::Point::read_from` + `Point::new` pipeline.
+    ///
+    /// This bridges the byte-slab API back to the rich [Point] struct for
+    /// callers that need owned, field-unpacked points. Each point incurs the
+    /// same per-point cost as [Reader::read_points_into](crate::Reader::read_points_into),
+    /// so prefer [PointCloud::iter] when zero-copy access suffices.
+    pub fn points(&self) -> impl Iterator<Item = crate::Result<Point>> + '_ {
+        let mut cursor = std::io::Cursor::new(&self.bytes);
+        let format = self.format;
+        let transforms = self.transforms;
+        (0..self.len()).map(move |_| {
+            raw::Point::read_from(&mut cursor, &format)
+                .map(|raw_point| Point::new(raw_point, &transforms))
+        })
+    }
+
+    /// Collects all points as owned [Point] values.
+    ///
+    /// Shorthand for `self.points().collect::<Result<Vec<_>, _>>()`.
+    pub fn to_points(&self) -> crate::Result<Vec<Point>> {
+        self.points().collect()
     }
 
     /// Raw scaled x values (little-endian i32 loads from the x column).
@@ -405,8 +475,13 @@ impl PointCloud {
     }
 
     /// Returns a mutable view of the underlying byte buffer, resized to hold
-    /// exactly `n` points. Intended for internal use by the reader fast paths.
-    pub(crate) fn resize_for(&mut self, n: usize) -> &mut [u8] {
+    /// exactly `n` points.
+    ///
+    /// This is the primary entry point for callers that drive a decompressor
+    /// directly (e.g. against COPC chunks that bypass [Reader](crate::Reader)).
+    /// Call `resize_for`, decompress into the returned slice, and then use the
+    /// cloud's accessors as usual.
+    pub fn resize_for(&mut self, n: usize) -> &mut [u8] {
         let new_len = n.checked_mul(self.offsets.record_len).expect("overflow");
         self.bytes.resize(new_len, 0u8);
         &mut self.bytes
@@ -888,6 +963,95 @@ mod tests {
             let rp = raw::Point::read_from(&mut cursor, &format).unwrap();
             assert_eq!(rp.x, i as i32);
             assert_eq!(rp.intensity, 1000 + i as u16);
+        }
+    }
+
+    #[test]
+    fn from_raw_bytes_valid() {
+        let format = Format::new(1).unwrap();
+        let transforms = default_transforms();
+        let record_len = format.len() as usize;
+        // Build 3 records via the writer.
+        let mut buf = Vec::new();
+        for i in 0..3 {
+            let rp = build_raw_point(&format, i);
+            rp.write_to(&mut buf, &format).unwrap();
+        }
+        assert_eq!(buf.len(), record_len * 3);
+        let cloud = PointCloud::from_raw_bytes(format, transforms, buf).unwrap();
+        assert_eq!(cloud.len(), 3);
+        assert_eq!(cloud.point(0).x_raw(), 0);
+        assert_eq!(cloud.point(2).x_raw(), 2);
+    }
+
+    #[test]
+    fn from_raw_bytes_rejects_bad_length() {
+        let format = Format::new(0).unwrap();
+        let transforms = default_transforms();
+        let record_len = format.len() as usize;
+        // One byte short of a full record.
+        let buf = vec![0u8; record_len * 2 + 1];
+        assert!(PointCloud::from_raw_bytes(format, transforms, buf).is_err());
+    }
+
+    #[test]
+    fn from_raw_bytes_accepts_empty() {
+        let format = Format::new(0).unwrap();
+        let transforms = default_transforms();
+        let cloud = PointCloud::from_raw_bytes(format, transforms, Vec::new()).unwrap();
+        assert!(cloud.is_empty());
+    }
+
+    #[test]
+    fn resize_for_and_fill() {
+        let format = Format::new(1).unwrap();
+        let transforms = default_transforms();
+        let mut cloud = PointCloud::new(format, transforms);
+        // Write 2 records into a separate buffer.
+        let mut buf = Vec::new();
+        for i in 0..2 {
+            build_raw_point(&format, i).write_to(&mut buf, &format).unwrap();
+        }
+        let slab = cloud.resize_for(2);
+        slab.copy_from_slice(&buf);
+        assert_eq!(cloud.len(), 2);
+        assert_eq!(cloud.point(0).x_raw(), 0);
+        assert_eq!(cloud.point(1).x_raw(), 1);
+    }
+
+    #[test]
+    fn points_bridge_matches_point_ref() {
+        let format = Format::new(1).unwrap();
+        let cloud = build_cloud_for_format(format);
+        let owned: Vec<Point> = cloud.to_points().unwrap();
+        assert_eq!(owned.len(), cloud.len());
+        for (owned_pt, ref_pt) in owned.iter().zip(cloud.iter()) {
+            assert!((owned_pt.x - ref_pt.x()).abs() < 1e-12);
+            assert!((owned_pt.y - ref_pt.y()).abs() < 1e-12);
+            assert!((owned_pt.z - ref_pt.z()).abs() < 1e-12);
+            assert_eq!(owned_pt.intensity, ref_pt.intensity());
+            assert_eq!(owned_pt.return_number, ref_pt.return_number());
+            assert_eq!(owned_pt.number_of_returns, ref_pt.number_of_returns());
+            assert_eq!(owned_pt.user_data, ref_pt.user_data());
+            assert_eq!(owned_pt.point_source_id, ref_pt.point_source_id());
+            assert_eq!(owned_pt.gps_time, ref_pt.gps_time());
+        }
+    }
+
+    #[test]
+    fn points_bridge_extended_format() {
+        let format = Format::new(7).unwrap();
+        let cloud = build_cloud_for_format(format);
+        let owned: Vec<Point> = cloud.to_points().unwrap();
+        assert_eq!(owned.len(), cloud.len());
+        for (owned_pt, ref_pt) in owned.iter().zip(cloud.iter()) {
+            assert!((owned_pt.x - ref_pt.x()).abs() < 1e-12);
+            assert_eq!(owned_pt.intensity, ref_pt.intensity());
+            assert_eq!(owned_pt.scanner_channel, ref_pt.scanner_channel());
+            assert_eq!(
+                owned_pt.color.map(|c| (c.red, c.green, c.blue)),
+                ref_pt.rgb()
+            );
         }
     }
 }
