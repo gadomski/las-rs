@@ -139,20 +139,9 @@ impl Format {
     /// assert_eq!(28, format.len());
     /// ```
     pub fn len(&self) -> u16 {
-        let mut len = if self.is_extended { 22 } else { 20 } + self.extra_bytes;
-        if self.has_gps_time {
-            len += 8;
-        }
-        if self.has_color {
-            len += 6;
-        }
-        if self.has_nir {
-            len += 2;
-        }
-        if self.has_waveform {
-            len += 29;
-        }
-        len
+        crate::raw::point::fields(self)
+            .map(|f| f.size(self))
+            .sum::<usize>() as u16
     }
 
     /// Converts this point format to a u8.

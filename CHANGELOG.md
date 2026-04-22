@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `read_points_into` + `Vec<Point>` loop (3.53 s → 1.70 s). The `Point` /
   `read_points_into` API is unchanged.
 
+### Fixed
+
+- Point format 10 on-disk field order: the old `raw::Point::read_from`
+  expected `gps_time → color → waveform → nir`, while `raw::Point::write_to`
+  and `Format::len()` used the LAS 1.4 spec order of
+  `gps_time → color → nir → waveform`. The three paths have been unified
+  through a single schema (`raw::point::fields`) and now all follow the spec
+  order. Format-10 files written by older versions of `las-rs` will
+  round-trip correctly through those same versions, but will be read
+  incorrectly by this version; files written by spec-compliant writers
+  (PDAL, LAStools, `laszip`) were always correct and are now read correctly.
+  Formats 0–9 are unaffected.
+
 ## [0.9.11](https://github.com/gadomski/las-rs/compare/v0.9.10...v0.9.11) - 2026-04-07
 
 ### Fixed
