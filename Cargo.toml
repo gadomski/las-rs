@@ -37,9 +37,8 @@ name = "roundtrip"
 harness = false
 
 [[bench]]
-name = "point_cloud"
+name = "points"
 harness = false
-required-features = ["laz"]
 
 [package.metadata.docs.rs]
 all-features = true

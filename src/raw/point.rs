@@ -314,6 +314,89 @@ pub enum ScanAngle {
     Scaled(i16),
 }
 
+/// Byte offsets of each field within a packed point record.
+///
+/// This is the single source of truth for the on-disk field layout. Both the
+/// sequential reader in [`Point::read_from`] and the byte-slab column accessors
+/// in [`crate::Points`] derive their field positions from here so that the
+/// layout is described once.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Layout {
+    /// Offset of the `user_data` byte.
+    pub user_data: usize,
+    /// Offset of the scan angle field (i8 for legacy, i16 for extended).
+    pub scan_angle: usize,
+    /// Offset of the `point_source_id` u16.
+    pub point_source_id: usize,
+    /// Offset of the gps_time f64, if the format has one.
+    pub gps_time: Option<usize>,
+    /// Offset of the RGB triple, if the format has color.
+    pub rgb: Option<usize>,
+    /// Offset of the NIR u16, if the format has NIR.
+    pub nir: Option<usize>,
+    /// Total record length in bytes.
+    pub record_len: usize,
+}
+
+impl Layout {
+    /// Computes the byte layout for a given point format.
+    ///
+    /// The ordering mirrors [`Point::read_from`]: x/y/z/intensity, then flags
+    /// (1 or 2 bytes after the two-byte intensity for legacy, 3 bytes for
+    /// extended), then the format-specific `user_data`/`scan_angle` pair, then
+    /// `point_source_id`, then optional `gps_time`, `color`, `waveform`, `nir`,
+    /// then extra bytes.
+    pub(crate) fn for_format(format: &Format) -> Self {
+        // x(4) + y(4) + z(4) + intensity(2) = 14
+        let mut off = 14usize;
+        // flags: 2 bytes for legacy, 3 bytes for extended.
+        off += if format.is_extended { 3 } else { 2 };
+        // legacy: scan_angle (i8) then user_data (u8).
+        // extended: user_data (u8) then scan_angle (i16).
+        let (user_data, scan_angle) = if format.is_extended {
+            let ud = off;
+            let sa = off + 1;
+            off += 3;
+            (ud, sa)
+        } else {
+            let sa = off;
+            let ud = off + 1;
+            off += 2;
+            (ud, sa)
+        };
+        let point_source_id = off;
+        off += 2;
+        let gps_time = format.has_gps_time.then(|| {
+            let g = off;
+            off += 8;
+            g
+        });
+        let rgb = format.has_color.then(|| {
+            let c = off;
+            off += 6;
+            c
+        });
+        if format.has_waveform {
+            off += 29;
+        }
+        let nir = format.has_nir.then(|| {
+            let n = off;
+            off += 2;
+            n
+        });
+        off += format.extra_bytes as usize;
+        Layout {
+            user_data,
+            scan_angle,
+            point_source_id,
+            gps_time,
+            rgb,
+            nir,
+            record_len: off,
+        }
+    }
+}
+
 /// These flags hold information about point classification, return number, and more.
 ///
 /// In point formats zero through five, two bytes are used to hold all of the information. Point

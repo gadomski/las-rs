@@ -46,7 +46,7 @@ mod laz_compression_test {
 
     fn compare_autzen_points(laz_points: Vec<las::Point>, las_points: Vec<las::Point>) {
         assert_eq!(laz_points.len(), las_points.len());
-        for (mut p_laz, p_las) in laz_points.into_iter().zip(las_points.into_iter()) {
+        for (mut p_laz, p_las) in laz_points.into_iter().zip(las_points) {
             p_laz.color = None; // The LAS file does not have colors
             assert_eq!(p_laz, p_las);
         }

@@ -9,16 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `PointCloud` and `PointRef`: a byte-slab point cloud API for
-  high-throughput bulk reads, with row-oriented and column-oriented accessors
-  over a single contiguous `Vec<u8>`. `Reader::read_into_cloud` and
-  `Reader::read_all_into_cloud` fill a cloud directly from the LAZ
-  decompressor or the raw reader, skipping per-point `Point` materialization.
-  This addresses the LAZ decompression throughput gap reported in
-  [#121](https://github.com/gadomski/las-rs/issues/121) — on a 167M-point LAZ
-  file with `laz-parallel`, `read_into_cloud` runs ~1.77× faster than
-  `read_points_into` for a 10M-point batch (722 ms → 408 ms). The existing
-  `Point` / `read_points_into` API is unchanged.
+- `Points`: a byte-slab point cloud API for high-throughput bulk reads, with
+  column-oriented accessors (`x`, `intensity`, `rgb`, …) over a single
+  contiguous `Vec<u8>`. Row iteration via `Points::iter()` goes through the
+  existing `raw::Point::read_from` + `Point::new` pipeline, so behavior matches
+  the single-point path. Constructed via `Points::from_reader(&mut reader, n)`,
+  `Points::read_all(&mut reader)`, `Points::from_raw_bytes(...)`, or
+  `Points::new(...)` + `Points::fill_from(&mut reader, n)` / `resize_for(n)`
+  for buffer reuse and callers driving their own decompressor (COPC). Skips
+  per-point `Point` materialization and fills the byte slab directly from the
+  LAZ decompressor or the raw reader. This addresses the LAZ decompression
+  throughput gap reported in
+  [#121](https://github.com/gadomski/las-rs/issues/121) — on a 42.7M-point
+  (159 MB) LAZ file with `laz-parallel`, reading every point and summing
+  x+y+z via `Points` column iterators runs ~2.08× faster than the equivalent
+  `read_points_into` + `Vec<Point>` loop (3.53 s → 1.70 s). The `Point` /
+  `read_points_into` API is unchanged.
 
 ## [0.9.11](https://github.com/gadomski/las-rs/compare/v0.9.10...v0.9.11) - 2026-04-07
 
