@@ -7,24 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release reshapes the public API around a new `PointData` type for
+byte-slab reads and writes. `Reader` becomes a factory that produces
+`PointData`; `PointData` is the container everything else operates on.
+Several breaking changes are involved — see below.
+
 ### Added
 
-- `Points`: a byte-slab point cloud API for high-throughput bulk reads, with
-  column-oriented accessors (`x`, `intensity`, `rgb`, …) over a single
-  contiguous `Vec<u8>`. Row iteration via `Points::iter()` goes through the
-  existing `raw::Point::read_from` + `Point::new` pipeline, so behavior matches
-  the single-point path. Constructed via `Points::from_reader(&mut reader, n)`,
-  `Points::read_all(&mut reader)`, `Points::from_raw_bytes(...)`, or
-  `Points::new(...)` + `Points::fill_from(&mut reader, n)` / `resize_for(n)`
-  for buffer reuse and callers driving their own decompressor (COPC). Skips
-  per-point `Point` materialization and fills the byte slab directly from the
-  LAZ decompressor or the raw reader. This addresses the LAZ decompression
+- `PointData`: a byte-slab point cloud holding a single contiguous
+  `Vec<u8>` of decompressed LAS records alongside the format and
+  coordinate transforms needed to decode them. Supports row iteration
+  as owned `Point` values via `PointData::points()` and column accessors
+  (`x`, `y`, `z`, `intensity`, `classification`, `rgb`, `nir`, …) that
+  sweep a single field without materializing a `Point`. Constructed by
+  `Reader::read_points(n)`, `Reader::read_all()`,
+  `Reader::fill_points(n, &mut pd)` for buffer reuse,
+  `PointData::from_raw_bytes(...)` to wrap an existing buffer, or
+  `PointData::new(...)` + `PointData::resize_for(n)` for callers driving
+  their own decompressor (e.g. COPC). Addresses the LAZ decompression
   throughput gap reported in
   [#121](https://github.com/gadomski/las-rs/issues/121) — on a 42.7M-point
   (159 MB) LAZ file with `laz-parallel`, reading every point and summing
-  x+y+z via `Points` column iterators runs ~2.08× faster than the equivalent
-  `read_points_into` + `Vec<Point>` loop (3.53 s → 1.70 s). The `Point` /
-  `read_points_into` API is unchanged.
+  x+y+z via column iterators runs ~2.08× faster than the equivalent
+  per-`Point` loop.
+- `PointData::from_points(&[Point], format, transforms)`: encodes an
+  existing `Vec<Point>` into a byte slab for bulk writing.
+- `Writer::write_points(&PointData)`: single-call bulk write of a byte
+  slab, skipping per-`Point` decode/encode round-trips. LAS-to-LAS
+  conversions become byte copies; LAZ involvement on either end uses
+  `compress_many` / `decompress_many` directly.
+- `Reader::read_all()`: convenience for reading every remaining point
+  into a fresh `PointData`.
+- `Reader::fill_points(n, &mut PointData)`: buffer-reuse fill for
+  chunked streaming over files that don't fit in memory.
+- `Header::add_point_data(&PointData)`: updates header stats (count,
+  per-return counts, bounds) from column scans without materializing any
+  `Point`.
+
+### Changed (breaking)
+
+- Per-`Point` iteration has moved from `Reader` to `PointData`. Load a
+  slab via `Reader::read_all()` (or `Reader::read_points(n)` /
+  `Reader::fill_points` for bounded memory) and iterate with
+  `PointData::points()`, which yields owned `Point` values through the
+  same `raw::Point::read_from` + `Point::new` pipeline the old
+  `Reader::points()` used.
+- `Reader::read_points(n)` now returns `Result<PointData>` (previously
+  `Result<Vec<Point>>`).
+- `Writer::write_points` now takes `&PointData` instead of `&[Point]`,
+  mirroring `Reader::read_points`. For callers building points
+  programmatically, use `PointData::from_points` to construct a slab
+  first, or loop over `Writer::write_point`.
+
+### Removed (breaking)
+
+- `Reader::read_point()`, `Reader::points()`, and the `PointIterator`
+  type — replaced by the `PointData::points()` flow described above.
+- `Reader::read_points_into(n, &mut Vec<Point>)`: use
+  `Reader::read_points(n)`, which now returns a `PointData`.
+- `Reader::read_all_points_into(&mut Vec<Point>)`: use `Reader::read_all()`.
+- Deprecated `las::Read` and `las::Write` traits plus their
+  `Reader::{read, read_n, read_n_into, read_all_points}` /
+  `Writer::write` inherent methods (deprecated since 0.9.0).
 
 ### Fixed
 
