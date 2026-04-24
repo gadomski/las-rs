@@ -11,7 +11,7 @@ fn roundtrip(npoints: usize) {
         writer.write_point(Point::default()).unwrap();
     }
     let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
-    for point in reader.points() {
+    for point in reader.read_all().unwrap().points() {
         let _ = point.unwrap();
     }
 }

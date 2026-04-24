@@ -62,27 +62,11 @@ where
             .map_err(Error::from)
     }
 
-    fn write_points(&mut self, points: &[Point]) -> Result<()> {
-        if points.is_empty() {
-            return Ok(());
-        }
-
-        let current_cap = self.buffer.get_ref().capacity();
-        let necessary_cap = self.header.point_format().len() as usize * points.len();
-        if necessary_cap > current_cap {
-            self.buffer.get_mut().reserve(necessary_cap - current_cap);
-        }
-        self.buffer.set_position(0);
-
-        for point in points.iter().cloned() {
-            self.header.add_point(&point);
-            let raw_point = point.into_raw(self.header.transforms())?;
-            raw_point.write_to(&mut self.buffer, self.header.point_format())?;
-        }
-
-        let len = self.buffer.position() as usize;
-        let buffer = &self.buffer.get_ref()[..len];
-        self.compressor.compress_many(buffer)?;
+    fn write_bytes(&mut self, bytes: &[u8], _point_count: u64) -> Result<()> {
+        // Header stats were updated by the caller. Hand the raw
+        // decompressed point bytes to the LAZ compressor in one batch —
+        // this is where parallel compression pays off for large slabs.
+        self.compressor.compress_many(bytes)?;
         Ok(())
     }
 

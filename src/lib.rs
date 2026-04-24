@@ -28,20 +28,13 @@
 //!
 //! ## Read points
 //!
-//! Read points one-by-one with [Reader::read]:
+//! Read into a [PointData] and iterate with [PointData::points]:
 //!
 //! ```
 //! use las::Reader;
 //! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-//! let point = reader.read().unwrap().unwrap();
-//! ```
-//!
-//! Or iterate over all points with [Reader::points]:
-//!
-//! ```
-//! use las::Reader;
-//! let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-//! for wrapped_point in reader.points() {
+//! let pd = reader.read_all().unwrap();
+//! for wrapped_point in pd.points() {
 //!     let point = wrapped_point.unwrap();
 //!     println!("Point coordinates: ({}, {}, {})", point.x, point.y, point.z);
 //!     if let Some(color) = point.color {
@@ -53,6 +46,10 @@
 //!     }
 //! }
 //! ```
+//!
+//! For large files that don't fit in memory, read in chunks and reuse a
+//! [PointData] buffer across iterations — see [Reader::read_points] and
+//! [Reader::fill_points].
 //!
 //! # Writing
 //!
@@ -99,10 +96,10 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Write, Writer, Point};
+//! use las::{Writer, Point};
 //! let mut writer = Writer::default();
 //! let point = Point { x: 1., y: 2., z: 3., ..Default::default() };
-//! writer.write(point).unwrap();
+//! writer.write_point(point).unwrap();
 //! ```
 //!
 //! # Compression
@@ -189,6 +186,7 @@ mod bounds;
 mod color;
 mod error;
 mod gps_time_type;
+mod point_data;
 mod transform;
 mod utils;
 mod vector;
@@ -204,6 +202,7 @@ pub use crate::{
     gps_time_type::GpsTimeType,
     header::{Builder, Header},
     point::Point,
+    point_data::{PointData, PointDataIter},
     reader::{Reader, ReaderOptions},
     transform::Transform,
     vector::Vector,
@@ -213,8 +212,6 @@ pub use crate::{
 };
 #[cfg(feature = "laz")]
 pub use reader::LazParallelism;
-#[allow(deprecated)]
-pub use {reader::Read, writer::Write};
 
 /// Crate-specific result type.
 pub type Result<T> = std::result::Result<T, Error>;

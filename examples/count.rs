@@ -8,7 +8,7 @@ fn main() {
     let path = std::env::args()
         .nth(1)
         .expect("Must provide a path to a las file");
-    let mut reader = Reader::from_path(path).expect("Unable to open reader");
-    let npoints = reader.points().collect::<Vec<Result<_, _>>>().len();
+    let reader = Reader::from_path(path).expect("Unable to open reader");
+    let npoints = reader.header().number_of_points();
     println!("Number of points: {npoints}");
 }

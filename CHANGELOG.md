@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release reshapes the public API around a new `PointData` type for
+byte-slab reads and writes. `Reader` becomes a factory that produces
+`PointData`; `PointData` is the container everything else operates on.
+Several breaking changes are involved — see below.
+
+### Added
+
+- `PointData`: a byte-slab point cloud holding a single contiguous
+  `Vec<u8>` of decompressed LAS records alongside the format and
+  coordinate transforms needed to decode them. Supports row iteration
+  as owned `Point` values via `PointData::points()` and column accessors
+  (`x`, `y`, `z`, `intensity`, `classification`, `rgb`, `nir`, …) that
+  sweep a single field without materializing a `Point`. Constructed by
+  `Reader::read_points(n)`, `Reader::read_all()`,
+  `Reader::fill_points(n, &mut pd)` for buffer reuse,
+  `PointData::from_raw_bytes(...)` to wrap an existing buffer, or
+  `PointData::new(...)` + `PointData::resize_for(n)` for callers driving
+  their own decompressor (e.g. COPC). Addresses the LAZ decompression
+  throughput gap reported in
+  [#121](https://github.com/gadomski/las-rs/issues/121) — on a 42.7M-point
+  (159 MB) LAZ file with `laz-parallel`, reading every point and summing
+  x+y+z via column iterators runs ~2.08× faster than the equivalent
+  per-`Point` loop.
+- `PointData::from_points(&[Point], format, transforms)`: encodes an
+  existing `Vec<Point>` into a byte slab for bulk writing.
+- `Writer::write_points(&PointData)`: single-call bulk write of a byte
+  slab, skipping per-`Point` decode/encode round-trips. LAS-to-LAS
+  conversions become byte copies; LAZ involvement on either end uses
+  `compress_many` / `decompress_many` directly.
+- `Reader::read_all()`: convenience for reading every remaining point
+  into a fresh `PointData`.
+- `Reader::fill_points(n, &mut PointData)`: buffer-reuse fill for
+  chunked streaming over files that don't fit in memory.
+- `Header::add_point_data(&PointData)`: updates header stats (count,
+  per-return counts, bounds) from column scans without materializing any
+  `Point`.
+
+### Changed (breaking)
+
+- Per-`Point` iteration has moved from `Reader` to `PointData`. Load a
+  slab via `Reader::read_all()` (or `Reader::read_points(n)` /
+  `Reader::fill_points` for bounded memory) and iterate with
+  `PointData::points()`, which yields owned `Point` values through the
+  same `raw::Point::read_from` + `Point::new` pipeline the old
+  `Reader::points()` used.
+- `Reader::read_points(n)` now returns `Result<PointData>` (previously
+  `Result<Vec<Point>>`).
+- `Writer::write_points` now takes `&PointData` instead of `&[Point]`,
+  mirroring `Reader::read_points`. For callers building points
+  programmatically, use `PointData::from_points` to construct a slab
+  first, or loop over `Writer::write_point`.
+
+### Removed (breaking)
+
+- `Reader::read_point()`, `Reader::points()`, and the `PointIterator`
+  type — replaced by the `PointData::points()` flow described above.
+- `Reader::read_points_into(n, &mut Vec<Point>)`: use
+  `Reader::read_points(n)`, which now returns a `PointData`.
+- `Reader::read_all_points_into(&mut Vec<Point>)`: use `Reader::read_all()`.
+- Deprecated `las::Read` and `las::Write` traits plus their
+  `Reader::{read, read_n, read_n_into, read_all_points}` /
+  `Writer::write` inherent methods (deprecated since 0.9.0).
+
+### Fixed
+
+- Point format 10 on-disk field order: the old `raw::Point::read_from`
+  expected `gps_time → color → waveform → nir`, while `raw::Point::write_to`
+  and `Format::len()` used the LAS 1.4 spec order of
+  `gps_time → color → nir → waveform`. The three paths have been unified
+  through a single schema (`raw::point::fields`) and now all follow the spec
+  order. Format-10 files written by older versions of `las-rs` will
+  round-trip correctly through those same versions, but will be read
+  incorrectly by this version; files written by spec-compliant writers
+  (PDAL, LAStools, `laszip`) were always correct and are now read correctly.
+  Formats 0–9 are unaffected.
+
 ## [0.9.11](https://github.com/gadomski/las-rs/compare/v0.9.10...v0.9.11) - 2026-04-07
 
 ### Fixed

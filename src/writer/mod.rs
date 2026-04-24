@@ -13,7 +13,7 @@
 //!
 //! ```
 //! use std::io::Cursor;
-//! use las::{Builder, Write, Writer, Point};
+//! use las::{Builder, Writer, Point};
 //! use las::point::Format;
 //! use las::Color;
 //!
@@ -22,13 +22,13 @@
 //! let mut writer = Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap();
 //!
 //! let mut point = Point::default(); // default points don't have any optional attributes
-//! assert!(writer.write(point.clone()).is_err());
+//! assert!(writer.write_point(point.clone()).is_err());
 //!
 //! point.gps_time = Some(42.); // point format 1 requires gps time
-//! writer.write(point.clone()).unwrap();
+//! writer.write_point(point.clone()).unwrap();
 //!
 //! point.color = Some(Color::new(1, 2, 3));
-//! assert!(writer.write(point).is_err()); // the point's color would be lost
+//! assert!(writer.write_point(point).is_err()); // the point's color would be lost
 //! ```
 
 mod las;
@@ -37,7 +37,7 @@ mod laz;
 
 #[cfg(feature = "laz")]
 use crate::LazParallelism;
-use crate::{Error, Header, Point, Result};
+use crate::{Error, Header, Point, PointData, Result};
 use std::{
     fmt::Debug,
     fs::File,
@@ -47,12 +47,10 @@ use std::{
 
 trait WritePoint<W: std::io::Write>: Send {
     fn write_point(&mut self, point: Point) -> Result<()>;
-    fn write_points(&mut self, points: &[Point]) -> Result<()> {
-        for point in points.iter().cloned() {
-            self.write_point(point)?;
-        }
-        Ok(())
-    }
+    /// Writes a pre-encoded byte slab of `point_count` records directly
+    /// into the backend. Caller has already verified that the slab's
+    /// format + transforms match this writer.
+    fn write_bytes(&mut self, bytes: &[u8], point_count: u64) -> Result<()>;
     //https://users.rust-lang.org/t/is-there-a-way-to-move-a-trait-object/707
     fn into_inner(self: Box<Self>) -> W;
     fn get_mut(&mut self) -> &mut W;
@@ -65,6 +63,9 @@ struct ClosedPointWriter;
 
 impl<W: std::io::Write> WritePoint<W> for ClosedPointWriter {
     fn write_point(&mut self, _point: Point) -> Result<()> {
+        unreachable!()
+    }
+    fn write_bytes(&mut self, _bytes: &[u8], _point_count: u64) -> Result<()> {
         unreachable!()
     }
     fn into_inner(self: Box<Self>) -> W {
@@ -82,39 +83,6 @@ impl<W: std::io::Write> WritePoint<W> for ClosedPointWriter {
     fn done(&mut self) -> Result<()> {
         unreachable!()
     }
-}
-
-/// Writes LAS data.
-///
-/// See StdWriter for a concrete implementation.
-#[deprecated(
-    since = "0.9.0",
-    note = "This interface has been refactored so that importing Write is no longer required"
-)]
-pub trait Write {
-    /// Returns a reference to this writer's header.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use las::Writer;
-    /// let writer = Writer::default();
-    /// let header = writer.header();
-    /// ```
-    fn header(&self) -> &Header;
-
-    /// Writes a point
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use las::Writer;
-    ///
-    /// let mut writer = Writer::default();
-    /// writer.write(Default::default()).unwrap();
-    /// ```
-    fn write(&mut self, point: Point) -> Result<()>;
 }
 
 /// Options for Writer
@@ -350,28 +318,49 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
         self.point_writer.write_point(point)
     }
 
-    /// Writes all the points
-    pub fn write_points(&mut self, points: &[Point]) -> Result<()> {
+    /// Writes a pre-encoded [`PointData`] slab in a single batched call,
+    /// skipping the per-[`Point`] decode/encode round-trip.
+    ///
+    /// This is the bulk-write counterpart to
+    /// [`Reader::read_points`](crate::Reader::read_points) /
+    /// [`Reader::read_all`](crate::Reader::read_all): decoded bytes flow
+    /// from reader to writer without ever materializing a [`Point`].
+    /// Use this for copy-style workloads (convert, filter-by-bytes,
+    /// reshuffle chunks) over large files.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slab's point format or coordinate
+    /// transforms don't match this writer's header — slab bytes are only
+    /// valid for the exact schema they were decoded against.
+    pub fn write_points(&mut self, points: &PointData) -> Result<()> {
         if self.closed {
             return Err(Error::ClosedWriter);
         }
-
-        if points
-            .iter()
-            .any(|point| !point.matches(self.header().point_format()))
-        {
+        // Compare formats ignoring `is_compressed`: the slab's bytes are
+        // always the decompressed on-disk layout, independent of whether
+        // this Writer targets LAS or LAZ (that's a container-level bit,
+        // not a field-layout one).
+        let mut slab_fmt = *points.format();
+        slab_fmt.is_compressed = self.header().point_format().is_compressed;
+        if &slab_fmt != self.header().point_format() {
             return Err(Error::PointAttributesDoNotMatch(
                 *self.header().point_format(),
             ));
         }
-
-        self.point_writer.write_points(points)
-    }
-
-    /// Writes a point.
-    #[deprecated(since = "0.9.0", note = "Use write_point() instead")]
-    pub fn write(&mut self, point: Point) -> Result<()> {
-        self.write_point(point)
+        if points.transforms() != self.header().transforms() {
+            return Err(Error::PointAttributesDoNotMatch(
+                *self.header().point_format(),
+            ));
+        }
+        if points.is_empty() {
+            return Ok(());
+        }
+        // Update header stats once over the whole slab — no per-Point
+        // materialization.
+        self.point_writer.header_mut().add_point_data(points);
+        self.point_writer
+            .write_bytes(points.raw_bytes(), points.len() as u64)
     }
 
     /// Closes this writer and returns its inner `Write`, seeked to the beginning of the las data.
@@ -399,17 +388,6 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
         let mut inner = point_writer.into_inner();
         let _ = inner.seek(SeekFrom::Start(self.start))?;
         Ok(inner)
-    }
-}
-
-#[allow(deprecated)]
-impl<W: 'static + std::io::Write + Seek + Debug + Send + Sync> Write for Writer<W> {
-    fn header(&self) -> &Header {
-        self.header()
-    }
-
-    fn write(&mut self, point: Point) -> Result<()> {
-        self.write(point)
     }
 }
 
@@ -537,6 +515,8 @@ mod tests {
         let point = Point::default();
         writer.write_point(point.clone()).unwrap();
         let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
-        assert_eq!(point, reader.read_point().unwrap().unwrap());
+        let pd = reader.read_all().unwrap();
+        let got = pd.points().next().unwrap().unwrap();
+        assert_eq!(point, got);
     }
 }
