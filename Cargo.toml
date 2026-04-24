@@ -37,7 +37,7 @@ name = "roundtrip"
 harness = false
 
 [[bench]]
-name = "points"
+name = "point_vs_columns"
 harness = false
 
 [package.metadata.docs.rs]

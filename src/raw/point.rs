@@ -320,7 +320,7 @@ pub enum ScanAngle {
 /// piece of code that needs to know the point format's byte layout —
 /// [`Point::read_from`], [`Point::write_to`], [`Layout::for_format`], and
 /// [`Format::len`](crate::point::Format::len) — walks [`fields`] and matches
-/// on [`Field`] rather than re-encoding the schema inline.
+/// on [`Field`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Field {
     X,
@@ -378,7 +378,7 @@ impl Field {
 /// optional blocks gps_time → color → nir → waveform → extra_bytes.
 ///
 /// Callers iterate this and match on [`Field`] to read, write, or locate
-/// each field — the schema is described once, here.
+/// each field.
 pub(crate) fn fields(format: &Format) -> impl Iterator<Item = Field> + '_ {
     // Legacy formats pack scan_angle (i8) before user_data; extended formats
     // pack user_data before scan_angle (i16). Emit them in the right order.
@@ -451,7 +451,7 @@ impl Layout {
                 Field::GpsTime => layout.gps_time = Some(offset),
                 Field::Color => layout.rgb = Some(offset),
                 Field::Nir => layout.nir = Some(offset),
-                // Other fields' offsets are fixed or not needed by Points.
+                // Other fields' offsets are fixed or not needed by PointData.
                 Field::X
                 | Field::Y
                 | Field::Z

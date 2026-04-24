@@ -685,10 +685,12 @@ mod tests {
                 .unwrap();
             points
         };
-        let mut laz_points = Vec::new();
-        let _pnum = Reader::from_path("tests/data/autzen.copc.laz")
+        let laz_points: Vec<_> = Reader::from_path("tests/data/autzen.copc.laz")
             .unwrap()
-            .read_all_points_into(&mut laz_points)
+            .read_all()
+            .unwrap()
+            .points()
+            .collect::<Result<_>>()
             .unwrap();
         assert!(laz_points
             .iter()

@@ -61,8 +61,8 @@
 
 pub use self::builder::Builder;
 use crate::{
-    point::Format, raw, utils::FromLasStr, Bounds, Error, GpsTimeType, Point, Result, Transform,
-    Vector, Version, Vlr,
+    point::Format, raw, utils::FromLasStr, Bounds, Error, GpsTimeType, Point, PointData, Result,
+    Transform, Vector, Version, Vlr,
 };
 use chrono::{Datelike, NaiveDate, Utc};
 use std::{
@@ -246,6 +246,45 @@ impl Header {
             *entry += 1;
         }
         self.bounds.grow(point);
+    }
+
+    /// Updates the header stats from a whole [`PointData`] block in one
+    /// pass, without materializing any [`Point`].
+    ///
+    /// Equivalent to calling [`Header::add_point`] once per row but walks
+    /// the byte columns directly — cheap enough to run on millions of
+    /// records as part of a bulk-write path.
+    pub fn add_point_data(&mut self, points: &PointData) {
+        let n = points.len() as u64;
+        self.number_of_points += n;
+
+        for rn in points.return_number() {
+            if rn > 0 {
+                let entry = self.number_of_points_by_return.entry(rn).or_insert(0);
+                *entry += 1;
+            }
+        }
+
+        for ((x, y), z) in points.x().zip(points.y()).zip(points.z()) {
+            if x < self.bounds.min.x {
+                self.bounds.min.x = x;
+            }
+            if y < self.bounds.min.y {
+                self.bounds.min.y = y;
+            }
+            if z < self.bounds.min.z {
+                self.bounds.min.z = z;
+            }
+            if x > self.bounds.max.x {
+                self.bounds.max.x = x;
+            }
+            if y > self.bounds.max.y {
+                self.bounds.max.y = y;
+            }
+            if z > self.bounds.max.z {
+                self.bounds.max.z = z;
+            }
+        }
     }
 
     /// Returns this header's file source id.

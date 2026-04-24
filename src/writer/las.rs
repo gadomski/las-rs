@@ -21,6 +21,14 @@ impl<W: Write + Seek + Send> WritePoint<W> for PointWriter<W> {
             .and_then(|raw_point| raw_point.write_to(&mut self.write, self.header.point_format()))
     }
 
+    fn write_bytes(&mut self, bytes: &[u8], _point_count: u64) -> Result<()> {
+        // LAS is uncompressed — the slab's on-disk layout is byte-identical
+        // to what would come out of per-point encoding. Copy straight
+        // through; header stats were updated by the caller via
+        // `Header::add_point_data`.
+        self.write.write_all(bytes).map_err(Into::into)
+    }
+
     fn into_inner(self: Box<Self>) -> W {
         self.write
     }

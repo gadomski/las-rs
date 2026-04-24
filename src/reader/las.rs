@@ -1,5 +1,5 @@
 use super::ReadPoints;
-use crate::{raw, Header, Point, Points, Result};
+use crate::{Header, Result};
 use std::io::{Read, Seek, SeekFrom};
 
 pub(crate) struct PointReader<R: Read + Seek> {
@@ -21,41 +21,17 @@ impl<R: Read + Seek> PointReader<R> {
 }
 
 impl<R: Read + Seek> ReadPoints for PointReader<R> {
-    fn read_point(&mut self) -> Result<Option<Point>> {
-        if self.index < self.header.number_of_points() {
-            self.index += 1;
-            raw::Point::read_from(&mut self.read, self.header.point_format())
-                .map(|p| Point::new(p, self.header.transforms()))
-                .map(Some)
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn read_points(&mut self, n: u64, points: &mut Vec<Point>) -> Result<u64> {
-        let points_left = self.header.number_of_points() - self.index;
-        let n = points_left.min(n);
-        if let Ok(n) = usize::try_from(n) {
-            points.reserve(n);
-        }
-        let mut count = 0;
-        for _ in 0..n {
-            if let Some(point) = self.read_point()? {
-                points.push(point);
-                count += 1;
-            } else {
-                break;
-            }
-        }
-        Ok(count)
-    }
-
-    fn read_into_points(&mut self, n: u64, points: &mut Points) -> Result<u64> {
+    fn fill_into_bytes(
+        &mut self,
+        n: u64,
+        out: &mut Vec<u8>,
+        record_len: usize,
+    ) -> Result<u64> {
         let points_left = self.header.number_of_points() - self.index;
         let n = points_left.min(n);
         let n_usize = usize::try_from(n)?;
-        let slab = points.resize_for(n_usize);
-        self.read.read_exact(slab)?;
+        out.resize(n_usize * record_len, 0u8);
+        self.read.read_exact(out)?;
         self.index += n;
         Ok(n)
     }

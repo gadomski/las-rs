@@ -22,7 +22,12 @@ mod laz_compression_test {
     /// compare that points are the same
     fn test_compression_does_not_corrupt(path: &str) {
         let mut reader = las::Reader::from_path(path).expect("Cannot open reader");
-        let points: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
+        let points: Vec<las::Point> = reader
+            .read_all()
+            .unwrap()
+            .points()
+            .map(|r| r.unwrap())
+            .collect();
 
         let mut header_builder = las::Builder::from(reader.header().version());
         header_builder.point_format = *reader.header().point_format();
@@ -39,7 +44,12 @@ mod laz_compression_test {
         let cursor = writer.into_inner().unwrap();
 
         let mut reader = las::Reader::new(cursor).unwrap();
-        let points_2: Vec<las::Point> = reader.points().map(|r| r.unwrap()).collect();
+        let points_2: Vec<las::Point> = reader
+            .read_all()
+            .unwrap()
+            .points()
+            .map(|r| r.unwrap())
+            .collect();
 
         assert_eq!(points, points_2);
     }
@@ -62,11 +72,18 @@ mod laz_compression_test {
 
         let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
 
-        let mut laz_vec = Vec::new();
-        laz_reader.read_all_points_into(&mut laz_vec).unwrap();
-
-        let mut las_vec = Vec::new();
-        las_reader.read_all_points_into(&mut las_vec).unwrap();
+        let laz_vec: Vec<_> = laz_reader
+            .read_all()
+            .unwrap()
+            .points()
+            .collect::<las::Result<_>>()
+            .unwrap();
+        let las_vec: Vec<_> = las_reader
+            .read_all()
+            .unwrap()
+            .points()
+            .collect::<las::Result<_>>()
+            .unwrap();
 
         compare_autzen_points(laz_vec, las_vec);
     }
@@ -83,11 +100,18 @@ mod laz_compression_test {
 
             let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
 
-            let mut laz_vec = Vec::new();
-            laz_reader.read_all_points_into(&mut laz_vec).unwrap();
-
-            let mut las_vec = Vec::new();
-            las_reader.read_all_points_into(&mut las_vec).unwrap();
+            let laz_vec: Vec<_> = laz_reader
+                .read_all()
+                .unwrap()
+                .points()
+                .collect::<las::Result<_>>()
+                .unwrap();
+            let las_vec: Vec<_> = las_reader
+                .read_all()
+                .unwrap()
+                .points()
+                .collect::<las::Result<_>>()
+                .unwrap();
 
             compare_autzen_points(laz_vec, las_vec);
         }
@@ -101,11 +125,18 @@ mod laz_compression_test {
 
             let mut las_reader = las::Reader::from_path("tests/data/autzen.las").unwrap();
 
-            let mut laz_vec = Vec::new();
-            laz_reader.read_all_points_into(&mut laz_vec).unwrap();
-
-            let mut las_vec = Vec::new();
-            las_reader.read_all_points_into(&mut las_vec).unwrap();
+            let laz_vec: Vec<_> = laz_reader
+                .read_all()
+                .unwrap()
+                .points()
+                .collect::<las::Result<_>>()
+                .unwrap();
+            let las_vec: Vec<_> = las_reader
+                .read_all()
+                .unwrap()
+                .points()
+                .collect::<las::Result<_>>()
+                .unwrap();
 
             compare_autzen_points(laz_vec, las_vec);
         }
@@ -118,22 +149,34 @@ mod laz_compression_test {
 
         // Read some original data
         let original_path = "./tests/data/autzen.las";
-        let mut original_points = vec![];
         let mut reader = las::Reader::from_path(original_path).unwrap();
-        let _ = reader.read_all_points_into(&mut original_points).unwrap();
+        let original_points: Vec<_> = reader
+            .read_all()
+            .unwrap()
+            .points()
+            .collect::<las::Result<_>>()
+            .unwrap();
 
         let mut builder = las::Builder::from(reader.header().clone());
         builder.point_format.is_compressed = true;
         let header = builder.into_header().unwrap();
 
-        // Write it compressed, with parallelism enabled
+        // Write it compressed, with parallelism enabled. Round-trip the
+        // two halves through PointData so we exercise the batched
+        // `write_points` path against the parallel LAZ compressor.
         let output = Cursor::new(vec![]);
         let options = WriterOptions::default().with_laz_parallelism(LazParallelism::Yes);
-        let mut writer = Writer::with_options(output, header, options).unwrap();
+        let mut writer = Writer::with_options(output, header.clone(), options).unwrap();
         let mid = original_points.len() / 2;
         let (first_half, second_half) = original_points.split_at(mid);
-        writer.write_points(first_half).unwrap();
-        writer.write_points(second_half).unwrap();
+        let format = *header.point_format();
+        let transforms = *header.transforms();
+        let first_pd =
+            las::PointData::from_points(first_half, format, transforms).unwrap();
+        let second_pd =
+            las::PointData::from_points(second_half, format, transforms).unwrap();
+        writer.write_points(&first_pd).unwrap();
+        writer.write_points(&second_pd).unwrap();
         writer.close().unwrap();
 
         // Check that the header was properly updated when writing
@@ -146,9 +189,13 @@ mod laz_compression_test {
 
         // Read what we wrote and compare to original points
         let written_bytes = writer.into_inner().unwrap();
-        let mut points = vec![];
         let mut reader = las::Reader::new(written_bytes).unwrap();
-        let _ = reader.read_all_points_into(&mut points).unwrap();
+        let points: Vec<_> = reader
+            .read_all()
+            .unwrap()
+            .points()
+            .collect::<las::Result<_>>()
+            .unwrap();
 
         assert_eq!(points, original_points);
     }

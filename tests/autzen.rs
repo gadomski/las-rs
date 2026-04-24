@@ -13,7 +13,7 @@ macro_rules! autzen {
                 builder.version = Version::new($major, $minor);
                 let mut writer =
                     Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap();
-                for point in reader.points() {
+                for point in reader.read_all().unwrap().points() {
                     writer.write_point(point.unwrap()).unwrap();
                 }
                 writer.close().unwrap();
@@ -31,28 +31,25 @@ autzen!(las_1_4, 1, 4);
 fn test_seek_0_works_on(path: &str) {
     use las::Reader;
     let mut reader = Reader::from_path(path).unwrap();
-    let _p1 = reader.read_point().unwrap().unwrap();
+    assert_eq!(reader.read_points(1).unwrap().len(), 1);
     reader.seek(0).unwrap();
-    let _p3 = reader.read_point().unwrap().unwrap();
+    assert_eq!(reader.read_points(1).unwrap().len(), 1);
 }
 
 fn test_seek_to_last_point_works_on(path: &str) {
     use las::Reader;
     let mut reader = Reader::from_path(path).unwrap();
-    let _p1 = reader.read_point().unwrap().unwrap();
+    assert_eq!(reader.read_points(1).unwrap().len(), 1);
     reader.seek(reader.header().number_of_points() - 1).unwrap();
-    let res = reader.read_point();
-    assert!(res.is_ok());
-    assert!(res.unwrap().is_some());
+    assert_eq!(reader.read_points(1).unwrap().len(), 1);
 }
 
 fn test_seek_past_last_point_works_on(path: &str) {
     use las::Reader;
     let mut reader = Reader::from_path(path).unwrap();
-    let _p1 = reader.read_point().unwrap().unwrap();
+    assert_eq!(reader.read_points(1).unwrap().len(), 1);
     reader.seek(reader.header().number_of_points()).unwrap();
-    let res = reader.read_point().unwrap();
-    assert!(res.is_none());
+    assert!(reader.read_points(1).unwrap().is_empty());
 }
 
 #[test]
@@ -114,6 +111,8 @@ fn test_read_points_on(path: &str) {
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
         ground_truth_reader
+            .read_all()
+            .unwrap()
             .points()
             .collect::<las::Result<Vec<Point>>>()
             .unwrap()
@@ -123,22 +122,26 @@ fn test_read_points_on(path: &str) {
     let n = 7;
     let mut all_points = Vec::with_capacity(reader.header().number_of_points() as usize);
     loop {
-        let mut points = reader.read_points(n).unwrap();
-        if points.is_empty() {
+        let pd = reader.read_points(n).unwrap();
+        if pd.is_empty() {
             break;
         }
-        all_points.append(&mut points);
+        for p in pd.points() {
+            all_points.push(p.unwrap());
+        }
     }
 
     assert_eq!(all_points, ground_truth_points);
 }
 
-fn test_read_points_into_on(path: &str) {
-    use las::{Point, Reader};
+fn test_fill_points_on(path: &str) {
+    use las::{Point, PointData, Reader};
 
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
         ground_truth_reader
+            .read_all()
+            .unwrap()
             .points()
             .collect::<las::Result<Vec<Point>>>()
             .unwrap()
@@ -147,9 +150,14 @@ fn test_read_points_into_on(path: &str) {
     let mut reader = Reader::from_path(path).unwrap();
     let n = 7;
     let mut all_points = Vec::with_capacity(reader.header().number_of_points() as usize);
-    let mut points_buffer = Vec::with_capacity(n as usize);
-    while reader.read_points_into(n, &mut points_buffer).unwrap() != 0 {
-        all_points.append(&mut points_buffer);
+    let mut buffer = PointData::new(
+        *reader.header().point_format(),
+        *reader.header().transforms(),
+    );
+    while reader.fill_points(n, &mut buffer).unwrap() != 0 {
+        for p in buffer.points() {
+            all_points.push(p.unwrap());
+        }
     }
 
     assert_eq!(all_points, ground_truth_points);
@@ -173,54 +181,59 @@ fn test_copc_read_n() {
 }
 
 #[test]
-fn test_las_read_n_into() {
-    test_read_points_into_on("tests/data/autzen.las");
+fn test_las_fill_points() {
+    test_fill_points_on("tests/data/autzen.las");
 }
 
 #[cfg(feature = "laz")]
 #[test]
-fn test_laz_read_n_into() {
-    test_read_points_into_on("tests/data/autzen.laz");
+fn test_laz_fill_points() {
+    test_fill_points_on("tests/data/autzen.laz");
 }
 
 #[cfg(feature = "laz")]
 #[test]
-fn test_copc_read_n_into() {
-    test_read_points_into_on("tests/data/autzen.copc.laz");
+fn test_copc_fill_points() {
+    test_fill_points_on("tests/data/autzen.copc.laz");
 }
 
-fn test_read_all_points_into_on(path: &str) {
+fn test_read_all_on(path: &str) {
     use las::{Point, Reader};
 
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
         ground_truth_reader
+            .read_all()
+            .unwrap()
             .points()
             .collect::<las::Result<Vec<Point>>>()
             .unwrap()
     };
 
     let mut reader = Reader::from_path(path).unwrap();
-    let mut all_points = vec![];
-    reader.read_all_points_into(&mut all_points).unwrap();
+    let pd = reader.read_all().unwrap();
+    let all_points: Vec<Point> = pd
+        .points()
+        .collect::<las::Result<Vec<Point>>>()
+        .unwrap();
     assert_eq!(all_points, ground_truth_points);
 }
 
 #[test]
-fn test_las_read_all_points() {
-    test_read_all_points_into_on("tests/data/autzen.las");
+fn test_las_read_all() {
+    test_read_all_on("tests/data/autzen.las");
 }
 
 #[cfg(feature = "laz")]
 #[test]
-fn test_laz_read_all_points() {
-    test_read_all_points_into_on("tests/data/autzen.laz");
+fn test_laz_read_all() {
+    test_read_all_on("tests/data/autzen.laz");
 }
 
 #[cfg(feature = "laz")]
 #[test]
-fn test_copc_read_all_points() {
-    test_read_all_points_into_on("tests/data/autzen.copc.laz");
+fn test_copc_read_all() {
+    test_read_all_on("tests/data/autzen.copc.laz");
 }
 
 #[cfg(feature = "laz-parallel")]
@@ -232,6 +245,6 @@ fn test_seek_to_zero() {
     // https://github.com/gadomski/las-rs/issues/125
     let file = File::open("tests/data/autzen.copc.laz").unwrap();
     let mut reader = Reader::new(file).unwrap();
-    for _ in reader.read_points(1_000).unwrap() {}
+    for _ in reader.read_points(1_000).unwrap().points() {}
     reader.seek(0).unwrap();
 }
