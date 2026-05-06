@@ -212,10 +212,7 @@ fn test_read_all_on(path: &str) {
 
     let mut reader = Reader::from_path(path).unwrap();
     let pd = reader.read_all().unwrap();
-    let all_points: Vec<Point> = pd
-        .points()
-        .collect::<las::Result<Vec<Point>>>()
-        .unwrap();
+    let all_points: Vec<Point> = pd.points().collect::<las::Result<Vec<Point>>>().unwrap();
     assert_eq!(all_points, ground_truth_points);
 }
 

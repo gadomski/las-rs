@@ -73,12 +73,7 @@ trait ReadPoints {
     /// Resizes `out` to `n * record_len` bytes and fills it with up to `n`
     /// raw point records. Returns the number of points actually read
     /// (never more than `n`, limited by remaining points in the file).
-    fn fill_into_bytes(
-        &mut self,
-        n: u64,
-        out: &mut Vec<u8>,
-        record_len: usize,
-    ) -> Result<u64>;
+    fn fill_into_bytes(&mut self, n: u64, out: &mut Vec<u8>, record_len: usize) -> Result<u64>;
     fn seek(&mut self, index: u64) -> Result<()>;
     fn header(&self) -> &Header;
 }
@@ -96,7 +91,14 @@ pub enum LazParallelism {
 
 /// Options for Reader.
 ///
-/// Currently, the only option is the selection of LAZ parallelism via [LazParallelism].
+#[cfg_attr(
+    feature = "laz",
+    doc = "Currently, the only option is the selection of LAZ parallelism via [`LazParallelism`]."
+)]
+#[cfg_attr(
+    not(feature = "laz"),
+    doc = "Currently, the only option is the selection of LAZ parallelism via `LazParallelism`."
+)]
 /// This option requires the `laz` feature to be enabled (and to use parallelism, the `laz-parallel`
 /// feature must also be enabled)
 /// By default, if the `laz-parallel` feature is enabled, parallelism will be the default choice
@@ -242,7 +244,7 @@ impl Reader {
     ///
     /// The returned [`PointData`] contains the next `n` points (or fewer
     /// if the file is exhausted), with this reader's format and coordinate
-    /// transforms. Use [`PointData::points`] to walk it as owned [`Point`]
+    /// transforms. Use [`PointData::points`] to walk it as owned [`Point`](crate::Point)
     /// values, or the column accessors ([`PointData::x`],
     /// [`PointData::intensity`], …) for bulk field extraction.
     ///
@@ -328,7 +330,6 @@ impl Reader {
         self.point_reader.seek(position)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

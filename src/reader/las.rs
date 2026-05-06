@@ -21,12 +21,7 @@ impl<R: Read + Seek> PointReader<R> {
 }
 
 impl<R: Read + Seek> ReadPoints for PointReader<R> {
-    fn fill_into_bytes(
-        &mut self,
-        n: u64,
-        out: &mut Vec<u8>,
-        record_len: usize,
-    ) -> Result<u64> {
+    fn fill_into_bytes(&mut self, n: u64, out: &mut Vec<u8>, record_len: usize) -> Result<u64> {
         let points_left = self.header.number_of_points() - self.index;
         let n = points_left.min(n);
         let n_usize = usize::try_from(n)?;

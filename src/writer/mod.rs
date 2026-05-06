@@ -87,7 +87,14 @@ impl<W: std::io::Write> WritePoint<W> for ClosedPointWriter {
 
 /// Options for Writer
 ///
-/// Currently, the only option is the selection of LAZ parallelism via [LazParallelism].
+#[cfg_attr(
+    feature = "laz",
+    doc = "Currently, the only option is the selection of LAZ parallelism via [`LazParallelism`]."
+)]
+#[cfg_attr(
+    not(feature = "laz"),
+    doc = "Currently, the only option is the selection of LAZ parallelism via `LazParallelism`."
+)]
 /// This option requires the `laz` feature to be enabled (and to use parallelism, the `laz-parallel`
 /// feature must also be enabled).
 /// Using parallel writing will speedup compression when writing points in batch, at the cost

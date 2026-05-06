@@ -171,10 +171,8 @@ mod laz_compression_test {
         let (first_half, second_half) = original_points.split_at(mid);
         let format = *header.point_format();
         let transforms = *header.transforms();
-        let first_pd =
-            las::PointData::from_points(first_half, format, transforms).unwrap();
-        let second_pd =
-            las::PointData::from_points(second_half, format, transforms).unwrap();
+        let first_pd = las::PointData::from_points(first_half, format, transforms).unwrap();
+        let second_pd = las::PointData::from_points(second_half, format, transforms).unwrap();
         writer.write_points(&first_pd).unwrap();
         writer.write_points(&second_pd).unwrap();
         writer.close().unwrap();

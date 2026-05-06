@@ -18,9 +18,7 @@ use las::Reader;
 use std::{collections::BTreeMap, env};
 
 fn main() {
-    let input = env::args()
-        .nth(1)
-        .expect("usage: columns <input.las|laz>");
+    let input = env::args().nth(1).expect("usage: columns <input.las|laz>");
 
     let mut reader = Reader::from_path(&input).expect("open input");
     let total = reader.header().number_of_points();
@@ -45,11 +43,16 @@ fn main() {
         });
 
     // Intensity stats — min/max/mean in a single pass.
-    let (i_min, i_max, i_sum, i_n) = points.intensity().fold(
-        (u16::MAX, u16::MIN, 0u64, 0u64),
-        |(lo, hi, sum, n), v| (lo.min(v), hi.max(v), sum + v as u64, n + 1),
-    );
-    let i_mean = if i_n > 0 { i_sum as f64 / i_n as f64 } else { 0.0 };
+    let (i_min, i_max, i_sum, i_n) = points
+        .intensity()
+        .fold((u16::MAX, u16::MIN, 0u64, 0u64), |(lo, hi, sum, n), v| {
+            (lo.min(v), hi.max(v), sum + v as u64, n + 1)
+        });
+    let i_mean = if i_n > 0 {
+        i_sum as f64 / i_n as f64
+    } else {
+        0.0
+    };
 
     // Classification histogram — one pass over the classification column.
     let mut hist: BTreeMap<u8, u64> = BTreeMap::new();

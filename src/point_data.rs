@@ -147,7 +147,10 @@ impl PointData {
 
     /// Returns the number of points currently held.
     pub fn len(&self) -> usize {
-        self.bytes.len().checked_div(self.layout.record_len).unwrap_or(0)
+        self.bytes
+            .len()
+            .checked_div(self.layout.record_len)
+            .unwrap_or(0)
     }
 
     /// Returns true if this `PointData` contains no points.
@@ -221,7 +224,7 @@ impl PointData {
     /// Builds a `PointData` by encoding each `Point` against the given
     /// format and transforms.
     ///
-    /// This is the bulk-write counterpart to [`Reader::read_points`]: if
+    /// This is the bulk-write counterpart to [`Reader::read_points`](crate::Reader::read_points): if
     /// you're constructing points programmatically (not reading a file),
     /// collect them into a `Vec<Point>`, hand them here, and pass the
     /// result to [`Writer::write_points`](crate::Writer::write_points).
@@ -421,7 +424,7 @@ impl PointData {
 ///
 /// Returned by [`PointData::points`]. Each call to `next` decodes one record
 /// through [`raw::Point::read_from`] + [`Point::new`], matching the cost and
-/// semantics of [`Reader::read_points_into`](crate::Reader::read_points_into).
+/// semantics of [`Reader::fill_points`](crate::Reader::fill_points).
 #[allow(missing_debug_implementations)]
 pub struct PointDataIter<'a> {
     cursor: Cursor<&'a [u8]>,
