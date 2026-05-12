@@ -55,7 +55,7 @@ mod las;
 #[cfg(feature = "laz")]
 mod laz;
 
-use crate::{Error, Header, PointData, Result};
+use crate::{Error, Header, PointData, PointDataBuilder, Result};
 use std::{
     fs::File,
     io::{BufReader, Seek},
@@ -259,10 +259,9 @@ impl Reader {
     /// assert_eq!(pd.len(), 10);
     /// ```
     pub fn read_points(&mut self, n: u64) -> Result<PointData> {
-        let mut pd = PointData::new(
-            *self.point_reader.header().point_format(),
-            *self.point_reader.header().transforms(),
-        );
+        let mut pd = PointDataBuilder::new()
+            .for_header(self.point_reader.header())
+            .build();
         let _ = self.fill_points(n, &mut pd)?;
         Ok(pd)
     }
@@ -292,20 +291,16 @@ impl Reader {
     /// # Examples
     ///
     /// ```
-    /// # use las::{Reader, PointData};
+    /// # use las::{PointDataBuilder, Reader};
     /// let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// let mut pd = PointData::new(
-    ///     *reader.header().point_format(),
-    ///     *reader.header().transforms(),
-    /// );
+    /// let mut pd = PointDataBuilder::new().for_header(reader.header()).build();
     /// let n = reader.fill_points(10, &mut pd).unwrap();
     /// assert_eq!(n, 10);
     /// ```
     pub fn fill_points(&mut self, n: u64, target: &mut PointData) -> Result<u64> {
-        let format = *self.point_reader.header().point_format();
-        let transforms = *self.point_reader.header().transforms();
-        if target.format() != &format {
-            *target = PointData::new(format, transforms);
+        let header = self.point_reader.header();
+        if target.format() != header.point_format() {
+            *target = PointDataBuilder::new().for_header(header).build();
         }
         let record_len = target.record_len();
         let bytes = target.take_bytes_mut();

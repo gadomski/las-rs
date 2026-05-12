@@ -18,7 +18,7 @@
 //! `min`/`max` fold naturally, but a running mean needs a `(sum, count)`
 //! pair, not a per-chunk mean.
 
-use las::{PointData, Reader};
+use las::{PointData, PointDataBuilder, Reader};
 use std::{collections::BTreeMap, env, io::Write};
 
 /// One LAZ chunk's worth of points, matched to the reader's internal
@@ -121,11 +121,9 @@ fn main() {
 
     let mut reader = Reader::from_path(&input).expect("open input");
     let total = reader.header().number_of_points();
-    let format = *reader.header().point_format();
-    let transforms = *reader.header().transforms();
 
     // Reusable chunk buffer — grows to CHUNK points once, never beyond.
-    let mut pd = PointData::new(format, transforms);
+    let mut pd = PointDataBuilder::new().for_header(reader.header()).build();
 
     let mut bbox = BBox::empty();
     let mut intensity = IntensityStats::empty();

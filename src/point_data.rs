@@ -12,8 +12,9 @@
 //! (next `n` points), [`Reader::read_all`](crate::Reader::read_all) (the
 //! whole file), or [`Reader::fill_points`](crate::Reader::fill_points)
 //! (reuse an existing `PointData`). For callers that drive a
-//! decompressor manually (e.g. against COPC chunks), construct an empty
-//! [`PointData::new`] and fill the bytes via [`PointData::resize_for`].
+//! decompressor manually (e.g. against COPC chunks), build an empty
+//! [`PointData`] via [`PointDataBuilder`] and fill the bytes via
+//! [`PointData::resize_for`].
 //!
 //! # Example
 //!
@@ -44,9 +45,8 @@ use std::io::Cursor;
 /// It's produced by [`Reader`](crate::Reader) — call
 /// [`Reader::read_points`](crate::Reader::read_points) or
 /// [`Reader::read_all`](crate::Reader::read_all) — or constructed directly
-/// with [`PointData::new`] + [`PointData::resize_for`] when driving an
-/// external decompressor (e.g. COPC). [`PointData::from_raw_bytes`] wraps
-/// an existing byte buffer.
+/// via [`PointDataBuilder`] (paired with [`PointData::resize_for`] when
+/// driving an external decompressor, e.g. COPC).
 ///
 /// The row view is [`PointData::points`], yielding owned [`Point`] values;
 /// column views are [`PointData::x`], [`PointData::intensity`], etc., each
@@ -69,44 +69,101 @@ pub struct PointData {
     layout: Layout,
 }
 
-impl PointData {
-    /// Creates an empty `PointData` for the given format and coordinate
-    /// transforms.
+/// Builder for [`PointData`].
+///
+/// Construct via [`PointDataBuilder::new`], configure the point format and
+/// coordinate transforms, then finalize with one of:
+///
+/// - [`build`](Self::build) — an empty `PointData`, sized to zero points.
+/// - [`build_from_bytes`](Self::build_from_bytes) — wrap an existing
+///   `Vec<u8>` of tightly-packed records for the configured format.
+/// - [`build_from_points`](Self::build_from_points) — encode owned
+///   [`Point`]s against the configured format and transforms.
+///
+/// Configure by either passing a [`Header`](crate::Header) wholesale with
+/// [`for_header`](Self::for_header) — the typical case when you already
+/// have a [`Reader`](crate::Reader) or [`Writer`](crate::Writer) in hand —
+/// or by setting the pieces individually with
+/// [`with_format`](Self::with_format) and
+/// [`with_transforms`](Self::with_transforms).
+///
+/// The format and transforms are cached for per-point accessor dispatch
+/// and must match the file these records will be filled from or were
+/// produced from.
+///
+/// # Example
+///
+/// ```
+/// use las::{PointDataBuilder, Reader};
+///
+/// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
+/// let points = PointDataBuilder::new().for_header(reader.header()).build();
+/// assert!(points.is_empty());
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct PointDataBuilder {
+    format: Format,
+    transforms: Vector<Transform>,
+}
+
+impl PointDataBuilder {
+    /// Creates a new builder with default format and transforms.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the point format the resulting `PointData` will be decoded against.
+    pub fn with_format(mut self, format: Format) -> Self {
+        self.format = format;
+        self
+    }
+
+    /// Sets the coordinate transforms applied when decoding x/y/z.
+    pub fn with_transforms(mut self, transforms: Vector<Transform>) -> Self {
+        self.transforms = transforms;
+        self
+    }
+
+    /// Configures format and transforms from a [`Header`](crate::Header).
     ///
-    /// The format and transforms are cached for per-point accessor dispatch,
-    /// and must match the file these records will be filled from. In typical
-    /// usage, pass `*reader.header().point_format()` and
-    /// `*reader.header().transforms()`.
+    /// Shorthand for chaining
+    /// [`with_format`](Self::with_format)`(*header.point_format())` and
+    /// [`with_transforms`](Self::with_transforms)`(*header.transforms())`.
+    /// Works equally well with `reader.header()`, `writer.header()`, or a
+    /// `Header` built manually via [`Builder`](crate::Builder).
     ///
     /// # Example
     ///
     /// ```
-    /// use las::{Reader, PointData};
+    /// use las::{PointDataBuilder, Reader};
+    ///
     /// let reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    /// let points = PointData::new(
-    ///     *reader.header().point_format(),
-    ///     *reader.header().transforms(),
-    /// );
+    /// let points = PointDataBuilder::new().for_header(reader.header()).build();
     /// assert!(points.is_empty());
     /// ```
-    pub fn new(format: Format, transforms: Vector<Transform>) -> Self {
-        let layout = Layout::for_format(&format);
+    pub fn for_header(self, header: &crate::Header) -> Self {
+        self.with_format(*header.point_format())
+            .with_transforms(*header.transforms())
+    }
+
+    /// Builds an empty `PointData`.
+    pub fn build(self) -> PointData {
+        let layout = Layout::for_format(&self.format);
         PointData {
             bytes: Vec::new(),
-            format,
-            transforms,
+            format: self.format,
+            transforms: self.transforms,
             layout,
         }
     }
 
-    /// Creates a `PointData` by wrapping an existing byte buffer.
+    /// Builds a `PointData` by taking ownership of an existing byte buffer.
     ///
     /// The byte buffer must be a sequence of tightly-packed point records for
-    /// the given format — i.e. its length must be a multiple of the format's
-    /// record length. This is useful for callers that already have a
+    /// the configured format — i.e. its length must be a multiple of the
+    /// format's record length. Useful for callers that already have a
     /// decompressed `Vec<u8>` in hand (custom decompressor, memory-mapped
-    /// region, received over the wire) and want to hand it over without an
-    /// extra allocation or copy.
+    /// region, received over the wire).
     ///
     /// # Errors
     ///
@@ -116,21 +173,21 @@ impl PointData {
     /// # Example
     ///
     /// ```
-    /// use las::{PointData, point::Format, Transform, Vector};
+    /// use las::{point::Format, PointDataBuilder, Transform, Vector};
     ///
     /// let format = Format::new(0).unwrap();
     /// let transforms: Vector<Transform> = Default::default();
     /// let record_len = format.len() as usize;
     /// let bytes = vec![0u8; record_len * 5];
-    /// let points = PointData::from_raw_bytes(format, transforms, bytes).unwrap();
+    /// let points = PointDataBuilder::new()
+    ///     .with_format(format)
+    ///     .with_transforms(transforms)
+    ///     .build_from_bytes(bytes)
+    ///     .unwrap();
     /// assert_eq!(points.len(), 5);
     /// ```
-    pub fn from_raw_bytes(
-        format: Format,
-        transforms: Vector<Transform>,
-        bytes: Vec<u8>,
-    ) -> Result<Self> {
-        let layout = Layout::for_format(&format);
+    pub fn build_from_bytes(self, bytes: Vec<u8>) -> Result<PointData> {
+        let layout = Layout::for_format(&self.format);
         if layout.record_len == 0 || !bytes.len().is_multiple_of(layout.record_len) {
             return Err(crate::Error::InvalidCloudByteLength {
                 len: bytes.len(),
@@ -139,12 +196,47 @@ impl PointData {
         }
         Ok(PointData {
             bytes,
-            format,
-            transforms,
+            format: self.format,
+            transforms: self.transforms,
             layout,
         })
     }
 
+    /// Builds a `PointData` by encoding owned [`Point`]s against the
+    /// configured format and transforms.
+    ///
+    /// This is the bulk-write counterpart to
+    /// [`Reader::read_points`](crate::Reader::read_points): if you're
+    /// constructing points programmatically (not reading a file), hand them
+    /// here and pass the result to
+    /// [`Writer::write_points`](crate::Writer::write_points).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any point's optional field set doesn't match the
+    /// target format, or if a coordinate transform overflows.
+    pub fn build_from_points<I>(self, points: I) -> Result<PointData>
+    where
+        I: IntoIterator<Item = Point>,
+    {
+        let layout = Layout::for_format(&self.format);
+        let iter = points.into_iter();
+        let (lower, _) = iter.size_hint();
+        let mut bytes = Vec::with_capacity(lower * layout.record_len);
+        for point in iter {
+            let raw = point.into_raw(&self.transforms)?;
+            raw.write_to(&mut bytes, &self.format)?;
+        }
+        Ok(PointData {
+            bytes,
+            format: self.format,
+            transforms: self.transforms,
+            layout,
+        })
+    }
+}
+
+impl PointData {
     /// Returns the number of points currently held.
     pub fn len(&self) -> usize {
         self.bytes
@@ -219,37 +311,6 @@ impl PointData {
     /// instead of through an intermediate buffer.
     pub(crate) fn take_bytes_mut(&mut self) -> &mut Vec<u8> {
         &mut self.bytes
-    }
-
-    /// Builds a `PointData` by encoding each `Point` against the given
-    /// format and transforms.
-    ///
-    /// This is the bulk-write counterpart to [`Reader::read_points`](crate::Reader::read_points): if
-    /// you're constructing points programmatically (not reading a file),
-    /// collect them into a `Vec<Point>`, hand them here, and pass the
-    /// result to [`Writer::write_points`](crate::Writer::write_points).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any point's optional field set doesn't match
-    /// the target format, or if a coordinate transform overflows.
-    pub fn from_points(
-        points: &[Point],
-        format: Format,
-        transforms: Vector<Transform>,
-    ) -> Result<Self> {
-        let layout = Layout::for_format(&format);
-        let mut bytes = Vec::with_capacity(points.len() * layout.record_len);
-        for point in points {
-            let raw = point.clone().into_raw(&transforms)?;
-            raw.write_to(&mut bytes, &format)?;
-        }
-        Ok(PointData {
-            bytes,
-            format,
-            transforms,
-            layout,
-        })
     }
 
     /// Raw scaled x values (little-endian i32 loads from the x column).
@@ -521,6 +582,13 @@ mod tests {
         }
     }
 
+    fn empty_point_data(format: Format) -> PointData {
+        PointDataBuilder::new()
+            .with_format(format)
+            .with_transforms(default_transforms())
+            .build()
+    }
+
     fn build_raw_point(format: &Format, i: i32) -> raw::Point {
         let flags = if format.is_extended {
             // return_number=1, number_of_returns=2, scanner_channel=1,
@@ -576,7 +644,7 @@ mod tests {
             let rp = build_raw_point(&format, i);
             rp.write_to(&mut buf, &format).unwrap();
         }
-        let mut points = PointData::new(format, default_transforms());
+        let mut points = empty_point_data(format);
         let slab = points.resize_for(n as usize);
         slab.copy_from_slice(&buf);
         points
@@ -707,15 +775,14 @@ mod tests {
     fn record_len_matches_format_len() {
         for n in [0u8, 1, 2, 3, 6, 7, 8] {
             let f = Format::new(n).unwrap();
-            let points = PointData::new(f, default_transforms());
+            let points = empty_point_data(f);
             assert_eq!(points.record_len(), f.len() as usize, "format {n}");
         }
     }
 
     #[test]
-    fn from_raw_bytes_valid() {
+    fn build_from_bytes_valid() {
         let format = Format::new(1).unwrap();
-        let transforms = default_transforms();
         let record_len = format.len() as usize;
         let mut buf = Vec::new();
         for i in 0..3 {
@@ -723,34 +790,43 @@ mod tests {
             rp.write_to(&mut buf, &format).unwrap();
         }
         assert_eq!(buf.len(), record_len * 3);
-        let points = PointData::from_raw_bytes(format, transforms, buf).unwrap();
+        let points = PointDataBuilder::new()
+            .with_format(format)
+            .with_transforms(default_transforms())
+            .build_from_bytes(buf)
+            .unwrap();
         assert_eq!(points.len(), 3);
         let xs: Vec<i32> = points.x_raw().collect();
         assert_eq!(xs, vec![0, 1, 2]);
     }
 
     #[test]
-    fn from_raw_bytes_rejects_bad_length() {
+    fn build_from_bytes_rejects_bad_length() {
         let format = Format::new(0).unwrap();
-        let transforms = default_transforms();
         let record_len = format.len() as usize;
         let buf = vec![0u8; record_len * 2 + 1];
-        assert!(PointData::from_raw_bytes(format, transforms, buf).is_err());
+        let result = PointDataBuilder::new()
+            .with_format(format)
+            .with_transforms(default_transforms())
+            .build_from_bytes(buf);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn from_raw_bytes_accepts_empty() {
+    fn build_from_bytes_accepts_empty() {
         let format = Format::new(0).unwrap();
-        let transforms = default_transforms();
-        let points = PointData::from_raw_bytes(format, transforms, Vec::new()).unwrap();
+        let points = PointDataBuilder::new()
+            .with_format(format)
+            .with_transforms(default_transforms())
+            .build_from_bytes(Vec::new())
+            .unwrap();
         assert!(points.is_empty());
     }
 
     #[test]
     fn resize_for_and_fill() {
         let format = Format::new(1).unwrap();
-        let transforms = default_transforms();
-        let mut points = PointData::new(format, transforms);
+        let mut points = empty_point_data(format);
         let mut buf = Vec::new();
         for i in 0..2 {
             build_raw_point(&format, i)

@@ -21,17 +21,24 @@ Several breaking changes are involved — see below.
   (`x`, `y`, `z`, `intensity`, `classification`, `rgb`, `nir`, …) that
   sweep a single field without materializing a `Point`. Constructed by
   `Reader::read_points(n)`, `Reader::read_all()`,
-  `Reader::fill_points(n, &mut pd)` for buffer reuse,
-  `PointData::from_raw_bytes(...)` to wrap an existing buffer, or
-  `PointData::new(...)` + `PointData::resize_for(n)` for callers driving
-  their own decompressor (e.g. COPC). Addresses the LAZ decompression
+  `Reader::fill_points(n, &mut pd)` for buffer reuse, or
+  `PointDataBuilder` (with `.build()`, `.build_from_bytes(...)`, or
+  `.build_from_points(...)`) paired with `PointData::resize_for(n)` for
+  callers driving their own decompressor (e.g. COPC). Addresses the LAZ
+  decompression
   throughput gap reported in
   [#121](https://github.com/gadomski/las-rs/issues/121) — on a 42.7M-point
   (159 MB) LAZ file with `laz-parallel`, reading every point and summing
   x+y+z via column iterators runs ~2.08× faster than the equivalent
   per-`Point` loop.
-- `PointData::from_points(&[Point], format, transforms)`: encodes an
-  existing `Vec<Point>` into a byte slab for bulk writing.
+- `PointDataBuilder`: configurable constructor for `PointData` with
+  `.with_format(...)`, `.with_transforms(...)`, or `.for_header(&Header)`
+  as a one-shot shortcut that pulls both from a header (works with
+  `reader.header()`, `writer.header()`, or a manually built `Header`).
+  Finalize with one of `.build()`, `.build_from_bytes(Vec<u8>)`, or
+  `.build_from_points(IntoIterator<Item = Point>)`. The point-encoding
+  path consumes points (no per-point clone) and is the bulk-write
+  counterpart to `Reader::read_points`.
 - `Writer::write_points(&PointData)`: single-call bulk write of a byte
   slab, skipping per-`Point` decode/encode round-trips. LAS-to-LAS
   conversions become byte copies; LAZ involvement on either end uses
@@ -56,8 +63,8 @@ Several breaking changes are involved — see below.
   `Result<Vec<Point>>`).
 - `Writer::write_points` now takes `&PointData` instead of `&[Point]`,
   mirroring `Reader::read_points`. For callers building points
-  programmatically, use `PointData::from_points` to construct a slab
-  first, or loop over `Writer::write_point`.
+  programmatically, use `PointDataBuilder::build_from_points` to
+  construct a slab first, or loop over `Writer::write_point`.
 
 ### Removed (breaking)
 

@@ -168,11 +168,20 @@ mod laz_compression_test {
         let options = WriterOptions::default().with_laz_parallelism(LazParallelism::Yes);
         let mut writer = Writer::with_options(output, header.clone(), options).unwrap();
         let mid = original_points.len() / 2;
-        let (first_half, second_half) = original_points.split_at(mid);
         let format = *header.point_format();
         let transforms = *header.transforms();
-        let first_pd = las::PointData::from_points(first_half, format, transforms).unwrap();
-        let second_pd = las::PointData::from_points(second_half, format, transforms).unwrap();
+        let mut second_half = original_points.clone();
+        let first_half = second_half.drain(..mid).collect::<Vec<_>>();
+        let first_pd = las::PointDataBuilder::new()
+            .with_format(format)
+            .with_transforms(transforms)
+            .build_from_points(first_half)
+            .unwrap();
+        let second_pd = las::PointDataBuilder::new()
+            .with_format(format)
+            .with_transforms(transforms)
+            .build_from_points(second_half)
+            .unwrap();
         writer.write_points(&first_pd).unwrap();
         writer.write_points(&second_pd).unwrap();
         writer.close().unwrap();

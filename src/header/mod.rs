@@ -258,9 +258,12 @@ impl Header {
         let n = points.len() as u64;
         self.number_of_points += n;
 
-        for rn in points.return_number() {
-            if rn > 0 {
-                let entry = self.number_of_points_by_return.entry(rn).or_insert(0);
+        for return_number in points.return_number() {
+            if return_number > 0 {
+                let entry = self
+                    .number_of_points_by_return
+                    .entry(return_number)
+                    .or_insert(0);
                 *entry += 1;
             }
         }

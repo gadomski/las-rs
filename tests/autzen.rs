@@ -135,7 +135,7 @@ fn test_read_points_on(path: &str) {
 }
 
 fn test_fill_points_on(path: &str) {
-    use las::{Point, PointData, Reader};
+    use las::{Point, PointDataBuilder, Reader};
 
     let ground_truth_points = {
         let mut ground_truth_reader = Reader::from_path(path).unwrap();
@@ -150,10 +150,7 @@ fn test_fill_points_on(path: &str) {
     let mut reader = Reader::from_path(path).unwrap();
     let n = 7;
     let mut all_points = Vec::with_capacity(reader.header().number_of_points() as usize);
-    let mut buffer = PointData::new(
-        *reader.header().point_format(),
-        *reader.header().transforms(),
-    );
+    let mut buffer = PointDataBuilder::new().for_header(reader.header()).build();
     while reader.fill_points(n, &mut buffer).unwrap() != 0 {
         for p in buffer.points() {
             all_points.push(p.unwrap());

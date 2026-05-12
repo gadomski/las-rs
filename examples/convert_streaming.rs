@@ -15,7 +15,7 @@
 //! [`las::PointData`] but you still want the throughput of the byte-slab
 //! path.
 
-use las::{PointData, Reader, Writer};
+use las::{PointDataBuilder, Reader, Writer};
 use std::{env, io::Write as _};
 
 /// One LAZ chunk's worth of points, matched to the reader's internal
@@ -44,11 +44,9 @@ fn main() {
     let mut reader = Reader::from_path(&input).expect("open input");
     let header = reader.header().clone();
     let total = header.number_of_points();
-    let format = *reader.header().point_format();
-    let transforms = *reader.header().transforms();
 
     // Reusable chunk buffer — grows to CHUNK points once, never beyond.
-    let mut pd = PointData::new(format, transforms);
+    let mut pd = PointDataBuilder::new().for_header(&header).build();
     let mut writer = Writer::from_path(&output, header).expect("open output");
     let mut seen = 0u64;
 

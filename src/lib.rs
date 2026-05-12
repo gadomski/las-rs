@@ -202,7 +202,7 @@ pub use crate::{
     gps_time_type::GpsTimeType,
     header::{Builder, Header},
     point::Point,
-    point_data::{PointData, PointDataIter},
+    point_data::{PointData, PointDataBuilder, PointDataIter},
     reader::{Reader, ReaderOptions},
     transform::Transform,
     vector::Vector,
