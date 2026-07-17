@@ -189,7 +189,7 @@ impl PointDataBuilder {
     pub fn build_from_bytes(self, bytes: Vec<u8>) -> Result<PointData> {
         let layout = Layout::for_format(&self.format);
         if layout.record_len == 0 || !bytes.len().is_multiple_of(layout.record_len) {
-            return Err(crate::Error::InvalidCloudByteLength {
+            return Err(crate::Error::InvalidByteBufferLength {
                 len: bytes.len(),
                 record_len: layout.record_len,
             });

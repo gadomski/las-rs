@@ -28,7 +28,7 @@ pub enum Error {
 
     /// The byte buffer length is not a multiple of the point record length.
     #[error("byte buffer length {len} is not a multiple of point record length {record_len}")]
-    InvalidCloudByteLength {
+    InvalidByteBufferLength {
         /// The buffer length.
         len: usize,
         /// The expected record length.
