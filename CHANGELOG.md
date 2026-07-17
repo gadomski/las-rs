@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/gadomski/las-rs/compare/v0.9.11...v0.10.0) - 2026-07-17
+
+### Added
+
+- [**breaking**] use PointData for buffered reads and writes ([#143](https://github.com/gadomski/las-rs/pull/143))
+
+### Other
+
+- *(deps)* bump actions/checkout from 6 to 7 ([#147](https://github.com/gadomski/las-rs/pull/147))
+- *(deps)* bump actions/create-github-app-token from 3.1.1 to 3.2.0 ([#146](https://github.com/gadomski/las-rs/pull/146))
+- add myself as codeowner
+- *(deps)* bump actions/create-github-app-token from 3.0.0 to 3.1.1 ([#144](https://github.com/gadomski/las-rs/pull/144))
+
 ## [0.9.11](https://github.com/gadomski/las-rs/compare/v0.9.10...v0.9.11) - 2026-04-07
 
 ### Fixed
