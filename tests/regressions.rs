@@ -4,9 +4,12 @@ use tempfile::NamedTempFile;
 #[test]
 fn issue_136() {
     let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
-    let mut points: Vec<las::Point> =
-        Vec::with_capacity(reader.header().number_of_points() as usize);
-    let _ = reader.read_all_points_into(&mut points);
+    let points: Vec<las::Point> = reader
+        .read_all()
+        .unwrap()
+        .points()
+        .collect::<las::Result<_>>()
+        .unwrap();
 
     let mut builder = Builder::from((1, 4));
     builder.point_format = las::point::Format::new(1).unwrap();
@@ -16,7 +19,9 @@ fn issue_136() {
     let file_name = tempfile.path().to_str().unwrap().to_string();
     {
         let mut writer = Writer::from_path(&file_name, header).unwrap();
-        writer.write_points(&points).unwrap();
+        for point in points {
+            writer.write_point(point).unwrap();
+        }
     }
 
     let reader = Reader::from_path(file_name).unwrap();

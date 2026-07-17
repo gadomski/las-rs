@@ -314,6 +314,159 @@ pub enum ScanAngle {
     Scaled(i16),
 }
 
+/// A single field within a point record.
+///
+/// This enum is the canonical description of the on-disk point schema: every
+/// piece of code that needs to know the point format's byte layout —
+/// [`Point::read_from`], [`Point::write_to`], [`Layout::for_format`], and
+/// [`Format::len`](crate::point::Format::len) — walks [`fields`] and matches
+/// on [`Field`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Field {
+    X,
+    Y,
+    Z,
+    Intensity,
+    /// Two bytes for legacy formats, three for extended.
+    Flags,
+    UserData,
+    /// One byte (i8) for legacy formats, two (i16) for extended.
+    ScanAngle,
+    PointSourceId,
+    GpsTime,
+    Color,
+    Nir,
+    Waveform,
+    /// `format.extra_bytes` bytes.
+    ExtraBytes,
+}
+
+impl Field {
+    /// Size in bytes this field occupies within a record of the given format.
+    pub(crate) fn size(self, format: &Format) -> usize {
+        match self {
+            Field::X | Field::Y | Field::Z => 4,
+            Field::Intensity | Field::PointSourceId | Field::Nir => 2,
+            Field::UserData => 1,
+            Field::Flags => {
+                if format.is_extended {
+                    3
+                } else {
+                    2
+                }
+            }
+            Field::ScanAngle => {
+                if format.is_extended {
+                    2
+                } else {
+                    1
+                }
+            }
+            Field::GpsTime => 8,
+            Field::Color => 6,
+            Field::Waveform => 29,
+            Field::ExtraBytes => format.extra_bytes as usize,
+        }
+    }
+}
+
+/// Canonical field order for a given point format.
+///
+/// This is the single source of truth for the on-disk layout. The order
+/// follows the LAS 1.4 spec: core (x/y/z/intensity), flags, the format-
+/// dependent `user_data`/`scan_angle` pair, `point_source_id`, then the
+/// optional blocks gps_time → color → nir → waveform → extra_bytes.
+///
+/// Callers iterate this and match on [`Field`] to read, write, or locate
+/// each field.
+pub(crate) fn fields(format: &Format) -> impl Iterator<Item = Field> + '_ {
+    // Legacy formats pack scan_angle (i8) before user_data; extended formats
+    // pack user_data before scan_angle (i16). Emit them in the right order.
+    let (second, third) = if format.is_extended {
+        (Field::UserData, Field::ScanAngle)
+    } else {
+        (Field::ScanAngle, Field::UserData)
+    };
+    [
+        Some(Field::X),
+        Some(Field::Y),
+        Some(Field::Z),
+        Some(Field::Intensity),
+        Some(Field::Flags),
+        Some(second),
+        Some(third),
+        Some(Field::PointSourceId),
+        format.has_gps_time.then_some(Field::GpsTime),
+        format.has_color.then_some(Field::Color),
+        format.has_nir.then_some(Field::Nir),
+        format.has_waveform.then_some(Field::Waveform),
+        Some(Field::ExtraBytes),
+    ]
+    .into_iter()
+    .flatten()
+}
+
+/// Byte offsets of format-dependent fields within a packed point record.
+///
+/// Derived from [`fields`] — do not edit the offset computation here without
+/// also keeping [`fields`] in sync (the reader and writer walk the same
+/// iterator).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Layout {
+    /// Offset of the `user_data` byte.
+    pub user_data: usize,
+    /// Offset of the scan angle field (i8 for legacy, i16 for extended).
+    pub scan_angle: usize,
+    /// Offset of the `point_source_id` u16.
+    pub point_source_id: usize,
+    /// Offset of the gps_time f64, if the format has one.
+    pub gps_time: Option<usize>,
+    /// Offset of the RGB triple, if the format has color.
+    pub rgb: Option<usize>,
+    /// Offset of the NIR u16, if the format has NIR.
+    pub nir: Option<usize>,
+    /// Total record length in bytes.
+    pub record_len: usize,
+}
+
+impl Layout {
+    /// Computes the byte layout for a given point format by accumulating
+    /// offsets as it walks [`fields`].
+    pub(crate) fn for_format(format: &Format) -> Self {
+        let mut layout = Layout {
+            user_data: 0,
+            scan_angle: 0,
+            point_source_id: 0,
+            gps_time: None,
+            rgb: None,
+            nir: None,
+            record_len: 0,
+        };
+        let mut offset = 0usize;
+        for field in fields(format) {
+            match field {
+                Field::UserData => layout.user_data = offset,
+                Field::ScanAngle => layout.scan_angle = offset,
+                Field::PointSourceId => layout.point_source_id = offset,
+                Field::GpsTime => layout.gps_time = Some(offset),
+                Field::Color => layout.rgb = Some(offset),
+                Field::Nir => layout.nir = Some(offset),
+                // Other fields' offsets are fixed or not needed by PointData.
+                Field::X
+                | Field::Y
+                | Field::Z
+                | Field::Intensity
+                | Field::Flags
+                | Field::Waveform
+                | Field::ExtraBytes => {}
+            }
+            offset += field.size(format);
+        }
+        layout.record_len = offset;
+        layout
+    }
+}
+
 /// These flags hold information about point classification, return number, and more.
 ///
 /// In point formats zero through five, two bytes are used to hold all of the information. Point
@@ -355,54 +508,50 @@ impl Point {
     /// file.seek(SeekFrom::Start(1994)).unwrap();
     /// let point = Point::read_from(file, &Format::new(1).unwrap()).unwrap();
     /// ```
-    #[allow(clippy::field_reassign_with_default)]
     pub fn read_from<R: Read>(mut read: R, format: &Format) -> Result<Point> {
         use crate::utils;
         use byteorder::{LittleEndian, ReadBytesExt};
 
         let mut point = Point::default();
-        point.x = read.read_i32::<LittleEndian>()?;
-        point.y = read.read_i32::<LittleEndian>()?;
-        point.z = read.read_i32::<LittleEndian>()?;
-        point.intensity = read.read_u16::<LittleEndian>()?;
-        point.flags = if format.is_extended {
-            Flags::ThreeByte(read.read_u8()?, read.read_u8()?, read.read_u8()?)
-        } else {
-            Flags::TwoByte(read.read_u8()?, read.read_u8()?)
-        };
-        if format.is_extended {
-            point.user_data = read.read_u8()?;
-            point.scan_angle = ScanAngle::Scaled(read.read_i16::<LittleEndian>()?);
-        } else {
-            point.scan_angle = ScanAngle::Rank(read.read_i8()?);
-            point.user_data = read.read_u8()?;
-        };
-        point.point_source_id = read.read_u16::<LittleEndian>()?;
-        point.gps_time = if format.has_gps_time {
-            Some(read.read_f64::<LittleEndian>()?)
-        } else {
-            None
-        };
-        point.color = if format.has_color {
-            let red = read.read_u16::<LittleEndian>()?;
-            let green = read.read_u16::<LittleEndian>()?;
-            let blue = read.read_u16::<LittleEndian>()?;
-            Some(Color::new(red, green, blue))
-        } else {
-            None
-        };
-        point.waveform = if format.has_waveform {
-            Some(Waveform::read_from(&mut read)?)
-        } else {
-            None
-        };
-        point.nir = if format.has_nir {
-            utils::some_or_none_if_zero(read.read_u16::<LittleEndian>()?)
-        } else {
-            None
-        };
-        point.extra_bytes.resize(format.extra_bytes as usize, 0);
-        read.read_exact(&mut point.extra_bytes)?;
+        for field in fields(format) {
+            match field {
+                Field::X => point.x = read.read_i32::<LittleEndian>()?,
+                Field::Y => point.y = read.read_i32::<LittleEndian>()?,
+                Field::Z => point.z = read.read_i32::<LittleEndian>()?,
+                Field::Intensity => point.intensity = read.read_u16::<LittleEndian>()?,
+                Field::Flags => {
+                    point.flags = if format.is_extended {
+                        Flags::ThreeByte(read.read_u8()?, read.read_u8()?, read.read_u8()?)
+                    } else {
+                        Flags::TwoByte(read.read_u8()?, read.read_u8()?)
+                    };
+                }
+                Field::UserData => point.user_data = read.read_u8()?,
+                Field::ScanAngle => {
+                    point.scan_angle = if format.is_extended {
+                        ScanAngle::Scaled(read.read_i16::<LittleEndian>()?)
+                    } else {
+                        ScanAngle::Rank(read.read_i8()?)
+                    };
+                }
+                Field::PointSourceId => point.point_source_id = read.read_u16::<LittleEndian>()?,
+                Field::GpsTime => point.gps_time = Some(read.read_f64::<LittleEndian>()?),
+                Field::Color => {
+                    let red = read.read_u16::<LittleEndian>()?;
+                    let green = read.read_u16::<LittleEndian>()?;
+                    let blue = read.read_u16::<LittleEndian>()?;
+                    point.color = Some(Color::new(red, green, blue));
+                }
+                Field::Nir => {
+                    point.nir = utils::some_or_none_if_zero(read.read_u16::<LittleEndian>()?);
+                }
+                Field::Waveform => point.waveform = Some(Waveform::read_from(&mut read)?),
+                Field::ExtraBytes => {
+                    point.extra_bytes.resize(format.extra_bytes as usize, 0);
+                    read.read_exact(&mut point.extra_bytes)?;
+                }
+            }
+        }
         Ok(point)
     }
 
@@ -424,44 +573,47 @@ impl Point {
         use byteorder::{LittleEndian, WriteBytesExt};
         assert_eq!(format.extra_bytes as usize, self.extra_bytes.len());
 
-        write.write_i32::<LittleEndian>(self.x)?;
-        write.write_i32::<LittleEndian>(self.y)?;
-        write.write_i32::<LittleEndian>(self.z)?;
-        write.write_u16::<LittleEndian>(self.intensity)?;
-        if format.is_extended {
-            let (a, b, c) = self.flags.into();
-            write.write_u8(a)?;
-            write.write_u8(b)?;
-            write.write_u8(c)?;
-        } else {
-            let (a, b) = self.flags.to_two_bytes()?;
-            write.write_u8(a)?;
-            write.write_u8(b)?;
+        for field in fields(format) {
+            match field {
+                Field::X => write.write_i32::<LittleEndian>(self.x)?,
+                Field::Y => write.write_i32::<LittleEndian>(self.y)?,
+                Field::Z => write.write_i32::<LittleEndian>(self.z)?,
+                Field::Intensity => write.write_u16::<LittleEndian>(self.intensity)?,
+                Field::Flags => {
+                    if format.is_extended {
+                        let (a, b, c) = self.flags.into();
+                        write.write_u8(a)?;
+                        write.write_u8(b)?;
+                        write.write_u8(c)?;
+                    } else {
+                        let (a, b) = self.flags.to_two_bytes()?;
+                        write.write_u8(a)?;
+                        write.write_u8(b)?;
+                    }
+                }
+                Field::UserData => write.write_u8(self.user_data)?,
+                Field::ScanAngle => {
+                    if format.is_extended {
+                        write.write_i16::<LittleEndian>(self.scan_angle.into())?;
+                    } else {
+                        write.write_i8(self.scan_angle.into())?;
+                    }
+                }
+                Field::PointSourceId => write.write_u16::<LittleEndian>(self.point_source_id)?,
+                Field::GpsTime => {
+                    write.write_f64::<LittleEndian>(self.gps_time.unwrap_or(0.0))?;
+                }
+                Field::Color => {
+                    let color = self.color.unwrap_or_default();
+                    write.write_u16::<LittleEndian>(color.red)?;
+                    write.write_u16::<LittleEndian>(color.green)?;
+                    write.write_u16::<LittleEndian>(color.blue)?;
+                }
+                Field::Nir => write.write_u16::<LittleEndian>(self.nir.unwrap_or(0))?,
+                Field::Waveform => self.waveform.unwrap_or_default().write_to(&mut write)?,
+                Field::ExtraBytes => write.write_all(&self.extra_bytes)?,
+            }
         }
-        if format.is_extended {
-            write.write_u8(self.user_data)?;
-            write.write_i16::<LittleEndian>(self.scan_angle.into())?;
-        } else {
-            write.write_i8(self.scan_angle.into())?;
-            write.write_u8(self.user_data)?;
-        }
-        write.write_u16::<LittleEndian>(self.point_source_id)?;
-        if format.has_gps_time {
-            write.write_f64::<LittleEndian>(self.gps_time.unwrap_or(0.0))?;
-        }
-        if format.has_color {
-            let color = self.color.unwrap_or_default();
-            write.write_u16::<LittleEndian>(color.red)?;
-            write.write_u16::<LittleEndian>(color.green)?;
-            write.write_u16::<LittleEndian>(color.blue)?;
-        }
-        if format.has_nir {
-            write.write_u16::<LittleEndian>(self.nir.unwrap_or(0))?;
-        }
-        if format.has_waveform {
-            self.waveform.unwrap_or_default().write_to(&mut write)?;
-        }
-        write.write_all(&self.extra_bytes)?;
         Ok(())
     }
 }
