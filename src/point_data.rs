@@ -167,7 +167,7 @@ impl PointDataBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidCloudByteLength`](crate::Error::InvalidCloudByteLength)
+    /// Returns [`Error::InvalidCloudByteLength`](crate::Error::InvalidByteBufferLength)
     /// if `bytes.len()` is not a multiple of the format's record length.
     ///
     /// # Example
