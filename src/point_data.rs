@@ -298,6 +298,13 @@ impl PointData {
     /// directly (e.g. against COPC chunks that bypass [Reader](crate::Reader)).
     /// Call `resize_for`, decompress into the returned slice, and then use the
     /// column accessors or [PointData::points] as usual.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `n * record_len` overflows `usize`. Callers deriving `n` from
+    /// file data (a header point count, a COPC entry's `point_count`) must
+    /// validate it against the bytes actually available first — otherwise a
+    /// crafted file reaches this multiply.
     pub fn resize_for(&mut self, n: usize) -> &mut [u8] {
         let new_len = n.checked_mul(self.layout.record_len).expect("overflow");
         self.bytes.resize(new_len, 0u8);

@@ -157,6 +157,21 @@ pub enum Error {
         version: Version,
     },
 
+    /// The header's point count and point data record length together imply a
+    /// point record body that overflows `u64` byte addressing, so the file
+    /// cannot describe a finite point stream. Reaching this means the
+    /// `number_of_point_records` / `point_data_record_length` pair is
+    /// inconsistent with any real file and was almost certainly crafted to
+    /// trigger a huge allocation or an arithmetic overflow in the reader.
+    #[error("point count {n} * point data record length {record_len} overflows u64")]
+    PointRecordLengthOverflow {
+        /// The number of point records from the header.
+        n: u64,
+
+        /// The point data record length from the header.
+        record_len: u16,
+    },
+
     /// Too many variable length records.
     #[error("too many variable length records: {0}")]
     TooManyVlrs(usize),

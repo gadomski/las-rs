@@ -106,6 +106,22 @@ impl Builder {
             Ordering::Equal => {} // pass
             Ordering::Greater => point_format.extra_bytes = raw_header.point_data_record_length - n,
         }
+        // Reject headers whose `number_of_point_records * point_data_record_length`
+        // overflows u64 before we hand the count to the read path, where it
+        // otherwise drives the preallocation in `Reader::read_all` and the
+        // `offset_to_end_of_points` seek computed in `Header::new`. Such a pair
+        // cannot describe a finite point stream, so this is an inconsistent
+        // header rather than a length to honour.
+        let record_len = raw_header.point_data_record_length;
+        if number_of_points
+            .checked_mul(u64::from(record_len))
+            .is_none()
+        {
+            return Err(Error::PointRecordLengthOverflow {
+                n: number_of_points,
+                record_len,
+            });
+        }
         Ok(Builder {
             date: NaiveDate::from_yo_opt(
                 i32::from(raw_header.file_creation_year),

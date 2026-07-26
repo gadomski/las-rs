@@ -355,8 +355,10 @@ impl Header {
     /// assert_eq!(227, Header::default().offset_to_end_of_points());
     /// ```
     pub fn offset_to_end_of_points(&self) -> u64 {
-        u64::from(self.offset_to_point_data)
-            + self.number_of_point_records() * u64::from(self.point_data_record_length)
+        u64::from(self.offset_to_point_data).saturating_add(
+            self.number_of_point_records()
+                .saturating_mul(u64::from(self.point_data_record_length)),
+        )
     }
 
     /// Writes a raw header to a `Write`.

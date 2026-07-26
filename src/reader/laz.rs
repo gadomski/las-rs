@@ -46,7 +46,18 @@ where
         let points_left = self.header.number_of_points() - self.index;
         let n = points_left.min(n);
         let n_usize = usize::try_from(n)?;
-        out.resize(n_usize * record_len, 0u8);
+        // Guard the byte count against `usize` overflow before `resize`. A
+        // crafted header can make `number_of_point_records * record_len`
+        // saturate `usize`, which `Vec::resize` turns into a `capacity
+        // overflow` panic; `decompress_many` already reports truncated input,
+        // so we only reject what no valid stream could back.
+        let alloc_bytes = n_usize.checked_mul(record_len).ok_or_else(|| {
+            crate::Error::PointRecordLengthOverflow {
+                n,
+                record_len: u16::try_from(record_len).unwrap_or(u16::MAX),
+            }
+        })?;
+        out.resize(alloc_bytes, 0u8);
         self.decompressor.decompress_many(out)?;
         self.index += n;
         Ok(n)

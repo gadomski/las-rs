@@ -588,22 +588,38 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
             .decompressor
             .get_mut()
             .seek(SeekFrom::Start(entry.offset))?;
-        points.reserve_exact(entry.point_count as usize);
+        // `entry.point_count` is an untrusted i64 read from the COPC hierarchy
+        // (`Entry::read_from`). A negative value cast to `usize` wraps to a
+        // number near `usize::MAX`, which then drives `reserve_exact` and the
+        // `resize` below. Reject negative and overflowing counts up front so a
+        // crafted COPC entry cannot force a huge allocation or a `capacity
+        // overflow` panic through this path.
+        let point_count =
+            u64::try_from(entry.point_count).map_err(|_| Error::PointRecordLengthOverflow {
+                n: entry.point_count as u64,
+                record_len: self.header.point_format().len(),
+            })?;
+        let point_count_usize = usize::try_from(point_count)?;
+        points.reserve_exact(point_count_usize);
 
-        let resize = usize::try_from(
-            entry.point_count as u64 * u64::from(self.header.point_format().len()),
-        )?;
+        let record_len = u64::from(self.header.point_format().len());
+        let resize = usize::try_from(point_count.checked_mul(record_len).ok_or_else(|| {
+            Error::PointRecordLengthOverflow {
+                n: point_count,
+                record_len: self.header.point_format().len(),
+            }
+        })?)?;
         self.buffer.get_mut().resize(resize, 0u8);
         self.decompressor.decompress_many(self.buffer.get_mut())?;
         self.buffer.set_position(0);
-        points.reserve(entry.point_count as usize);
+        points.reserve(point_count_usize);
 
-        for _ in 0..entry.point_count as usize {
+        for _ in 0..point_count_usize {
             let point = raw::Point::read_from(&mut self.buffer, self.header.point_format())
                 .map(|raw_point| Point::new(raw_point, self.header.transforms()))?;
             points.push(point);
         }
-        Ok(entry.point_count as u64)
+        Ok(point_count)
     }
 
     /// Returns a reference to the LAS header.
