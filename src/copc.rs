@@ -595,13 +595,11 @@ impl<R: Read + Seek> CopcReader<'_, R> {
     ///
     /// The method filters out any entries that could not be parsed correctly, returning only
     /// successfully parsed entries.
-    pub fn hierarchy_entries(&self) -> Option<Vec<Entry>> {
-        Some(
-            self.hierarchy
-                .iter_entries()
-                .filter_map(|entry| entry.ok().copied())
-                .collect(),
-        )
+    pub fn hierarchy_entries(&self) -> Vec<Entry> {
+        self.hierarchy
+            .iter_entries()
+            .filter_map(|entry| entry.ok().copied())
+            .collect()
     }
 
     /// Reads all points specified by a COPC entry.
@@ -617,7 +615,7 @@ impl<R: Read + Seek> CopcReader<'_, R> {
     /// let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
     /// let mut entry_reader = CopcEntryReader::new(file).unwrap();
     /// // Get entry from hierarchy
-    /// let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
+    /// let root_entry = entry_reader.hierarchy_entries()[0];
     /// // Read all points
     /// let mut points = Vec::new();
     /// let point_count = entry_reader.read_entry_points(&root_entry, &mut points).unwrap();
@@ -756,11 +754,11 @@ fn point_in_bounds(point: &[u8], bounds: &Bounds, transforms: &Vector<crate::Tra
     let y = transforms.y.direct(raw(4));
     let z = transforms.z.direct(raw(8));
     bounds.min.x <= x
-        && x <= bounds.max.x
+        && bounds.max.x >= x
         && bounds.min.y <= y
-        && y <= bounds.max.y
+        && bounds.max.y >= y
         && bounds.min.z <= z
-        && z <= bounds.max.z
+        && bounds.max.z >= z
 }
 
 #[cfg(test)]
@@ -866,7 +864,7 @@ mod tests {
         let file =
             BufReader::new(File::open("tests/data/autzen.copc.laz").expect("Cannot open reader"));
         let entry_reader = CopcEntryReader::new(file).unwrap();
-        let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
+        let root_entry = entry_reader.hierarchy_entries()[0];
         assert_eq!(root_entry.key, VoxelKey::ROOT);
         assert_eq!(root_entry.point_count, 107);
     }
@@ -876,7 +874,7 @@ mod tests {
         let copc_points = {
             let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
             let mut entry_reader = CopcEntryReader::new(file).unwrap();
-            let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
+            let root_entry = entry_reader.hierarchy_entries()[0];
             let mut points = Vec::new();
             let _p_num = entry_reader
                 .read_entry_points(&root_entry, &mut points)
