@@ -26,6 +26,21 @@ pub enum Error {
     #[error("Entry referenced a page that is not present")]
     ReferencedPageMissingFromEvlr(crate::copc::Entry),
 
+    /// The COPC info VLR was not found.
+    #[cfg(feature = "laz")]
+    #[error("copc info vlr not found")]
+    CopcInfoVlrNotFound,
+
+    /// The COPC hierarchy EVLR was not found.
+    #[cfg(feature = "laz")]
+    #[error("copc hierarchy evlr not found")]
+    CopcHierarchyEvlrNotFound,
+
+    /// The requested COPC resolution is invalid.
+    #[cfg(feature = "laz")]
+    #[error("invalid COPC resolution: {0}")]
+    InvalidResolution(f64),
+
     /// The byte buffer length is not a multiple of the point record length.
     #[error("byte buffer length {len} is not a multiple of point record length {record_len}")]
     InvalidByteBufferLength {
