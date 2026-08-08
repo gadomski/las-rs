@@ -10,10 +10,10 @@ use std::{
     path::Path,
 };
 
-/// The user id of the LasZip VLR header.
+/// The user id of the Copc VLRs.
 pub const USER_ID: &str = "copc";
 
-/// The description of the LasZip VLR header.
+/// The description of the Copc VLRs.
 pub const DESCRIPTION: &str = "https://copc.io";
 
 use crate::{Error, Header, Result, Vlr};
@@ -27,7 +27,7 @@ use crate::{Error, Header, Result, Vlr};
 ///   from the beginning of the file).
 /// - The info VLR is 160 bytes described by the following structure. reserved
 ///   elements MUST be set to 0.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct CopcInfoVlr {
     /// Actual (unscaled) X coordinate of center of octree
     pub center_x: f64,
@@ -163,7 +163,7 @@ impl VoxelKey {
     }
     /// Calculates bounds of the VoxelKey.
     /// Serves as a guidance implementation.
-    pub fn bounds(&self, copc_info: CopcInfoVlr) -> Bounds {
+    pub fn bounds(&self, copc_info: &CopcInfoVlr) -> Bounds {
         let root_min_x = copc_info.center_x - copc_info.halfsize;
         let root_min_y = copc_info.center_y - copc_info.halfsize;
         let root_min_z = copc_info.center_z - copc_info.halfsize;
@@ -280,7 +280,7 @@ impl Entry {
 /// page (contained in the parent page as [Entry::byte_size] or in the COPC info
 /// VLR as [CopcData::root_hier_size]) and dividing by the size of an Entry (32
 /// bytes).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Page {
     entries: Vec<Entry>,
 }
@@ -317,7 +317,7 @@ impl Page {
 /// child hierarchy page, octree node data chunk, or an empty octree node. The
 /// size and file offset of each data chunk is provided in the hierarchy
 /// entries, allowing the chunks to be directly read for decoding.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CopcHierarchyVlr {
     root: Page,
     sub_pages: HashMap<VoxelKey, Page>,
@@ -677,7 +677,7 @@ impl<R: Read + Seek> CopcReader<'_, R> {
             entry.point_count > 0
                 && level_range.contains(&entry.key.l)
                 && query_bounds.is_none_or(|bounds| {
-                    bounds_intersect(&entry.key.bounds(self.copc_info), &bounds)
+                    bounds_intersect(&entry.key.bounds(&self.copc_info), &bounds)
                 })
         });
         entries.sort_by_key(|entry| entry.offset);
@@ -952,7 +952,7 @@ mod tests {
             reserved: [0; 11],
         };
         let key = VoxelKey::ROOT.child(3).unwrap();
-        let bounds = key.bounds(copc_info);
+        let bounds = key.bounds(&copc_info);
         assert_eq!(
             bounds,
             Bounds {
