@@ -53,7 +53,7 @@ pub struct CopcInfoVlr {
 }
 
 impl CopcInfoVlr {
-    /// The record id of the LasZip VLR header.
+    /// The record id of the CopcInfo VLR header.
     pub const RECORD_ID: u16 = 1;
 
     /// Reads the Vlr data from the source.
@@ -324,7 +324,7 @@ pub struct CopcHierarchyVlr {
 }
 
 impl CopcHierarchyVlr {
-    /// The record id of the LasZip VLR header.
+    /// The record id of the CopcHierarchy VLR header.
     pub const RECORD_ID: u16 = 1000;
 
     /// Writes the Vlr data to the source.
