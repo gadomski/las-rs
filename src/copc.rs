@@ -1,17 +1,19 @@
 //! [COPC](https://copc.io/) header data
 
-use crate::{raw, Bounds, Point, Vector};
+use crate::{raw, Bounds, Point, PointData, PointDataBuilder, Vector};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use laz::record::{LayeredPointRecordDecompressor, RecordDecompressor};
 use std::{
     collections::HashMap,
-    io::{Cursor, Read, Seek, SeekFrom, Write},
+    fs::File,
+    io::{self, BufReader, Cursor, Read, Seek, SeekFrom, Write},
+    path::Path,
 };
 
-/// The user id of the LasZip VLR header.
+/// The user id of the Copc VLRs.
 pub const USER_ID: &str = "copc";
 
-/// The description of the LasZip VLR header.
+/// The description of the Copc VLRs.
 pub const DESCRIPTION: &str = "https://copc.io";
 
 use crate::{Error, Header, Result, Vlr};
@@ -25,7 +27,7 @@ use crate::{Error, Header, Result, Vlr};
 ///   from the beginning of the file).
 /// - The info VLR is 160 bytes described by the following structure. reserved
 ///   elements MUST be set to 0.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CopcInfoVlr {
     /// Actual (unscaled) X coordinate of center of octree
     pub center_x: f64,
@@ -51,7 +53,7 @@ pub struct CopcInfoVlr {
 }
 
 impl CopcInfoVlr {
-    /// The record id of the LasZip VLR header.
+    /// The record id of the CopcInfo VLR header.
     pub const RECORD_ID: u16 = 1;
 
     /// Reads the Vlr data from the source.
@@ -161,7 +163,7 @@ impl VoxelKey {
     }
     /// Calculates bounds of the VoxelKey.
     /// Serves as a guidance implementation.
-    pub fn bounds(&self, copc_info: CopcInfoVlr) -> Bounds {
+    pub fn bounds(&self, copc_info: &CopcInfoVlr) -> Bounds {
         let root_min_x = copc_info.center_x - copc_info.halfsize;
         let root_min_y = copc_info.center_y - copc_info.halfsize;
         let root_min_z = copc_info.center_z - copc_info.halfsize;
@@ -278,7 +280,7 @@ impl Entry {
 /// page (contained in the parent page as [Entry::byte_size] or in the COPC info
 /// VLR as [CopcData::root_hier_size]) and dividing by the size of an Entry (32
 /// bytes).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Page {
     entries: Vec<Entry>,
 }
@@ -315,14 +317,14 @@ impl Page {
 /// child hierarchy page, octree node data chunk, or an empty octree node. The
 /// size and file offset of each data chunk is provided in the hierarchy
 /// entries, allowing the chunks to be directly read for decoding.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CopcHierarchyVlr {
     root: Page,
     sub_pages: HashMap<VoxelKey, Page>,
 }
 
 impl CopcHierarchyVlr {
-    /// The record id of the LasZip VLR header.
+    /// The record id of the CopcHierarchy VLR header.
     pub const RECORD_ID: u16 = 1000;
 
     /// Writes the Vlr data to the source.
@@ -338,23 +340,47 @@ impl CopcHierarchyVlr {
 
     /// Reads the CopcHierarchyVlr from the Vlr payload with specifications from copc_info.
     pub fn read_from_with(vlr: &Vlr, copc_info: &CopcInfoVlr) -> Result<CopcHierarchyVlr> {
-        let root = Page::read_from(vlr.data[0..copc_info.root_hier_size as usize].as_ref())?;
-        let sub_pages = root
+        let read_page = |offset: u64, byte_size: u64| {
+            let start = offset
+                .checked_sub(copc_info.root_hier_offset)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid COPC page"))?;
+            let start = usize::try_from(start)?;
+            let end = start
+                .checked_add(usize::try_from(byte_size)?)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid COPC page"))?;
+            let data = vlr
+                .data
+                .get(start..end)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid COPC page"))?;
+            Page::read_from(data)
+        };
+        let root = read_page(copc_info.root_hier_offset, copc_info.root_hier_size)?;
+        let mut sub_pages = HashMap::new();
+        let mut pending = root
             .entries
             .iter()
             .filter(|entry| entry.is_referencing_page())
-            .map(|entry| {
-                let start = (entry.offset - copc_info.root_hier_offset) as usize;
-                let end = start + entry.byte_size as usize;
-                Page::read_from(vlr.data[start..end].as_ref()).map(|p| (entry.key, p))
-            })
-            .collect::<Result<HashMap<VoxelKey, Page>>>()?;
+            .copied()
+            .collect::<Vec<_>>();
+
+        while let Some(entry) = pending.pop() {
+            if sub_pages.contains_key(&entry.key) {
+                continue;
+            }
+            let page = read_page(entry.offset, u64::try_from(entry.byte_size)?)?;
+            pending.extend(
+                page.entries
+                    .iter()
+                    .filter(|entry| entry.is_referencing_page()),
+            );
+            let _ = sub_pages.insert(entry.key, page);
+        }
         Ok(CopcHierarchyVlr { root, sub_pages })
     }
 
     /// iterates over all entries merging all referenced pages into root
     pub fn iter_entries(&self) -> EntryIterator<'_> {
-        EntryIterator::new(self.root.entries.iter().peekable(), &self.sub_pages)
+        EntryIterator::new(self.root.entries.iter(), &self.sub_pages)
     }
 }
 
@@ -375,24 +401,17 @@ impl CopcHierarchyVlr {
 /// the problematic entry.
 #[derive(Debug)]
 pub struct EntryIterator<'a> {
-    /// Peekable iterator over root entries, allows looking ahead without consuming
-    root_iter: std::iter::Peekable<std::slice::Iter<'a, Entry>>,
-
-    /// Optional iterator over entries in the currently referenced page
-    ref_iter: Option<std::slice::Iter<'a, Entry>>,
+    /// Stack of iterators for the hierarchy pages currently being traversed.
+    iterators: Vec<std::slice::Iter<'a, Entry>>,
 
     /// Reference to the mapping of VoxelKeys to Pages containing sub-entries
     sub_pages: &'a HashMap<VoxelKey, Page>,
 }
 
 impl<'a> EntryIterator<'a> {
-    fn new(
-        root_iter: std::iter::Peekable<std::slice::Iter<'a, Entry>>,
-        sub_pages: &'a HashMap<VoxelKey, Page>,
-    ) -> Self {
+    fn new(root_iter: std::slice::Iter<'a, Entry>, sub_pages: &'a HashMap<VoxelKey, Page>) -> Self {
         Self {
-            root_iter,
-            ref_iter: None,
+            iterators: vec![root_iter],
             sub_pages,
         }
     }
@@ -402,37 +421,20 @@ impl<'a> Iterator for EntryIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match (
-                &mut self.ref_iter,
-                self.root_iter
-                    .peek()
-                    .map(|entry| entry.is_referencing_page()),
-            ) {
-                // there currently is no page referenced and the next root entry would reference a page
-                (None, Some(true)) => {
-                    let next_entry = self.root_iter.next();
-                    self.ref_iter = next_entry
-                        .and_then(|entry| self.sub_pages.get(&entry.key))
-                        .map(|page| page.entries.iter());
-                    if self.ref_iter.is_none() {
-                        // Entry is referencing a  missing page
-                        return next_entry
-                            .map(|entry| Err(Error::ReferencedPageMissingFromEvlr(*entry)));
-                    }
+            let entry = match self.iterators.last_mut()?.next() {
+                Some(entry) => entry,
+                None => {
+                    let _ = self.iterators.pop();
+                    continue;
                 }
-                //there is a page referenced
-                (Some(ref_iter), _) => {
-                    if let Some(entry) = ref_iter.next() {
-                        return Some(Ok(entry));
-                    } else {
-                        //iterator is empty
-                        self.ref_iter = None;
-                    }
+            };
+            if entry.is_referencing_page() {
+                match self.sub_pages.get(&entry.key) {
+                    Some(page) => self.iterators.push(page.entries.iter()),
+                    None => return Some(Err(Error::ReferencedPageMissingFromEvlr(*entry))),
                 }
-                // there is no page referenced and the next entry would not reference a page
-                (None, Some(false)) => return self.root_iter.next().map(Ok),
-                // the root iterator is empty
-                (None, None) => return None,
+            } else {
+                return Some(Ok(entry));
             }
         }
     }
@@ -511,20 +513,49 @@ impl Header {
     }
 }
 
-/// Entry Reader can read whole entries of copc laz files
-/// A reader for COPC (Cloud Optimized Point Cloud) entries that handles decompression and point reading.
-///
-/// This struct provides functionality to read points from COPC entries in LAZ files,
-/// handling the necessary decompression and format transformations.
+/// Selects the octree levels returned by a COPC query.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LodSelection {
+    /// All levels.
+    All,
+    /// Levels needed to provide at least the requested point spacing.
+    Resolution(f64),
+    /// Only the requested level.
+    Level(i32),
+    /// Levels in the half-open range `min..max`.
+    LevelMinMax(i32, i32),
+}
+
+/// Selects the bounds returned by a COPC query.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BoundsSelection {
+    /// No bounds filter.
+    All,
+    /// Points within the bounds.
+    Within(Bounds),
+}
+
+/// Reads and queries points from a COPC file.
 #[allow(missing_debug_implementations)]
-pub struct CopcEntryReader<'a, R: Read + Seek> {
+pub struct CopcReader<'a, R: Read + Seek> {
     decompressor: LayeredPointRecordDecompressor<'a, R>,
     buffer: Cursor<Vec<u8>>,
     header: Header,
+    copc_info: CopcInfoVlr,
+    hierarchy: CopcHierarchyVlr,
 }
 
-impl<R: Read + Seek> CopcEntryReader<'_, R> {
-    /// Creates a new COPC Entry reader.
+impl CopcReader<'static, BufReader<File>> {
+    /// Creates a COPC reader from a path.
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        File::open(path)
+            .map_err(Error::from)
+            .and_then(|file| Self::new(BufReader::new(file)))
+    }
+}
+
+impl<R: Read + Seek> CopcReader<'_, R> {
+    /// Creates a new COPC reader.
     ///
     /// Initializes a new reader by parsing the LAS header and setting up the decompressor
     /// with the appropriate field configurations from the LAZ VLR.
@@ -532,13 +563,17 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     /// # Examples
     ///
     /// ```
-    /// use las::CopcEntryReader;
+    /// use las::CopcReader;
     /// use std::{fs::File, io::BufReader};
     /// let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
-    /// let reader = CopcEntryReader::new(file).unwrap();
+    /// let reader = CopcReader::new(file).unwrap();
     /// ```
     pub fn new(mut read: R) -> Result<Self> {
         let header = Header::new(read.by_ref())?;
+        let copc_info = header.copc_info_vlr().ok_or(Error::CopcInfoVlrNotFound)?;
+        let hierarchy = header
+            .copc_hierarchy_evlr()
+            .ok_or(Error::CopcHierarchyEvlrNotFound)?;
         let mut decompressor = LayeredPointRecordDecompressor::new(read);
         decompressor.set_fields_from(header.laz_vlr()?.items())?;
         let buffer = Cursor::new(Vec::new());
@@ -546,6 +581,8 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
             decompressor,
             buffer,
             header,
+            copc_info,
+            hierarchy,
         })
     }
 
@@ -558,10 +595,11 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     ///
     /// The method filters out any entries that could not be parsed correctly, returning only
     /// successfully parsed entries.
-    pub fn hierarchy_entries(&self) -> Option<Vec<Entry>> {
-        self.header()
-            .copc_hierarchy_evlr()
-            .map(|vlr| vlr.iter_entries().filter_map(|e| e.ok().copied()).collect())
+    pub fn hierarchy_entries(&self) -> Vec<Entry> {
+        self.hierarchy
+            .iter_entries()
+            .filter_map(|entry| entry.ok().copied())
+            .collect()
     }
 
     /// Reads all points specified by a COPC entry.
@@ -577,33 +615,103 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     /// let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
     /// let mut entry_reader = CopcEntryReader::new(file).unwrap();
     /// // Get entry from hierarchy
-    /// let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
+    /// let root_entry = entry_reader.hierarchy_entries()[0];
     /// // Read all points
     /// let mut points = Vec::new();
     /// let point_count = entry_reader.read_entry_points(&root_entry, &mut points).unwrap();
     /// println!("Read {} points", point_count);
     /// ```
     pub fn read_entry_points(&mut self, entry: &Entry, points: &mut Vec<Point>) -> Result<u64> {
-        let _off = self
-            .decompressor
-            .get_mut()
-            .seek(SeekFrom::Start(entry.offset))?;
-        points.reserve_exact(entry.point_count as usize);
+        let format = *self.header.point_format();
+        let transforms = *self.header.transforms();
+        let point_count = usize::try_from(entry.point_count)?;
+        let bytes = self.read_entry_bytes(entry)?;
+        let mut buffer = Cursor::new(bytes);
+        points.reserve(point_count);
 
-        let resize = usize::try_from(
-            entry.point_count as u64 * u64::from(self.header.point_format().len()),
-        )?;
-        self.buffer.get_mut().resize(resize, 0u8);
-        self.decompressor.decompress_many(self.buffer.get_mut())?;
-        self.buffer.set_position(0);
-        points.reserve(entry.point_count as usize);
-
-        for _ in 0..entry.point_count as usize {
-            let point = raw::Point::read_from(&mut self.buffer, self.header.point_format())
-                .map(|raw_point| Point::new(raw_point, self.header.transforms()))?;
+        for _ in 0..point_count {
+            let point = raw::Point::read_from(&mut buffer, &format)
+                .map(|raw_point| Point::new(raw_point, &transforms))?;
             points.push(point);
         }
         Ok(entry.point_count as u64)
+    }
+
+    /// Reads all points matching the level-of-detail and bounds selections.
+    ///
+    /// The result uses the same [`PointData`] representation as [`crate::Reader`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::{BoundsSelection, CopcReader, LodSelection};
+    /// let mut reader = CopcReader::from_path("tests/data/autzen.copc.laz").unwrap();
+    /// let points = reader
+    ///     .query(LodSelection::Level(0), BoundsSelection::All)
+    ///     .unwrap();
+    /// assert_eq!(points.len(), 107);
+    /// ```
+    pub fn query(&mut self, levels: LodSelection, bounds: BoundsSelection) -> Result<PointData> {
+        let level_range = match levels {
+            LodSelection::All => 0..i32::MAX,
+            LodSelection::Resolution(resolution) => {
+                if !resolution.is_normal() || !resolution.is_sign_positive() {
+                    return Err(Error::InvalidResolution(resolution));
+                }
+                let max = 1.max((self.copc_info.spacing / resolution).log2().ceil() as i32 + 1);
+                0..max
+            }
+            LodSelection::Level(level) => level..level + 1,
+            LodSelection::LevelMinMax(min, max) => min..max,
+        };
+        let query_bounds = match bounds {
+            BoundsSelection::All => None,
+            BoundsSelection::Within(bounds) => Some(bounds),
+        };
+        let mut entries = self
+            .hierarchy
+            .iter_entries()
+            .map(|entry| entry.copied())
+            .collect::<Result<Vec<_>>>()?;
+        entries.retain(|entry| {
+            entry.point_count > 0
+                && level_range.contains(&entry.key.l)
+                && query_bounds.is_none_or(|bounds| {
+                    bounds_intersect(&entry.key.bounds(&self.copc_info), &bounds)
+                })
+        });
+        entries.sort_by_key(|entry| entry.offset);
+
+        let format = *self.header.point_format();
+        let transforms = *self.header.transforms();
+        let record_len = usize::from(format.len());
+        let mut bytes = Vec::new();
+        for entry in entries {
+            for point in self.read_entry_bytes(&entry)?.chunks_exact(record_len) {
+                if query_bounds.is_none_or(|bounds| point_in_bounds(point, &bounds, &transforms)) {
+                    bytes.extend_from_slice(point);
+                }
+            }
+        }
+        PointDataBuilder::new()
+            .for_header(&self.header)
+            .build_from_bytes(bytes)
+    }
+
+    fn read_entry_bytes(&mut self, entry: &Entry) -> Result<&[u8]> {
+        let point_count = usize::try_from(entry.point_count)?;
+        let record_len = usize::from(self.header.point_format().len());
+        let byte_count = usize::try_from(u64::try_from(point_count)? * u64::try_from(record_len)?)?;
+        let _ = self
+            .decompressor
+            .get_mut()
+            .seek(SeekFrom::Start(entry.offset))?;
+        self.decompressor.reset();
+        self.decompressor
+            .set_fields_from(self.header.laz_vlr()?.items())?;
+        self.buffer.get_mut().resize(byte_count, 0u8);
+        self.decompressor.decompress_many(self.buffer.get_mut())?;
+        Ok(self.buffer.get_ref())
     }
 
     /// Returns a reference to the LAS header.
@@ -614,10 +722,10 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     /// # Examples
     ///
     /// ```
-    /// use las::CopcEntryReader;
+    /// use las::CopcReader;
     /// use std::{fs::File, io::BufReader};
     /// let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
-    /// let reader = CopcEntryReader::new(file).unwrap();
+    /// let reader = CopcReader::new(file).unwrap();
     /// let header = reader.header();
     /// println!("Point count: {}", header.number_of_points());
     /// println!("Point format: {:?}", header.point_format());
@@ -627,11 +735,39 @@ impl<R: Read + Seek> CopcEntryReader<'_, R> {
     }
 }
 
+/// Backwards-compatible name for [`CopcReader`].
+pub type CopcEntryReader<'a, R> = CopcReader<'a, R>;
+
+fn bounds_intersect(a: &Bounds, b: &Bounds) -> bool {
+    a.min.x <= b.max.x
+        && a.max.x >= b.min.x
+        && a.min.y <= b.max.y
+        && a.max.y >= b.min.y
+        && a.min.z <= b.max.z
+        && a.max.z >= b.min.z
+}
+
+fn point_in_bounds(point: &[u8], bounds: &Bounds, transforms: &Vector<crate::Transform>) -> bool {
+    let raw =
+        |offset| i32::from_le_bytes(point[offset..offset + 4].try_into().expect("four bytes"));
+    let x = transforms.x.direct(raw(0));
+    let y = transforms.y.direct(raw(4));
+    let z = transforms.z.direct(raw(8));
+    bounds.min.x <= x
+        && bounds.max.x >= x
+        && bounds.min.y <= y
+        && bounds.max.y >= y
+        && bounds.min.z <= z
+        && bounds.max.z >= z
+}
+
 #[cfg(test)]
 mod tests {
 
-    use super::{CopcInfoVlr, Result, VoxelKey};
-    use crate::{copc::CopcEntryReader, Bounds, Reader, Vector};
+    use super::{
+        BoundsSelection, CopcHierarchyVlr, CopcInfoVlr, Entry, LodSelection, Result, VoxelKey,
+    };
+    use crate::{copc::CopcEntryReader, Bounds, CopcReader, Reader, Vector, Vlr};
     use std::{fs::File, io::BufReader};
     #[test]
     fn test_voxelkey() {
@@ -664,11 +800,71 @@ mod tests {
     }
 
     #[test]
+    fn test_nested_hierarchy_pages() {
+        let child = VoxelKey::ROOT.child(0).unwrap();
+        let entries = [
+            Entry {
+                key: VoxelKey::ROOT,
+                offset: 132,
+                byte_size: 64,
+                point_count: -1,
+            },
+            Entry {
+                key: VoxelKey::ROOT,
+                offset: 1_000,
+                byte_size: 20,
+                point_count: 1,
+            },
+            Entry {
+                key: child,
+                offset: 196,
+                byte_size: 32,
+                point_count: -1,
+            },
+            Entry {
+                key: child,
+                offset: 2_000,
+                byte_size: 40,
+                point_count: 2,
+            },
+        ];
+        let mut data = Vec::new();
+        entries
+            .iter()
+            .try_for_each(|entry| entry.write_to(&mut data))
+            .unwrap();
+        let vlr = Vlr {
+            data,
+            ..Default::default()
+        };
+        let info = CopcInfoVlr {
+            center_x: 0.0,
+            center_y: 0.0,
+            center_z: 0.0,
+            halfsize: 1.0,
+            spacing: 1.0,
+            root_hier_offset: 100,
+            root_hier_size: 32,
+            gpstime_minimum: 0.0,
+            gpstime_maximum: 0.0,
+            reserved: [0; 11],
+        };
+        let hierarchy = CopcHierarchyVlr::read_from_with(&vlr, &info).unwrap();
+        let entries = hierarchy
+            .iter_entries()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].point_count, 1);
+        assert_eq!(entries[1].point_count, 2);
+    }
+
+    #[test]
     fn test_copc_entry_key_autzen() {
         let file =
             BufReader::new(File::open("tests/data/autzen.copc.laz").expect("Cannot open reader"));
         let entry_reader = CopcEntryReader::new(file).unwrap();
-        let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
+        let root_entry = entry_reader.hierarchy_entries()[0];
         assert_eq!(root_entry.key, VoxelKey::ROOT);
         assert_eq!(root_entry.point_count, 107);
     }
@@ -678,7 +874,7 @@ mod tests {
         let copc_points = {
             let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
             let mut entry_reader = CopcEntryReader::new(file).unwrap();
-            let root_entry = entry_reader.hierarchy_entries().unwrap()[0];
+            let root_entry = entry_reader.hierarchy_entries()[0];
             let mut points = Vec::new();
             let _p_num = entry_reader
                 .read_entry_points(&root_entry, &mut points)
@@ -697,6 +893,50 @@ mod tests {
             .zip(copc_points)
             .all(|(laz_point, copc_point)| laz_point.eq(&copc_point)));
     }
+
+    #[test]
+    fn test_copc_query_autzen() {
+        let mut reader = CopcReader::from_path("tests/data/autzen.copc.laz").unwrap();
+        let bounds = reader.header().bounds();
+        let points = reader
+            .query(LodSelection::Level(0), BoundsSelection::Within(bounds))
+            .unwrap();
+        assert_eq!(points.len(), reader.header().number_of_points() as usize);
+        assert!(points.points().all(|point| {
+            let point = point.unwrap();
+            point.x >= bounds.min.x
+                && point.x <= bounds.max.x
+                && point.y >= bounds.min.y
+                && point.y <= bounds.max.y
+                && point.z >= bounds.min.z
+                && point.z <= bounds.max.z
+        }));
+    }
+
+    #[test]
+    fn test_copc_query_filters_bounds() {
+        let mut reader = CopcReader::from_path("tests/data/autzen.copc.laz").unwrap();
+        let mut bounds = reader.header().bounds();
+        bounds.max.x = (bounds.min.x + bounds.max.x) / 2.0;
+        let points = reader
+            .query(LodSelection::Level(0), BoundsSelection::Within(bounds))
+            .unwrap();
+        assert!(!points.is_empty());
+        assert!(points.x().all(|x| x >= bounds.min.x && x <= bounds.max.x));
+
+        let repeated = reader
+            .query(LodSelection::Level(0), BoundsSelection::Within(bounds))
+            .unwrap();
+        assert_eq!(points.raw_bytes(), repeated.raw_bytes());
+    }
+
+    #[test]
+    fn test_copc_query_rejects_invalid_resolution() {
+        let mut reader = CopcReader::from_path("tests/data/autzen.copc.laz").unwrap();
+        assert!(reader
+            .query(LodSelection::Resolution(0.0), BoundsSelection::All,)
+            .is_err());
+    }
     #[test]
     fn test_voxel_bounds() {
         let copc_info = CopcInfoVlr {
@@ -712,7 +952,7 @@ mod tests {
             reserved: [0; 11],
         };
         let key = VoxelKey::ROOT.child(3).unwrap();
-        let bounds = key.bounds(copc_info);
+        let bounds = key.bounds(&copc_info);
         assert_eq!(
             bounds,
             Bounds {
