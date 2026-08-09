@@ -1,12 +1,13 @@
 //! [COPC](https://copc.io/) header data
 
-use crate::{raw, Bounds, Point, PointData, PointDataBuilder, Vector};
+use crate::{Bounds, PointData, PointDataBuilder, Vector};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use laz::record::{LayeredPointRecordDecompressor, RecordDecompressor};
 use std::{
     collections::HashMap,
     fs::File,
     io::{self, BufReader, Cursor, Read, Seek, SeekFrom, Write},
+    ops::Range,
     path::Path,
 };
 
@@ -152,6 +153,11 @@ impl VoxelKey {
         })
     }
 
+    /// Compute all 8 children of the VoxelKey
+    pub fn children(&self) -> impl Iterator<Item = Self> {
+        (0..8).map(|i| self.child(i).unwrap())
+    }
+
     /// Computes the parent VoxelKey.
     pub fn parent(&self) -> Self {
         Self {
@@ -196,6 +202,7 @@ impl VoxelKey {
             max: voxel_max,
         }
     }
+
     /// The root voxel key.
     pub const ROOT: Self = Self {
         l: 0,
@@ -269,6 +276,7 @@ impl Entry {
         dst.write_i32::<LittleEndian>(self.point_count)?;
         Ok(())
     }
+
     fn is_referencing_page(&self) -> bool {
         self.point_count == -1
     }
@@ -416,6 +424,7 @@ impl<'a> EntryIterator<'a> {
         }
     }
 }
+
 impl<'a> Iterator for EntryIterator<'a> {
     type Item = Result<&'a Entry>;
 
@@ -439,6 +448,7 @@ impl<'a> Iterator for EntryIterator<'a> {
         }
     }
 }
+
 impl Vlr {
     /// Returns true if this [Vlr] is the Copc info Vlr.
     ///
@@ -474,6 +484,7 @@ impl Header {
             .and_then(|vlr| vlr.try_into().ok())
     }
 }
+
 impl Vlr {
     /// Returns true if this [Vlr] is the Copc Hierarchy Vlr.
     ///
@@ -542,7 +553,7 @@ pub struct CopcReader<'a, R: Read + Seek> {
     buffer: Cursor<Vec<u8>>,
     header: Header,
     copc_info: CopcInfoVlr,
-    hierarchy: CopcHierarchyVlr,
+    hierarchy: HashMap<VoxelKey, Entry>,
 }
 
 impl CopcReader<'static, BufReader<File>> {
@@ -574,6 +585,12 @@ impl<R: Read + Seek> CopcReader<'_, R> {
         let hierarchy = header
             .copc_hierarchy_evlr()
             .ok_or(Error::CopcHierarchyEvlrNotFound)?;
+        let hierarchy = hierarchy.iter_entries().collect::<Result<Vec<_>>>()?;
+        let hierarchy = hierarchy
+            .into_iter()
+            .map(|e| (e.key, *e))
+            .collect::<HashMap<_, _>>();
+
         let mut decompressor = LayeredPointRecordDecompressor::new(read);
         decompressor.set_fields_from(header.laz_vlr()?.items())?;
         let buffer = Cursor::new(Vec::new());
@@ -588,53 +605,39 @@ impl<R: Read + Seek> CopcReader<'_, R> {
 
     /// Retrieves all entries from the COPC hierarchy.
     ///
-    /// This method extracts all COPC hierarchy entries from the Extended Variable Length Record (EVLR)
-    /// in the file header, providing access to the octree structure of the point cloud.
-    ///
-    /// # Notes
-    ///
-    /// The method filters out any entries that could not be parsed correctly, returning only
-    /// successfully parsed entries.
-    pub fn hierarchy_entries(&self) -> Vec<Entry> {
-        self.hierarchy
-            .iter_entries()
-            .filter_map(|entry| entry.ok().copied())
-            .collect()
+    /// The entries are in no particular order
+    pub fn hierarchy_entries(&self) -> impl Iterator<Item = Entry> {
+        self.hierarchy.values().copied()
+    }
+
+    /// Get a specific entry from the hierarchy by key
+    pub fn hierarchy_entry(&self, key: &VoxelKey) -> Option<Entry> {
+        self.hierarchy.get(key).copied()
     }
 
     /// Reads all points specified by a COPC entry.
     ///
-    /// Seeks to the specified offset in the file, decompresses the point data,
-    /// and converts the raw points to the point format defined by the header.
+    /// The result uses the same [`PointData`] representation as [`crate::Reader`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use las::CopcEntryReader;
+    /// use las::{CopcEntryReader, copc::VoxelKey};
     /// use std::{fs::File, io::BufReader};
     /// let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
     /// let mut entry_reader = CopcEntryReader::new(file).unwrap();
     /// // Get entry from hierarchy
-    /// let root_entry = entry_reader.hierarchy_entries()[0];
+    /// let root_entry = entry_reader.hierarchy_entry(&VoxelKey::ROOT).unwrap();
     /// // Read all points
-    /// let mut points = Vec::new();
-    /// let point_count = entry_reader.read_entry_points(&root_entry, &mut points).unwrap();
+    /// let point_count = entry_reader.read_entry(&root_entry).unwrap().points().len();
     /// println!("Read {} points", point_count);
     /// ```
-    pub fn read_entry_points(&mut self, entry: &Entry, points: &mut Vec<Point>) -> Result<u64> {
-        let format = *self.header.point_format();
-        let transforms = *self.header.transforms();
-        let point_count = usize::try_from(entry.point_count)?;
-        let bytes = self.read_entry_bytes(entry)?;
-        let mut buffer = Cursor::new(bytes);
-        points.reserve(point_count);
+    pub fn read_entry(&mut self, entry: &Entry) -> Result<PointData> {
+        let bytes = self.read_entry_bytes(entry)?.to_vec();
 
-        for _ in 0..point_count {
-            let point = raw::Point::read_from(&mut buffer, &format)
-                .map(|raw_point| Point::new(raw_point, &transforms))?;
-            points.push(point);
-        }
-        Ok(entry.point_count as u64)
+        PointDataBuilder::new()
+            .for_header(&self.header)
+            .build_from_bytes(bytes)
     }
 
     /// Reads all points matching the level-of-detail and bounds selections.
@@ -668,18 +671,8 @@ impl<R: Read + Seek> CopcReader<'_, R> {
             BoundsSelection::All => None,
             BoundsSelection::Within(bounds) => Some(bounds),
         };
-        let mut entries = self
-            .hierarchy
-            .iter_entries()
-            .map(|entry| entry.copied())
-            .collect::<Result<Vec<_>>>()?;
-        entries.retain(|entry| {
-            entry.point_count > 0
-                && level_range.contains(&entry.key.l)
-                && query_bounds.is_none_or(|bounds| {
-                    bounds_intersect(&entry.key.bounds(&self.copc_info), &bounds)
-                })
-        });
+        let mut entries =
+            select_entries(&self.hierarchy, &self.copc_info, level_range, query_bounds)?;
         entries.sort_by_key(|entry| entry.offset);
 
         let format = *self.header.point_format();
@@ -747,6 +740,35 @@ fn bounds_intersect(a: &Bounds, b: &Bounds) -> bool {
         && a.max.z >= b.min.z
 }
 
+fn select_entries(
+    entries: &HashMap<VoxelKey, Entry>,
+    copc_info: &CopcInfoVlr,
+    levels: Range<i32>,
+    bounds: Option<Bounds>,
+) -> Result<Vec<Entry>> {
+    let mut selected = Vec::new();
+    let mut pending = vec![VoxelKey::ROOT];
+
+    while let Some(key) = pending.pop() {
+        if key.l >= levels.end {
+            continue;
+        }
+        let Some(entry) = entries.get(&key) else {
+            continue;
+        };
+        if bounds.is_some_and(|bounds| !bounds_intersect(&key.bounds(copc_info), &bounds)) {
+            continue;
+        }
+        if key.l + 1 < levels.end {
+            pending.extend(key.children());
+        }
+        if entry.point_count > 0 && levels.contains(&key.l) {
+            selected.push(*entry);
+        }
+    }
+    Ok(selected)
+}
+
 fn point_in_bounds(point: &[u8], bounds: &Bounds, transforms: &Vector<crate::Transform>) -> bool {
     let raw =
         |offset| i32::from_le_bytes(point[offset..offset + 4].try_into().expect("four bytes"));
@@ -765,10 +787,11 @@ fn point_in_bounds(point: &[u8], bounds: &Bounds, transforms: &Vector<crate::Tra
 mod tests {
 
     use super::{
-        BoundsSelection, CopcHierarchyVlr, CopcInfoVlr, Entry, LodSelection, Result, VoxelKey,
+        select_entries, BoundsSelection, CopcHierarchyVlr, CopcInfoVlr, Entry, LodSelection,
+        Result, VoxelKey,
     };
     use crate::{copc::CopcEntryReader, Bounds, CopcReader, Reader, Vector, Vlr};
-    use std::{fs::File, io::BufReader};
+    use std::{collections::HashMap, fs::File, io::BufReader};
     #[test]
     fn test_voxelkey() {
         let vk = VoxelKey::ROOT;
@@ -860,11 +883,50 @@ mod tests {
     }
 
     #[test]
+    fn test_entry_selection_stops_at_missing_parent() {
+        let orphan = VoxelKey::ROOT.child(0).unwrap().child(0).unwrap();
+        let entries = vec![
+            Entry {
+                key: VoxelKey::ROOT,
+                offset: 1_000,
+                byte_size: 20,
+                point_count: 1,
+            },
+            Entry {
+                key: orphan,
+                offset: 2_000,
+                byte_size: 20,
+                point_count: 1,
+            },
+        ];
+        let index = entries
+            .into_iter()
+            .map(|entry| (entry.key, entry))
+            .collect::<HashMap<_, _>>();
+        let info = CopcInfoVlr {
+            center_x: 0.0,
+            center_y: 0.0,
+            center_z: 0.0,
+            halfsize: 1.0,
+            spacing: 1.0,
+            root_hier_offset: 0,
+            root_hier_size: 0,
+            gpstime_minimum: 0.0,
+            gpstime_maximum: 0.0,
+            reserved: [0; 11],
+        };
+
+        let selected = select_entries(&index, &info, 0..i32::MAX, None).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].key, VoxelKey::ROOT);
+    }
+
+    #[test]
     fn test_copc_entry_key_autzen() {
         let file =
             BufReader::new(File::open("tests/data/autzen.copc.laz").expect("Cannot open reader"));
         let entry_reader = CopcEntryReader::new(file).unwrap();
-        let root_entry = entry_reader.hierarchy_entries()[0];
+        let root_entry = entry_reader.hierarchy_entry(&VoxelKey::ROOT).unwrap();
         assert_eq!(root_entry.key, VoxelKey::ROOT);
         assert_eq!(root_entry.point_count, 107);
     }
@@ -874,12 +936,12 @@ mod tests {
         let copc_points = {
             let file = BufReader::new(File::open("tests/data/autzen.copc.laz").unwrap());
             let mut entry_reader = CopcEntryReader::new(file).unwrap();
-            let root_entry = entry_reader.hierarchy_entries()[0];
-            let mut points = Vec::new();
-            let _p_num = entry_reader
-                .read_entry_points(&root_entry, &mut points)
-                .unwrap();
-            points
+            entry_reader
+                .query(LodSelection::All, BoundsSelection::All)
+                .unwrap()
+                .points()
+                .collect::<Result<Vec<_>>>()
+                .unwrap()
         };
         let laz_points: Vec<_> = Reader::from_path("tests/data/autzen.copc.laz")
             .unwrap()
