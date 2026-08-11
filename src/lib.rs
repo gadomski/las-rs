@@ -192,8 +192,11 @@ mod utils;
 mod vector;
 mod version;
 
+#[allow(deprecated)]
 #[cfg(feature = "laz")]
-pub use crate::copc::{BoundsSelection, CopcEntryReader, CopcReader, LodSelection};
+pub use crate::copc::CopcEntryReader;
+#[cfg(feature = "laz")]
+pub use crate::copc::{BoundsSelection, CopcReader, LodSelection};
 pub use crate::{
     bounds::Bounds,
     color::Color,

@@ -92,6 +92,16 @@ impl Bounds {
             },
         })
     }
+
+    /// Check if the bounds intersect another bounds
+    pub fn intersect(&self, other: &Bounds) -> bool {
+        self.min.x <= other.max.x
+            && self.max.x >= other.min.x
+            && self.min.y <= other.max.y
+            && self.max.y >= other.min.y
+            && self.min.z <= other.max.z
+            && self.max.z >= other.min.z
+    }
 }
 
 impl Default for Bounds {
