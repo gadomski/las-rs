@@ -5,6 +5,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// The VLR does not identify an Extra Bytes record.
+    #[error("the VLR is not an Extra Bytes VLR")]
+    NotExtraBytesVlr,
+
     /// The writer is closed.
     #[error("the writer is closed")]
     ClosedWriter,
@@ -243,4 +247,74 @@ pub enum Error {
         /// Actual minor revision
         actual_minor: u16,
     },
+
+    /// More than one Extra Bytes VLR is present.
+    #[error("found {0} Extra Bytes VLRs; at most one is allowed")]
+    MultipleExtraBytesVlrs(usize),
+
+    /// The VLR payload is not a sequence of 192-byte descriptors.
+    #[error("Extra Bytes VLR payload length {0} is not a multiple of 192")]
+    InvalidExtraBytesVlrLength(usize),
+
+    /// A descriptor uses an unassigned data type whose width is unknown.
+    #[error("Extra Bytes descriptor uses reserved data type {0}")]
+    ReservedExtraBytesDataType(u8),
+
+    /// A descriptor uses a data type that typed writing does not support.
+    #[error("cannot write Extra Bytes descriptor data type {0}")]
+    UnsupportedExtraBytesDataType(u8),
+
+    /// The descriptors require more bytes than the point format contains.
+    #[error(
+        "Extra Bytes VLR describes {0} bytes, but the point format contains only {1} extra bytes"
+    )]
+    ExtraBytesMismatch(usize, usize),
+
+    /// A byte slab does not contain enough Extra Bytes for a descriptor.
+    #[error("PointData contains {1} extra bytes per point, but the field requires at least {0}")]
+    PointDataExtraBytesMismatch(usize, usize),
+
+    /// An owned point does not contain enough Extra Bytes for a descriptor.
+    #[error("point contains {1} extra bytes, but the field requires at least {0}")]
+    PointExtraBytesMismatch(usize, usize),
+
+    /// No descriptor has the requested name.
+    #[error("Extra Bytes field '{0}' does not exist")]
+    ExtraBytesFieldNotFound(String),
+
+    /// The requested descriptor is raw bytes or a deprecated array, not a scalar.
+    #[error("Extra Bytes field '{0}' is not a scalar numeric field")]
+    NonNumericExtraBytesField(String),
+
+    /// A value cannot be represented by an Extra Bytes field's storage type.
+    #[error("value cannot be encoded for Extra Bytes field '{0}'")]
+    InvalidExtraBytesValue(String),
+
+    /// An Extra Bytes field has no no-data value to encode.
+    #[error("Extra Bytes field '{0}' does not define a no-data value")]
+    ExtraBytesNoDataNotDefined(String),
+
+    /// A raw Extra Bytes value has the wrong width.
+    #[error("Extra Bytes field '{name}' requires {expected} bytes, but received {actual}")]
+    ExtraBytesFieldLengthMismatch {
+        /// The field name.
+        name: String,
+        /// The descriptor's byte width.
+        expected: usize,
+        /// The supplied value's byte width.
+        actual: usize,
+    },
+
+    /// A typed Extra Bytes column has the wrong number of values.
+    #[error("Extra Bytes column requires {expected} values, but received {actual}")]
+    ExtraBytesColumnLengthMismatch {
+        /// The number of points in the destination.
+        expected: usize,
+        /// The supplied number of values.
+        actual: usize,
+    },
+
+    /// More than one descriptor uses the same Extra Bytes field name.
+    #[error("duplicate Extra Bytes field name '{0}'")]
+    DuplicateExtraBytesField(String),
 }

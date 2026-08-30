@@ -174,6 +174,7 @@ pub mod copc;
 pub mod laz;
 
 pub mod crs;
+pub mod extra_bytes;
 pub mod feature;
 pub mod header;
 pub mod point;
@@ -201,6 +202,11 @@ pub use crate::{
     bounds::Bounds,
     color::Color,
     error::Error,
+    extra_bytes::{
+        ExtraBytesColumn, ExtraBytesDataType, ExtraBytesDescriptor, ExtraBytesNullableColumn,
+        ExtraBytesRawColumn, ExtraBytesTypedColumn, ExtraBytesTypedNullableColumn, ExtraBytesValue,
+        ExtraBytesVlr,
+    },
     feature::Feature,
     gps_time_type::GpsTimeType,
     header::{Builder, Header},

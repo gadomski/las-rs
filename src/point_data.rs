@@ -458,6 +458,24 @@ impl PointData {
         )
     }
 
+    /// Raw extra bytes for each point, or `None` if the format has none.
+    ///
+    /// The returned slices borrow this slab and contain exactly
+    /// `self.format().extra_bytes` bytes each. Use [`crate::ExtraBytesVlr`] when
+    /// an Extra Bytes VLR describes typed attributes within these slices.
+    pub fn extra_bytes(&self) -> Option<impl Iterator<Item = &[u8]> + '_> {
+        let len = usize::from(self.format.extra_bytes);
+        if len == 0 {
+            return None;
+        }
+        let start = self.layout.record_len - len;
+        Some(
+            self.bytes
+                .chunks_exact(self.layout.record_len)
+                .map(move |record| &record[start..]),
+        )
+    }
+
     fn records(&self) -> impl Iterator<Item = &[u8]> + '_ {
         self.bytes.chunks_exact(self.layout.record_len)
     }
