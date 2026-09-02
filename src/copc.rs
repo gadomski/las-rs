@@ -347,10 +347,21 @@ impl CopcHierarchyVlr {
     }
 
     /// Reads the CopcHierarchyVlr from the Vlr payload with specifications from copc_info.
-    pub fn read_from_with(vlr: &Vlr, copc_info: &CopcInfoVlr) -> Result<CopcHierarchyVlr> {
+    ///
+    /// Page offsets in the hierarchy (`copc_info.root_hier_offset` and the
+    /// `offset` of every entry with `point_count == -1`) are absolute file
+    /// offsets, so `payload_file_offset` — the file position where `vlr.data`
+    /// begins, i.e. just past the EVLR header — is needed to locate pages
+    /// inside the payload. The root page is not necessarily the first page:
+    /// PDAL and Untwine both write it last on multi-page hierarchies.
+    pub fn read_from_with(
+        vlr: &Vlr,
+        copc_info: &CopcInfoVlr,
+        payload_file_offset: u64,
+    ) -> Result<CopcHierarchyVlr> {
         let read_page = |offset: u64, byte_size: u64| {
             let start = offset
-                .checked_sub(copc_info.root_hier_offset)
+                .checked_sub(payload_file_offset)
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid COPC page"))?;
             let start = usize::try_from(start)?;
             let end = start
@@ -517,10 +528,22 @@ impl Header {
     ///   or if there was an error parsing the COPC hierarchy EVLRto parse it using the CopcInfoVlr.
     pub fn copc_hierarchy_evlr(&self) -> Option<CopcHierarchyVlr> {
         let copc_info = self.copc_info_vlr()?;
-        self.evlrs()
-            .iter()
-            .find(|vlr| vlr.is_copc_hierarchy())
-            .and_then(|vlr| CopcHierarchyVlr::read_from_with(vlr, &copc_info).ok())
+        // Hierarchy page offsets are absolute file offsets, so the parser
+        // needs to know where the EVLR payload sits in the file. Walk the
+        // EVLRs in file order to find it; when the header was not read from
+        // a file (no EVLR start position), fall back to the historical
+        // assumption that the root page is the first page of the payload.
+        let mut payload_offset = self.start_of_first_evlr();
+        for vlr in self.evlrs() {
+            if vlr.is_copc_hierarchy() {
+                let anchor = payload_offset
+                    .map(|offset| offset + 60)
+                    .unwrap_or(copc_info.root_hier_offset);
+                return CopcHierarchyVlr::read_from_with(vlr, &copc_info, anchor).ok();
+            }
+            payload_offset = payload_offset.map(|offset| offset + vlr.len(true) as u64);
+        }
+        None
     }
 }
 
@@ -886,7 +909,7 @@ mod tests {
             gpstime_maximum: 0.0,
             reserved: [0; 11],
         };
-        let hierarchy = CopcHierarchyVlr::read_from_with(&vlr, &info).unwrap();
+        let hierarchy = CopcHierarchyVlr::read_from_with(&vlr, &info, 100).unwrap();
         let entries = hierarchy
             .iter_entries()
             .collect::<Result<Vec<_>>>()
@@ -894,6 +917,114 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].point_count, 1);
         assert_eq!(entries[1].point_count, 2);
+    }
+
+    #[test]
+    fn test_root_page_not_first_in_payload() {
+        // PDAL and Untwine write the root page LAST on multi-page
+        // hierarchies. Payload layout here: child page at file offset 100
+        // (the payload start), root page at 164.
+        let child = VoxelKey::ROOT.child(0).unwrap();
+        let child_page = [
+            Entry {
+                key: child.child(0).unwrap(),
+                offset: 1_000,
+                byte_size: 20,
+                point_count: 2,
+            },
+            Entry {
+                key: child.child(1).unwrap(),
+                offset: 2_000,
+                byte_size: 20,
+                point_count: 3,
+            },
+        ];
+        let root_page = [
+            Entry {
+                key: child,
+                offset: 100,
+                byte_size: 64,
+                point_count: -1,
+            },
+            Entry {
+                key: VoxelKey::ROOT,
+                offset: 3_000,
+                byte_size: 20,
+                point_count: 1,
+            },
+        ];
+        let mut data = Vec::new();
+        child_page
+            .iter()
+            .chain(root_page.iter())
+            .try_for_each(|entry| entry.write_to(&mut data))
+            .unwrap();
+        let vlr = Vlr {
+            data,
+            ..Default::default()
+        };
+        let info = CopcInfoVlr {
+            center_x: 0.0,
+            center_y: 0.0,
+            center_z: 0.0,
+            halfsize: 1.0,
+            spacing: 1.0,
+            root_hier_offset: 164,
+            root_hier_size: 64,
+            gpstime_minimum: 0.0,
+            gpstime_maximum: 0.0,
+            reserved: [0; 11],
+        };
+        let hierarchy = CopcHierarchyVlr::read_from_with(&vlr, &info, 100).unwrap();
+        let mut point_counts = hierarchy
+            .iter_entries()
+            .collect::<Result<Vec<_>>>()
+            .unwrap()
+            .iter()
+            .map(|entry| entry.point_count)
+            .collect::<Vec<_>>();
+        point_counts.sort_unstable();
+        assert_eq!(point_counts, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_copc_reader_handles_root_page_not_first_in_evlr() {
+        // End-to-end: shift autzen's root page 32 bytes into the EVLR
+        // payload (spec-valid — entry offsets are absolute and no page
+        // ordering is mandated) and verify the reader still works.
+        let original = std::fs::read("tests/data/autzen.copc.laz").unwrap();
+        let u64_at =
+            |bytes: &[u8], at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
+        // LAS 1.4 header: start of first EVLR at byte 235. COPC info VLR
+        // payload at 429 (375 header + 54 VLR header); root_hier_offset at
+        // payload byte 40, i.e. file byte 469.
+        let evlr_offset = u64_at(&original, 235) as usize;
+        let payload_start = evlr_offset + 60;
+        let root_hier_offset = u64_at(&original, 469);
+        assert_eq!(root_hier_offset, payload_start as u64);
+
+        let mut moved = Vec::with_capacity(original.len() + 32);
+        moved.extend_from_slice(&original[..payload_start]);
+        moved.extend_from_slice(&[0xAB; 32]); // unreferenced filler
+        moved.extend_from_slice(&original[payload_start..]);
+        moved[469..477].copy_from_slice(&(root_hier_offset + 32).to_le_bytes());
+        let evlr_length = u64_at(&original, evlr_offset + 20);
+        moved[evlr_offset + 20..evlr_offset + 28]
+            .copy_from_slice(&(evlr_length + 32).to_le_bytes());
+
+        let path = std::env::temp_dir().join("las_rs_autzen_root_page_moved.copc.laz");
+        std::fs::write(&path, moved).unwrap();
+
+        let mut reader = CopcReader::from_path(&path).unwrap();
+        let points = reader
+            .query(LodSelection::All, BoundsSelection::All)
+            .unwrap();
+        let mut original_reader = CopcReader::from_path("tests/data/autzen.copc.laz").unwrap();
+        let original_points = original_reader
+            .query(LodSelection::All, BoundsSelection::All)
+            .unwrap();
+        assert_eq!(points.len(), original_points.len());
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
