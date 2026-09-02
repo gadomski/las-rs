@@ -190,7 +190,14 @@ impl Header {
             );
             builder.version = version;
         }
-        builder.into_header()
+        let mut header = builder.into_header()?;
+        // Keep the EVLRs' file position: COPC hierarchy entries carry
+        // absolute file offsets, so parsing the hierarchy EVLR needs to know
+        // where its payload sits in the file.
+        if let Some(evlr) = evlr {
+            header.set_start_of_first_evlr(evlr.start_of_first_evlr);
+        }
+        Ok(header)
     }
     /// Creates a new header from a raw header.
     ///
@@ -669,6 +676,13 @@ impl Header {
 
     pub(crate) fn set_start_of_first_evlr(&mut self, start_of_first_evlr: u64) {
         self.start_of_first_evlr = Some(start_of_first_evlr);
+    }
+
+    /// The file offset of the first EVLR, when known (headers read from a
+    /// file, or written). `None` for headers built from scratch.
+    #[cfg(feature = "laz")]
+    pub(crate) fn start_of_first_evlr(&self) -> Option<u64> {
+        self.start_of_first_evlr
     }
 
     fn global_encoding(&self) -> u16 {
