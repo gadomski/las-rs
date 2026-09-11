@@ -4,24 +4,26 @@ use crate::{Error, Header, Result, Vlr};
 use laz::{LazItemRecordBuilder, LazItemType, LazVlr};
 use std::io::Cursor;
 
-/// Returns true if this [Vlr] is the laszip Vlr.
-///
-/// # Examples
-///
-/// ```
-/// #[cfg(feature = "laz")]
-/// {
-/// use las::{laz, Vlr};
-///
-/// let mut vlr = Vlr::default();
-/// assert!(!laz::is_laszip_vlr(&vlr));
-/// vlr.user_id = "laszip encoded".to_string();
-/// vlr.record_id = 22204;
-/// assert!(laz::is_laszip_vlr(&vlr));
-/// }
-/// ```
-pub fn is_laszip_vlr(vlr: &Vlr) -> bool {
-    vlr.user_id == LazVlr::USER_ID && vlr.record_id == LazVlr::RECORD_ID
+impl Vlr {
+    /// Returns true if this [Vlr] is the laszip Vlr.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[cfg(feature = "laz")]
+    /// {
+    /// use las::{laz, Vlr};
+    ///
+    /// let mut vlr = Vlr::default();
+    /// assert!(!vlr.is_laszip());
+    /// vlr.user_id = "laszip encoded".to_string();
+    /// vlr.record_id = 22204;
+    /// assert!(vlr.is_laszip());
+    /// }
+    /// ```
+    pub fn is_laszip(&self) -> bool {
+        self.user_id == LazVlr::USER_ID && self.record_id == LazVlr::RECORD_ID
+    }
 }
 
 impl Header {
@@ -111,7 +113,7 @@ impl Header {
     pub fn laz_vlr(&self) -> Result<LazVlr> {
         self.vlrs
             .iter()
-            .find(|vlr| is_laszip_vlr(vlr))
+            .find(|vlr| vlr.is_laszip())
             .map_or(Err(Error::LasZipVlrNotFound), |vlr| vlr.try_into())
     }
 }

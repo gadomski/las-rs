@@ -11,9 +11,16 @@ use crate::{Error, Header, Result, Vlr};
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Cursor, Seek, SeekFrom};
 
-const MAIN_VLR_ID: u16 = 34735;
-const DOUBLE_VLR_ID: u16 = 34736;
-const ASCII_VLR_ID: u16 = 34737;
+/// User Id of CRS VLRs
+pub const CRS_USER_ID: &str = "LASF_Projection";
+/// Record Id of WKT CRS VLR
+pub const WKT_RECORD_ID: u16 = 2112;
+/// Record Id of main GeoTIFF CRS VLR
+pub const MAIN_VLR_ID: u16 = 34735;
+/// Record Id of Double GeoTIFF CRS VLR
+pub const DOUBLE_VLR_ID: u16 = 34736;
+/// Record Id of ASCII GeoTIFF CRS VLR
+pub const ASCII_VLR_ID: u16 = 34737;
 
 impl Header {
     /// Removes all CRS (E)VLRs from the header
@@ -36,8 +43,6 @@ impl Header {
     /// Adds a WKT CRS VLR to the header
     ///
     /// Returns Err if the header already contains CRS (E)VLRs or the Las version is below 1.4.
-    ///
-    /// The WKT bytes can be obtained from a horizontal EPSG code by using the [crs-definitions](https://docs.rs/crs-definitions/latest/crs_definitions/) crate
     ///
     /// # Examples
     ///
@@ -64,8 +69,8 @@ impl Header {
 
         let num_bytes = wkt_crs_bytes.len();
         let vlr = Vlr {
-            user_id: "LASF_Projection".to_string(),
-            record_id: 2112,
+            user_id: CRS_USER_ID.to_string(),
+            record_id: WKT_RECORD_ID,
             description: String::new(),
             data: wkt_crs_bytes,
         };
@@ -138,6 +143,65 @@ impl Header {
         } else {
             Ok(None)
         }
+    }
+}
+
+impl Vlr {
+    /// Check if the vlr is a projection (coordinate reference system) VLR
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// vlr.user_id = "LASF_Projection".to_string();
+    /// vlr.record_id = 2112;
+    /// assert!(vlr.is_crs());
+    /// ```
+    pub fn is_crs(&self) -> bool {
+        matches!(
+            (self.user_id.as_str(), self.record_id),
+            (
+                CRS_USER_ID,
+                WKT_RECORD_ID | MAIN_VLR_ID | ASCII_VLR_ID | DOUBLE_VLR_ID
+            )
+        )
+    }
+
+    /// Returns true if it's a well-known WKT coordinate reference system VLR.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// vlr.user_id = "LASF_Projection".to_string();
+    /// vlr.record_id = 2112;
+    /// assert!(vlr.is_wkt_crs());
+    /// ```
+    pub fn is_wkt_crs(&self) -> bool {
+        matches!(
+            (self.user_id.as_str(), self.record_id),
+            (CRS_USER_ID, WKT_RECORD_ID)
+        )
+    }
+
+    /// Returns true if it's a geotiff coordinate reference system VLR.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use las::Vlr;
+    /// let mut vlr = Vlr::default();
+    /// vlr.user_id = "LASF_Projection".to_string();
+    /// vlr.record_id = 34735;
+    /// assert!(vlr.is_geotiff_crs());
+    /// ```
+    pub fn is_geotiff_crs(&self) -> bool {
+        matches!(
+            (self.user_id.as_str(), self.record_id),
+            (CRS_USER_ID, MAIN_VLR_ID | ASCII_VLR_ID | DOUBLE_VLR_ID)
+        )
     }
 }
 
