@@ -11,8 +11,11 @@ macro_rules! autzen {
                 let mut reader = Reader::from_path("tests/data/autzen.las").unwrap();
                 let mut builder = Builder::from(reader.header().clone());
                 builder.version = Version::new($major, $minor);
-                let mut writer =
-                    Writer::new(Cursor::new(Vec::new()), builder.into_header().unwrap()).unwrap();
+                let mut writer = Writer::new(
+                    Cursor::new(Vec::new()),
+                    builder.into_header().unwrap(),
+                )
+                .unwrap();
                 for point in reader.read_all().unwrap().points() {
                     writer.write_point(point.unwrap()).unwrap();
                 }

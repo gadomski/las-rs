@@ -90,7 +90,9 @@ macro_rules! version {
                 });
                 roundtrip_point!(intensity, |p: &mut Point| p.intensity = 42);
                 roundtrip_point!(return_number, |p: &mut Point| p.return_number = 2);
-                roundtrip_point!(number_of_returns, |p: &mut Point| p.number_of_returns = 2);
+                roundtrip_point!(number_of_returns, |p: &mut Point| p
+                    .number_of_returns =
+                    2);
                 roundtrip_point!(scan_direction, |p: &mut Point| p.scan_direction =
                     ScanDirection::LeftToRight);
                 roundtrip_point!(is_edge_of_flight_line, |p: &mut Point| p
@@ -116,7 +118,8 @@ macro_rules! version {
                 );
                 roundtrip_point!(scan_angle_rank, |p: &mut Point| p.scan_angle = 3.);
                 roundtrip_point!(user_data, |p: &mut Point| p.user_data = 42);
-                roundtrip_point!(point_source_id, |p: &mut Point| p.point_source_id = 42);
+                roundtrip_point!(point_source_id, |p: &mut Point| p.point_source_id =
+                    42);
                 roundtrip_point!(
                     gps_time,
                     |p: &mut Point| p.gps_time = Some(42.),
@@ -165,7 +168,11 @@ macro_rules! version {
                 use las::{GpsTimeType, Vlr};
                 use uuid::Uuid;
 
-                roundtrip_builder!(file_source_id, |b: &mut Builder| b.file_source_id = 42, 1);
+                roundtrip_builder!(
+                    file_source_id,
+                    |b: &mut Builder| b.file_source_id = 42,
+                    1
+                );
                 roundtrip_builder!(
                     gps_time_type,
                     |b: &mut Builder| b.gps_time_type = GpsTimeType::Standard,
@@ -176,8 +183,10 @@ macro_rules! version {
                     |b: &mut Builder| b.has_synthetic_return_numbers = true,
                     3
                 );
-                roundtrip_builder!(guid, |b: &mut Builder| b.guid = Uuid::from_bytes([42; 16]));
-                roundtrip_builder!(system_identifier, |b: &mut Builder| b.system_identifier =
+                roundtrip_builder!(guid, |b: &mut Builder| b.guid =
+                    Uuid::from_bytes([42; 16]));
+                roundtrip_builder!(system_identifier, |b: &mut Builder| b
+                    .system_identifier =
                     "roundtrip test".to_string());
                 roundtrip_builder!(generating_software, |b: &mut Builder| b
                     .generating_software =
@@ -197,7 +206,9 @@ macro_rules! version {
                         z: transform,
                     };
                 });
-                roundtrip_builder!(vlrs, |b: &mut Builder| b.vlrs.push(Default::default()));
+                roundtrip_builder!(vlrs, |b: &mut Builder| b
+                    .vlrs
+                    .push(Default::default()));
                 roundtrip_builder!(
                     evlrs,
                     |b: &mut Builder| {

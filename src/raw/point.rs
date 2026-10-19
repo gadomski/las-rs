@@ -1011,7 +1011,10 @@ mod tests {
                     let mut cursor = Cursor::new(Vec::new());
                     point.write_to(&mut cursor, &format).unwrap();
                     cursor.set_position(0);
-                    assert_eq!(point, Point::read_from(cursor, &format).unwrap());
+                    assert_eq!(
+                        point,
+                        Point::read_from(cursor, &format).unwrap()
+                    );
                 }
             }
         };
