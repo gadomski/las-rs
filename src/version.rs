@@ -167,7 +167,10 @@ mod tests {
                 fn features() {
                     let version = Version::new($major, $minor);
                     assert_eq!($supports[0], version.supports::<FileSourceId>());
-                    assert_eq!($supports[1], version.supports::<GpsStandardTime>());
+                    assert_eq!(
+                        $supports[1],
+                        version.supports::<GpsStandardTime>()
+                    );
                     assert_eq!($supports[2], version.supports::<Waveforms>());
                     assert_eq!($supports[3], version.supports::<LargeFiles>());
                     assert_eq!($supports[4], version.supports::<Evlrs>());
