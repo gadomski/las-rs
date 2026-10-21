@@ -16,6 +16,9 @@ pub fn roundtrip(builder: Builder, point: &Point, should_succeed: bool) {
     };
     let mut writer = Writer::new(Cursor::new(Vec::new()), header).unwrap();
     writer.write_point(point.clone()).unwrap();
+    // Close before snapshotting the header: closing records the EVLR block
+    // position, which a header read back from the file carries too.
+    writer.close().unwrap();
     let header = writer.header().clone();
     let mut reader = Reader::new(writer.into_inner().unwrap()).unwrap();
     let pd = reader.read_all().unwrap();
