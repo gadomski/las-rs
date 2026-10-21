@@ -189,7 +189,7 @@ mod laz_compression_test {
         // Check that the header was properly updated when writing
         // We need to remove the laszip VLR and unset is_compressed to compare
         let mut builder = las::Builder::from(writer.header().clone());
-        builder.vlrs.retain(|vlr| !las::laz::is_laszip_vlr(vlr));
+        builder.vlrs.retain(|vlr| !vlr.is_laszip());
         builder.point_format.is_compressed = false;
         let writer_header_normalized = builder.into_header().unwrap();
         assert_eq!(&writer_header_normalized, reader.header());
