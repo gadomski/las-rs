@@ -256,10 +256,15 @@ impl<W: 'static + std::io::Write + Seek + Send + Sync> Writer<W> {
         let point_padding = self.header().point_padding().clone();
         self.point_writer.get_mut().write_all(&point_padding)?;
 
-        let start_of_first_evlr = self.point_writer.get_mut().stream_position()?;
-        self.point_writer
-            .header_mut()
-            .set_start_of_first_evlr(start_of_first_evlr);
+        // Only record the EVLR block position when there are EVLRs — the raw
+        // header omits the block entirely otherwise, so a header read back
+        // from the file would carry no position either.
+        if !self.point_writer.header().evlrs().is_empty() {
+            let start_of_first_evlr = self.point_writer.get_mut().stream_position()?;
+            self.point_writer
+                .header_mut()
+                .set_start_of_first_evlr(start_of_first_evlr);
+        }
         let raw_evlrs: Vec<Result<crate::raw::Vlr>> = {
             self.point_writer
                 .header()
